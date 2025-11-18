@@ -7,7 +7,7 @@ except ImportError:
         "secrets.py not found! Please copy secrets.example.py to secrets.py and add your Discord bot token."
     )
 
-XP_PER_RUN_DEFAULT = 315000.0
+XP_PER_RUN_DEFAULT = 300000.0
 TARGET_LEVEL = 50
 DEBUG_MODE = True
 

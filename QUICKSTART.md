@@ -51,7 +51,7 @@ python main.py
 
 ## Installation Check
 
-**Linux:**
+**Linux and Windows:**
 Make sure you have Python 3.8+ installed:
 ```bash
 python3 --version
@@ -60,17 +60,6 @@ python3 --version
 Install dependencies manually (if needed):
 ```bash
 pip3 install -r requirements.txt
-```
-
-**Windows:**
-Make sure you have Python 3.8+ installed:
-```cmd
-python --version
-```
-
-Install dependencies manually (if needed):
-```cmd
-pip install -r requirements.txt
 ```
 
 ## Configuration
@@ -123,3 +112,6 @@ Start-Process python -ArgumentList "main.py" -WindowStyle Hidden
 ```
 
 Or create a shortcut for `run.bat` and configure it to run in the background.
+
+Win+r > shell:startup and place it here 
+

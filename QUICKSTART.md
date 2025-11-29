@@ -133,21 +133,7 @@ To update the bot to the latest version:
    git pull origin main
    ```
 
-3. **Update dependencies**:
-   
-   **Linux:**
-   ```bash
-   source venv/bin/activate
-   pip install -r requirements.txt --upgrade
-   ```
-   
-   **Windows:**
-   ```cmd
-   venv\Scripts\activate
-   pip install -r requirements.txt --upgrade
-   ```
-
-4. **Restart the bot** using your preferred method (run.sh, run.bat, run.ps1, etc.)
+3. **Restart the bot** using your preferred method (run.sh, run.bat, run.ps1, etc.)
 
 **Note:** Your `secrets.py` file will not be affected by updates as it's not tracked by git.
 

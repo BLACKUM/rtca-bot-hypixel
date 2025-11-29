@@ -225,7 +225,8 @@ class BonusSelectView(View):
             current_val = self.bonuses.get("mayor", default_bonuses["mayor"])
             options = [
                 discord.SelectOption(label="0%", value="1", description="No boost", default=(abs(current_val - 1.0) < 0.0001)),
-                discord.SelectOption(label="Derpy or Aura (50%)", value="1.5", description="50% boost", default=(abs(current_val - 1.5) < 0.0001)),
+                discord.SelectOption(label="Derpy (50%)", value="1.5", description="50% boost", default=(abs(current_val - 1.5) < 0.0001)),
+                discord.SelectOption(label="Aura (55%, probably bugged. select Derpy)", value="1.55", description="55% boost", default=(abs(current_val - 1.55) < 0.0001)),
             ]
         else:
             return None

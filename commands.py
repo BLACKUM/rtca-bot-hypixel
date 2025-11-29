@@ -3,11 +3,31 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Select, View
 import time
+import math
 
 from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT
 from utils.logging import log_info, log_debug, log_error
 from api import get_uuid, get_profile_data
 from simulation import simulate_to_level_all50
+
+
+def calculate_dungeon_xp_per_run(base_floor: float, ring: float, hecatomb: float, global_mult: float, mayor_mult: float) -> float:
+    if base_floor >= 15000:
+        maxcomps = 26
+    elif base_floor == 4880:
+        maxcomps = 51
+    else:
+        maxcomps = 76
+    
+    if ring > 0 and mayor_mult > 1:
+        cataperrun = base_floor * (0.95 + ((mayor_mult - 1) + (maxcomps - 1) / 100) + ring + hecatomb + (maxcomps - 1) * (0.024 + hecatomb / 50))
+    elif ring > 0:
+        cataperrun = base_floor * (0.95 + ring + hecatomb + (maxcomps - 1) * (0.024 + hecatomb / 50))
+    else:
+        cataperrun = base_floor * (0.95 + hecatomb + (maxcomps - 1) * (0.022 + hecatomb / 50))
+    
+    cataperrun *= global_mult
+    return math.ceil(cataperrun)
 
 
 class ValueSelect(Select):
@@ -38,6 +58,17 @@ class ValueSelect(Select):
         self.parent_view.bonuses[self.option] = value
         
         log_debug(f"Recalculating with bonuses: {self.parent_view.bonuses}")
+        
+        ring = self.parent_view.bonuses.get("ring", 0.1)
+        hecatomb = self.parent_view.bonuses.get("hecatomb", 0.02)
+        global_mult = self.parent_view.bonuses.get("global", 1.0)
+        mayor_mult = self.parent_view.bonuses.get("mayor", 1.0)
+        
+        dungeon_xp = calculate_dungeon_xp_per_run(self.parent_view.base_floor, ring, hecatomb, global_mult, mayor_mult)
+        
+        self.parent_view.xp_per_run = dungeon_xp
+        log_debug(f"Dungeon XP per run: {dungeon_xp:,.0f}")
+        
         runs_total, results = simulate_to_level_all50(
             self.parent_view.dungeon_classes, 
             self.parent_view.base_floor, 
@@ -110,7 +141,7 @@ class MainSelect(Select):
 class BonusSelectView(View):
     
     def __init__(self, bot: commands.Bot, dungeon_classes: dict, base_floor: float, 
-                 initial_bonuses: dict, ign: str, floor: str):
+                 initial_bonuses: dict, ign: str, floor: str, xp_per_run: float):
         super().__init__(timeout=300)
         self.bot = bot
         self.dungeon_classes = dungeon_classes
@@ -119,6 +150,7 @@ class BonusSelectView(View):
         self.ign = ign
         self.floor = floor
         self.message = None
+        self.xp_per_run = xp_per_run
         
         self.main_select = MainSelect(self)
         self.add_item(self.main_select)
@@ -182,7 +214,7 @@ class BonusSelectView(View):
             current_val = self.bonuses.get("mayor", 1.0)
             options = [
                 discord.SelectOption(label="0%", value="1", description="No boost", default=(abs(current_val - 1.0) < 0.0001)),
-                discord.SelectOption(label="Derpy (50%)", value="1.5", description="50% boost", default=(abs(current_val - 1.5) < 0.0001)),
+                discord.SelectOption(label="Derpy or Aura (50%)", value="1.5", description="50% boost", default=(abs(current_val - 1.5) < 0.0001)),
             ]
         else:
             return None
@@ -195,9 +227,11 @@ class BonusSelectView(View):
         self.add_item(self.main_select)
     
     def _create_embed(self, results: dict, runs_total: int) -> discord.Embed:
+        xp_description = f"Dungeon XP per run: {self.xp_per_run:,.0f}"
+        
         embed = discord.Embed(
             title=f"Simulation — reach Level {TARGET_LEVEL} for all classes ({self.ign})",
-            description=f"Floor: {self.floor} ({self.base_floor:,} base XP)\nBonuses auto-detected from API",
+            description=f"Floor: {self.floor} ({self.base_floor:,} base XP)\n{xp_description}",
             color=0x00ff99
         )
         
@@ -299,9 +333,18 @@ def setup_commands(bot: commands.Bot):
 
         log_debug(f"Detected bonuses: {bonuses}")
 
+        ring = bonuses.get("ring", 0.1)
+        hecatomb = bonuses.get("hecatomb", 0.02)
+        global_mult = bonuses.get("global", 1.0)
+        mayor_mult = bonuses.get("mayor", 1.0)
+        
+        dungeon_xp = calculate_dungeon_xp_per_run(base_floor, ring, hecatomb, global_mult, mayor_mult)
+        
+        log_debug(f"Dungeon XP per run: {dungeon_xp:,.0f}")
+
         runs_total, results = simulate_to_level_all50(dungeon_classes, base_floor, bonuses)
 
-        view = BonusSelectView(bot, dungeon_classes, base_floor, bonuses, ign, floor)
+        view = BonusSelectView(bot, dungeon_classes, base_floor, bonuses, ign, floor, dungeon_xp)
         
         embed = view._create_embed(results, runs_total)
         

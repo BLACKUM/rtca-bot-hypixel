@@ -115,3 +115,39 @@ Or create a shortcut for `run.bat` and configure it to run in the background.
 
 Win+r > shell:startup and place it here 
 
+## Updating the Bot
+
+To update the bot to the latest version:
+
+1. **Stop the bot** if it's currently running
+
+2. **Pull the latest changes from git:**
+   
+   **Linux:**
+   ```bash
+   git pull origin main
+   ```
+   
+   **Windows:**
+   ```cmd
+   git pull origin main
+   ```
+
+3. **Update dependencies**:
+   
+   **Linux:**
+   ```bash
+   source venv/bin/activate
+   pip install -r requirements.txt --upgrade
+   ```
+   
+   **Windows:**
+   ```cmd
+   venv\Scripts\activate
+   pip install -r requirements.txt --upgrade
+   ```
+
+4. **Restart the bot** using your preferred method (run.sh, run.bat, run.ps1, etc.)
+
+**Note:** Your `secrets.py` file will not be affected by updates as it's not tracked by git.
+

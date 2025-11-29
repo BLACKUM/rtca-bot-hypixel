@@ -31,4 +31,4 @@ FLOOR_XP_MAP = {
     "F3": 560, "F2": 220, "F1": 110, "ENTRANCE": 55
 }
 
-CACHE_TTL = 300
+CACHE_TTL = 60 # 1 minute

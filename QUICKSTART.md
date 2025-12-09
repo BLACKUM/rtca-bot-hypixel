@@ -91,17 +91,32 @@ Before running, you need to set up your Discord bot token:
 
 ### For Linux Servers
 
-Use `nohup` or `screen`:
+We recommend using `tmux` for managing the bot in the background.
 
-```bash
-# Using nohup
-nohup python3 main.py > bot.log 2>&1 &
+1. **Check for existing sessions:**
+   ```bash
+   tmux ls
+   ```
 
-# Or using screen
-screen -S rtca-bot
-python3 main.py
-# Press Ctrl+A, then D to detach
-```
+2. **Kill existing session (if needed):**
+   ```bash
+   tmux kill-session -t rtca
+   ```
+
+3. **Start the bot:**
+   Replace `/path/to/bot` with your actual bot directory path.
+   ```bash
+   tmux new -s rtca "cd /path/to/bot && source venv/bin/activate && chmod +x run.sh && ./run.sh"
+   ```
+   *This command creates a new session named 'rtca', navigates to the directory, activates the virtual environment, makes run.sh executable, and runs it - all in one go.*
+
+4. **Detach from session:**
+   Press `Ctrl+B`, then `D`.
+
+5. **Reattach to session:**
+   ```bash
+   tmux attach -t rtca
+   ```
 
 ### For Windows
 

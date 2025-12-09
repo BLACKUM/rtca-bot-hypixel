@@ -5,12 +5,10 @@ from discord.ui import Select, View
 import time
 import math
 
-from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT
+from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS
 from utils.logging import log_info, log_debug, log_error
 from api import get_uuid, get_profile_data
 from simulation import simulate_to_level_all50
-
-OWNER_ID = 377351386637271041 # DM @BLACKUM if you want to report an issue.
 
 default_bonuses = {
     "ring": 0.1,
@@ -271,7 +269,7 @@ class DefaultValueSelect(Select):
         super().__init__(placeholder=f"{option.replace('_', ' ').title()}...", options=options)
     
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != OWNER_ID:
+        if interaction.user.id not in OWNER_IDS:
             await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
             return
         
@@ -331,7 +329,7 @@ class DefaultMainSelect(Select):
         )
     
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != OWNER_ID:
+        if interaction.user.id not in OWNER_IDS:
             await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
             return
         

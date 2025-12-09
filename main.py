@@ -9,7 +9,7 @@ from utils.logging import log_info, log_error
 def main():
     log_info("Starting RTCA Discord Bot...")
     
-    bot = commands.Bot(command_prefix="", intents=INTENTS)
+    bot = commands.Bot(command_prefix="!", intents=INTENTS)
     setup_commands(bot)
     
     try:

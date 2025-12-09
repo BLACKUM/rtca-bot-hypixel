@@ -1,3 +1,4 @@
+import time
 from utils.logging import log_info, log_debug
 from xp_calculations import get_dungeon_level, get_total_xp_for_level
 from config import TARGET_LEVEL
@@ -5,6 +6,7 @@ from config import TARGET_LEVEL
 
 def simulate_to_level_all50(dungeon_classes: dict, floor_xp: float, bonuses: dict,
                             target_level: int = TARGET_LEVEL, max_runs: int = 200000):
+    start_time = time.perf_counter()
     log_info("▶ Starting simulation...")
     log_debug(f"Initial XP: {dungeon_classes}")
     log_debug(f"Bonuses: {bonuses}")
@@ -72,7 +74,8 @@ def simulate_to_level_all50(dungeon_classes: dict, floor_xp: float, bonuses: dic
             avg_lvl = {c: round(get_dungeon_level(xp), 2) for c, xp in classes.items()}
             log_debug(f"#{runs:,} runs → levels: {avg_lvl}")
 
-    log_info(f"🏁 Simulation completed after {runs:,} runs")
+    elapsed = time.perf_counter() - start_time
+    log_debug(f"🏁 Simulation completed after {runs:,} runs ({elapsed*1000:.2f}ms)")
 
     results = {}
     for c, xp in classes.items():

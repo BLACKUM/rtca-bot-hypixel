@@ -1,7 +1,8 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ui import Select, View
+from discord.ui import Select, View, Modal, TextInput
+from discord import app_commands, TextStyle
 import time
 import math
 
@@ -9,6 +10,7 @@ from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS
 from utils.logging import log_info, log_debug, log_error
 from api import get_uuid, get_profile_data
 from simulation import simulate_to_level_all50
+from rng_manager import rng_manager, RNG_DROPS
 
 default_bonuses = {
     "ring": 0.1,
@@ -484,6 +486,192 @@ class DefaultSelectView(View):
         return embed
 
 
+
+class RngAmountModal(Modal):
+    def __init__(self, parent_view):
+        super().__init__(title="Set Drop Count")
+        self.parent_view = parent_view
+        
+        self.amount_input = TextInput(
+            label="Amount",
+            placeholder="Enter new count",
+            style=TextStyle.short,
+            min_length=1,
+            max_length=5,
+            required=True
+        )
+        self.add_item(self.amount_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            amount = int(self.amount_input.value)
+            if amount < 0:
+                raise ValueError("Amount must be non-negative")
+                
+            rng_manager.set_drop_count(
+                self.parent_view.target_user_id, 
+                self.parent_view.current_floor, 
+                self.parent_view.current_item, 
+                amount
+            )
+            
+            self.parent_view.update_view()
+            await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+            
+        except ValueError:
+            await interaction.response.send_message("❌ Please enter a valid non-negative number.", ephemeral=True)
+        except Exception as e:
+            log_error(f"Error in RngAmountModal: {e}")
+            await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+
+class RngFloorSelect(Select):
+    def __init__(self, parent_view):
+        options = [
+            discord.SelectOption(label=floor, value=floor)
+            for floor in RNG_DROPS.keys()
+        ]
+        super().__init__(placeholder="Select a Floor...", options=options, custom_id="rng_floor_select")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.parent_view.invoker_id:
+             await interaction.response.send_message("❌ This is not your menu.", ephemeral=True)
+             return
+
+        self.parent_view.current_floor = self.values[0]
+        self.parent_view.current_item = None
+        self.parent_view.update_view()
+        log_info(f"RNG View ({self.parent_view.target_user_name}): Selected floor {self.parent_view.current_floor}")
+        await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+
+
+class RngItemSelect(Select):
+    def __init__(self, parent_view, floor):
+        options = [
+            discord.SelectOption(label=item, value=item)
+            for item in RNG_DROPS[floor]
+        ]
+        super().__init__(placeholder="Select a Drop...", options=options, custom_id="rng_item_select")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.parent_view.invoker_id:
+             await interaction.response.send_message("❌ This is not your menu.", ephemeral=True)
+             return
+             
+        self.parent_view.current_item = self.values[0]
+        self.parent_view.update_view()
+        log_info(f"RNG View ({self.parent_view.target_user_name}): Selected item {self.parent_view.current_item}")
+        await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+
+class RngActionButton(discord.ui.Button):
+    def __init__(self, parent_view, label, style, custom_id, action):
+        super().__init__(label=label, style=style, custom_id=custom_id)
+        self.parent_view = parent_view
+        self.action = action
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.parent_view.invoker_id:
+             await interaction.response.send_message("❌ This is not your menu.", ephemeral=True)
+             return
+
+        if self.action == "add":
+            rng_manager.update_drop(self.parent_view.target_user_id, self.parent_view.current_floor, self.parent_view.current_item, 1)
+            log_info(f"RNG View ({self.parent_view.target_user_name}): Added {self.parent_view.current_item}")
+        elif self.action == "subtract":
+            rng_manager.update_drop(self.parent_view.target_user_id, self.parent_view.current_floor, self.parent_view.current_item, -1)
+            log_info(f"RNG View ({self.parent_view.target_user_name}): Removed {self.parent_view.current_item}")
+        elif self.action == "back":
+            log_info(f"RNG View ({self.parent_view.target_user_name}): Go back")
+            if self.parent_view.current_item:
+                self.parent_view.current_item = None
+            elif self.parent_view.current_floor:
+                self.parent_view.current_floor = None
+            self.parent_view.update_view()
+            await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+            return
+            
+        elif self.action == "set":
+             modal = RngAmountModal(self.parent_view)
+             await interaction.response.send_modal(modal)
+             return
+
+        self.parent_view.update_view()
+        await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+
+class RngView(View):
+    def __init__(self, target_user_id, target_user_name, invoker_id):
+        super().__init__(timeout=300)
+        self.target_user_id = str(target_user_id)
+        self.target_user_name = target_user_name
+        self.invoker_id = invoker_id
+        self.current_floor = None
+        self.current_item = None
+        self.update_view()
+
+    def update_view(self):
+        self.clear_items()
+        
+        if self.current_item:
+            self.add_item(RngActionButton(self, "-", discord.ButtonStyle.danger, "rng_sub", "subtract"))
+            self.add_item(RngActionButton(self, "+", discord.ButtonStyle.success, "rng_add", "add"))
+            self.add_item(RngActionButton(self, "Set", discord.ButtonStyle.primary, "rng_set", "set"))
+            self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
+        elif self.current_floor:
+            self.add_item(RngItemSelect(self, self.current_floor))
+            self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
+        else:
+            self.add_item(RngFloorSelect(self))
+
+    def get_embed(self):
+        embed = discord.Embed(color=0x00ff99)
+        
+        if self.current_item:
+            embed.title = f"{self.current_item}"
+            count = rng_manager.get_floor_stats(self.target_user_id, self.current_floor).get(self.current_item, 0)
+            embed.description = f"**Current Count:** {count}"
+            embed.set_footer(text=f"{self.current_floor} • {self.target_user_name}")
+            
+        elif self.current_floor:
+            embed.title = f"{self.current_floor} Drops"
+            stats = rng_manager.get_floor_stats(self.target_user_id, self.current_floor)
+            desc = []
+            for item in RNG_DROPS[self.current_floor]:
+                count = stats.get(item, 0)
+                if count > 0:
+                     desc.append(f"**{item}:** {count}")
+                else:
+                     desc.append(f"{item}: {count}")
+            embed.description = "\n".join(desc)
+            if not desc:
+                embed.description = "No drops recorded yet."
+            embed.set_footer(text=f"Select a drop to update • {self.target_user_name}")
+
+        else:
+            embed.title = f"RNG Tracker - {self.target_user_name}"
+            user_stats = rng_manager.get_user_stats(self.target_user_id)
+            desc = []
+            
+            total_drops_found = False
+            
+            for floor_name in RNG_DROPS.keys():
+                floor_stats = user_stats.get(floor_name, {})
+                for item_name in RNG_DROPS[floor_name]:
+                    count = floor_stats.get(item_name, 0)
+                    if count > 0:
+                        desc.append(f"**{item_name}:** {count}")
+                        total_drops_found = True
+
+            if not total_drops_found:
+                 desc.append("No drops recorded yet.")
+                 
+            desc.append("\nSelect a floor to view or edit drops.")
+            embed.description = "\n".join(desc)
+            embed.set_footer(text="Manage your RNG collection")
+
+        return embed
+
+
 def setup_commands(bot: commands.Bot):
     
     @bot.event
@@ -593,3 +781,42 @@ def setup_commands(bot: commands.Bot):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
         view.message = await interaction.original_response()
+
+    @app_commands.describe(user="User to manage (optional)")
+    @bot.tree.command(name="rng", description="Track and manage your Skyblock RNG drops (Owner Only)")
+    async def rng(interaction: discord.Interaction, user: discord.User = None):
+        if interaction.user.id not in OWNER_IDS:
+            await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
+            return
+
+        log_info(f"Command /rng called by {interaction.user}")
+        
+        # Determine target user
+        if user:
+            target_user = user
+        else:
+            default_target_id = rng_manager.get_default_target(str(interaction.user.id))
+            target_user = interaction.user 
+            
+            if default_target_id:
+                try:
+                    fetched = await bot.fetch_user(int(default_target_id))
+                    if fetched:
+                         target_user = fetched
+                except:
+                    pass
+        
+        view = RngView(target_user.id, target_user.display_name, interaction.user.id)
+        embed = view.get_embed()
+        await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.describe(user="Default user to manage")
+    @bot.tree.command(name="rngdefault", description="Set default User Account to manage (Owner Only)")
+    async def rngdefault(interaction: discord.Interaction, user: discord.User):
+        if interaction.user.id not in OWNER_IDS:
+            await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
+            return
+            
+        rng_manager.set_default_target(str(interaction.user.id), str(user.id))
+        
+        await interaction.response.send_message(f"✅ Default target for /rng set to **{user.mention}**.", ephemeral=True)

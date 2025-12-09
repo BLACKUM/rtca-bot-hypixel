@@ -25,4 +25,4 @@ Thumbs.db
 
 # Secrets (contains sensitive information like API tokens)
 secrets.py
-
+rng_data.json

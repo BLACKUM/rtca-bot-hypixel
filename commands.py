@@ -683,6 +683,8 @@ def setup_commands(bot: commands.Bot):
         except Exception as e:
             log_error(f"❌ Sync failed: {e}")
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.describe(ign="Minecraft IGN", floor="Dungeon floor (M7, M6, etc.)")
     @bot.tree.command(name="rtca", description="Simulate runs until all dungeon classes reach level 50")
     async def rtca(interaction: discord.Interaction, ign: str, floor: str = "M7"):
@@ -782,29 +784,25 @@ def setup_commands(bot: commands.Bot):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
         view.message = await interaction.original_response()
 
-    @app_commands.describe(user="User to manage (optional)")
-    @bot.tree.command(name="rng", description="Track and manage your Skyblock RNG drops (Owner Only)")
-    async def rng(interaction: discord.Interaction, user: discord.User = None):
-        if interaction.user.id not in OWNER_IDS:
-            await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
-            return
-
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @bot.tree.command(name="rng", description="Track and manage your Skyblock RNG drops")
+    async def rng(interaction: discord.Interaction):
+        # Allow anyone to use this command
+        
         log_info(f"Command /rng called by {interaction.user}")
         
-        # Determine target user
-        if user:
-            target_user = user
-        else:
-            default_target_id = rng_manager.get_default_target(str(interaction.user.id))
-            target_user = interaction.user 
-            
-            if default_target_id:
-                try:
-                    fetched = await bot.fetch_user(int(default_target_id))
-                    if fetched:
-                         target_user = fetched
-                except:
-                    pass
+        target_user = interaction.user
+        
+        # Check for default target override (set via /rngdefault, only by owners)
+        default_target_id = rng_manager.get_default_target(str(interaction.user.id))
+        if default_target_id:
+            try:
+                fetched = await bot.fetch_user(int(default_target_id))
+                if fetched:
+                        target_user = fetched
+            except:
+                pass
         
         view = RngView(target_user.id, target_user.display_name, interaction.user.id)
         embed = view.get_embed()

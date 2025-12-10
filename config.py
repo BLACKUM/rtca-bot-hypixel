@@ -18,6 +18,8 @@ OWNER_IDS = [
 
 INTENTS = discord.Intents.default()
 INTENTS.message_content = True
+INTENTS.dm_messages = True
+INTENTS.members = True
 
 DUNGEON_XP = [
     0, 50, 75, 110, 160, 230, 330, 470, 670, 950, 1340,

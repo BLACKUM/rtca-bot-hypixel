@@ -97,3 +97,42 @@ async def get_all_prices():
     prices.update(ah_prices)
     return prices
 
+
+async def get_dungeon_runs(uuid: str):
+    profile_data = await get_profile_data(uuid)
+    if not profile_data:
+        return {}
+    
+    profiles = profile_data.get("profiles")
+    if not profiles:
+        return {}
+    
+    best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
+    member = best_profile.get("members", {}).get(uuid, {})
+    dungeons = member.get("dungeons", {})
+    
+    catacombs_data = dungeons.get("dungeon_types", {}).get("catacombs", {})
+    normal_completions = catacombs_data.get("tier_completions", {})
+    master_completions = catacombs_data.get("master_tier_completions", {})
+    
+    log_debug(f"Normal completions: {normal_completions}")
+    log_debug(f"Master completions: {master_completions}")
+
+    tier_to_floor = {
+        '1': "Floor 1 (Bonzo)",
+        '2': "Floor 2 (Scarf)",
+        '3': "Floor 3 (Professor)",
+        '4': "Floor 4 (Thorn)",
+        '5': "Floor 5 (Livid)",
+        '6': "Floor 6 (Sadan)",
+        '7': "Floor 7 (Necron)",
+    }
+    
+    run_counts = {}
+    for tier_key, floor_name in tier_to_floor.items():
+        normal_runs = int(normal_completions.get(tier_key, 0))
+        master_runs = int(master_completions.get(tier_key, 0))
+        run_counts[floor_name] = normal_runs + master_runs
+    
+    log_debug(f"Fetched run counts for {uuid}: {run_counts}")
+    return run_counts

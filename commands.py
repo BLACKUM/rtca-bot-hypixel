@@ -8,7 +8,7 @@ import math
 
 from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS, RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS
 from utils.logging import log_info, log_debug, log_error
-from api import get_uuid, get_profile_data, get_all_prices
+from api import get_uuid, get_profile_data, get_all_prices, get_dungeon_runs
 from simulation import simulate_to_level_all50
 from rng_manager import rng_manager
 from utils.link_manager import link_manager
@@ -614,13 +614,15 @@ def format_trunc(value: float) -> str:
         return f"{value:,.0f}"
 
 class RngView(View):
-    def __init__(self, target_user_id, target_user_name, invoker_id):
+    def __init__(self, target_user_id, target_user_name, invoker_id, run_counts=None, target_ign=None):
         super().__init__(timeout=300)
         self.target_user_id = str(target_user_id)
         self.target_user_name = target_user_name
         self.invoker_id = invoker_id
         self.current_floor = None
         self.current_item = None
+        self.run_counts = run_counts or {}
+        self.target_ign = target_ign
         self.update_view()
 
     def update_view(self):
@@ -657,7 +659,17 @@ class RngView(View):
             price_text = format_trunc(price) if price > 0 else "?"
             val_text = format_trunc(total_val)
             
-            embed.description = f"**Current Count:** {count}\n**Avg Price:** {price_text}\n**Chest Cost:** {format_trunc(chest_cost)}\n**Total Profit:** {val_text}"
+            desc_lines = [f"**Current Count:** {count}", f"**Avg Price:** {price_text}", f"**Chest Cost:** {format_trunc(chest_cost)}", f"**Total Profit:** {val_text}"]
+            
+            runs = self.run_counts.get(self.current_floor, 0)
+            if runs > 0 and count > 0:
+                profit_per_run = total_val / runs
+                desc_lines.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
+                desc_lines.append(f"**Total Runs:** {runs:,}")
+            elif runs > 0:
+                desc_lines.append(f"**Total Runs:** {runs:,}")
+            
+            embed.description = "\n".join(desc_lines)
             embed.set_footer(text=f"{self.current_floor} • {self.target_user_name}")
             
         elif self.current_floor:
@@ -686,8 +698,17 @@ class RngView(View):
                 else:
                      desc.append(f"{label}: {count}")
             
+            runs = self.run_counts.get(self.current_floor, 0)
+            
             if floor_total_val > 0:
                 desc.append(f"\n**Floor Profit:** {format_trunc(floor_total_val)}")
+                
+                if runs > 0:
+                    profit_per_run = floor_total_val / runs
+                    desc.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
+                    desc.append(f"**Total Runs:** {runs:,}")
+            elif runs > 0:
+                desc.append(f"\n**Total Runs:** {runs:,}")
                 
             embed.description = "\n".join(desc)
             if not desc:
@@ -721,14 +742,28 @@ class RngView(View):
                         desc.append(f"**{label}:** {count}")
                         total_drops_found = True
 
+            total_runs = sum(self.run_counts.values())
+            
             if not total_drops_found:
                  desc.append("No drops recorded yet.")
             else:
                  desc.append(f"\n**Total Profile Profit:** {format_trunc(grand_total)}")
                  
+                 if total_runs > 0:
+                     avg_profit_per_run = grand_total / total_runs
+                     desc.append(f"**Avg Profit/Run:** {format_trunc(avg_profit_per_run)}")
+                     desc.append(f"**Total Runs:** {total_runs:,}")
+            
+            if total_runs > 0 and not total_drops_found:
+                desc.append(f"\n**Total Runs:** {total_runs:,}")
+                 
             desc.append("\nSelect a floor to view or edit drops.")
             embed.description = "\n".join(desc)
-            embed.set_footer(text="Manage your RNG collection")
+            
+            footer_text = "Manage your RNG collection"
+            if self.target_ign:
+                footer_text += f" • {self.target_ign}"
+            embed.set_footer(text=footer_text)
  
         return embed
 
@@ -858,20 +893,40 @@ def setup_commands(bot: commands.Bot):
         
         log_info(f"Command /rng called by {interaction.user}")
         
+        # Defer early to prevent timeout
+        target_ign = link_manager.get_link(interaction.user.id)
+        default_target_id = rng_manager.get_default_target(str(interaction.user.id))
+        
+        if target_ign or default_target_id:
+            await interaction.response.defer(thinking=True)
+        
         target_user = interaction.user
         
-        default_target_id = rng_manager.get_default_target(str(interaction.user.id))
         if default_target_id:
             try:
                 fetched = await bot.fetch_user(int(default_target_id))
                 if fetched:
-                        target_user = fetched
+                    target_user = fetched
+                    # Re-check IGN for the target user
+                    target_ign = link_manager.get_link(target_user.id)
             except:
                 pass
         
-        view = RngView(target_user.id, target_user.display_name, interaction.user.id)
+        run_counts = {}
+        
+        if target_ign:
+            uuid = await get_uuid(target_ign)
+            if uuid:
+                run_counts = await get_dungeon_runs(uuid)
+                log_debug(f"Fetched run counts for {target_ign}: {run_counts}")
+        
+        view = RngView(target_user.id, target_user.display_name, interaction.user.id, run_counts, target_ign)
         embed = await view.get_embed()
-        await interaction.response.send_message(embed=embed, view=view)
+        
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, view=view)
+        else:
+            await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.describe(user="Default user to manage")
     @bot.tree.command(name="rngdefault", description="Set default User Account to manage (Owner Only)")

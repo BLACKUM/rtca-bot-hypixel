@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from discord.ext import commands
 from config import TOKEN, INTENTS
 from commands import setup_commands

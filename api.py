@@ -36,3 +36,64 @@ async def get_profile_data(uuid: str):
         except asyncio.TimeoutError:
             log_error("Profile request timed out (15s)")
             return None
+
+
+async def get_bazaar_prices():
+    cached = cache_get("bazaar_prices")
+    if cached:
+        return cached
+    
+    url = "https://api.hypixel.net/skyblock/bazaar"
+    log_debug("Fetching Bazaar prices")
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                if r.status != 200:
+                    log_error(f"Bazaar request failed ({r.status})")
+                    return {}
+                data = await r.json()
+                products = data.get("products", {})
+                prices = {
+                    pid: info["quick_status"]["sellPrice"] 
+                    for pid, info in products.items()
+                }
+                cache_set("bazaar_prices", prices)
+                return prices
+        except Exception as e:
+            log_error(f"Failed to fetch Bazaar prices: {e}")
+            return {}
+
+
+async def get_ah_prices():
+    cached = cache_get("ah_prices")
+    if cached:
+        return cached
+        
+    url = "https://moulberry.codes/auction_averages_lbin/3day.json"
+    log_debug("Fetching AH prices (3-day avg)")
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                if r.status != 200:
+                    log_error(f"AH request failed ({r.status})")
+                    return {}
+                prices = await r.json()
+                cache_set("ah_prices", prices)
+                return prices
+        except Exception as e:
+            log_error(f"Failed to fetch AH prices: {e}")
+            return {}
+
+
+async def get_all_prices():
+    bz_future = get_bazaar_prices()
+    ah_future = get_ah_prices()
+    
+    bz_prices, ah_prices = await asyncio.gather(bz_future, ah_future)
+    
+    prices = bz_prices.copy()
+    prices.update(ah_prices)
+    return prices
+

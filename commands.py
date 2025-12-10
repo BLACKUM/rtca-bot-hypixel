@@ -6,9 +6,9 @@ from discord import app_commands, TextStyle
 import time
 import math
 
-from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS, RNG_DROPS, DROP_EMOJIS
+from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS, RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS
 from utils.logging import log_info, log_debug, log_error
-from api import get_uuid, get_profile_data
+from api import get_uuid, get_profile_data, get_all_prices
 from simulation import simulate_to_level_all50
 from rng_manager import rng_manager
 
@@ -516,7 +516,7 @@ class RngAmountModal(Modal):
             )
             
             self.parent_view.update_view()
-            await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+            await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
             
         except ValueError:
             await interaction.response.send_message("❌ Please enter a valid non-negative number.", ephemeral=True)
@@ -542,7 +542,7 @@ class RngFloorSelect(Select):
         self.parent_view.current_item = None
         self.parent_view.update_view()
         log_info(f"RNG View ({self.parent_view.target_user_name}): Selected floor {self.parent_view.current_floor}")
-        await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+        await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
 
 
 class RngItemSelect(Select):
@@ -565,7 +565,7 @@ class RngItemSelect(Select):
         self.parent_view.current_item = self.values[0]
         self.parent_view.update_view()
         log_info(f"RNG View ({self.parent_view.target_user_name}): Selected item {self.parent_view.current_item}")
-        await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+        await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
 
 class RngActionButton(discord.ui.Button):
     def __init__(self, parent_view, label, style, custom_id, action):
@@ -591,7 +591,7 @@ class RngActionButton(discord.ui.Button):
             elif self.parent_view.current_floor:
                 self.parent_view.current_floor = None
             self.parent_view.update_view()
-            await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+            await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
             return
             
         elif self.action == "set":
@@ -600,7 +600,17 @@ class RngActionButton(discord.ui.Button):
              return
 
         self.parent_view.update_view()
-        await interaction.response.edit_message(embed=self.parent_view.get_embed(), view=self.parent_view)
+        await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
+
+def format_trunc(value: float) -> str:
+    if value >= 1_000_000_000:
+        return f"{value / 1_000_000_000:.1f}B"
+    elif value >= 1_000_000:
+        return f"{value / 1_000_000:.1f}M"
+    elif value >= 1_000:
+        return f"{value / 1_000:.0f}k"
+    else:
+        return f"{value:,.0f}"
 
 class RngView(View):
     def __init__(self, target_user_id, target_user_name, invoker_id):
@@ -626,40 +636,70 @@ class RngView(View):
         else:
             self.add_item(RngFloorSelect(self))
 
-    def get_embed(self):
+    async def get_embed(self):
         embed = discord.Embed(color=0x00ff99)
+        prices = await get_all_prices()
         
         if self.current_item:
             emoji = DROP_EMOJIS.get(self.current_item)
             label = f"{emoji} {self.current_item}" if emoji else self.current_item
             embed.title = label
             count = rng_manager.get_floor_stats(self.target_user_id, self.current_floor).get(self.current_item, 0)
-            embed.description = f"**Current Count:** {count}"
+            
+            item_id = DROP_IDS.get(self.current_item)
+            price = float(prices.get(item_id, 0))
+            chest_cost = CHEST_COSTS.get(self.current_item, 0)
+            profit = max(0, price - chest_cost)
+            
+            total_val = profit * count
+            
+            price_text = format_trunc(price) if price > 0 else "?"
+            val_text = format_trunc(total_val)
+            
+            embed.description = f"**Current Count:** {count}\n**Avg Price:** {price_text}\n**Chest Cost:** {format_trunc(chest_cost)}\n**Total Profit:** {val_text}"
             embed.set_footer(text=f"{self.current_floor} • {self.target_user_name}")
             
         elif self.current_floor:
             embed.title = f"{self.current_floor} Drops"
             stats = rng_manager.get_floor_stats(self.target_user_id, self.current_floor)
             desc = []
+            floor_total_val = 0
+            
             for item in RNG_DROPS[self.current_floor]:
                 count = stats.get(item, 0)
                 emoji = DROP_EMOJIS.get(item)
                 label = f"{emoji} {item}" if emoji else item
+                
+                item_id = DROP_IDS.get(item)
+                price = float(prices.get(item_id, 0))
+                chest_cost = CHEST_COSTS.get(item, 0)
+                profit = max(0, price - chest_cost)
+                
+                val = profit * count
+                floor_total_val += val
+                
+                price_str = f"({format_trunc(profit)})" if price > 0 else ""
+
                 if count > 0:
-                     desc.append(f"**{label}:** {count}")
+                     desc.append(f"**{label}:** {count} {price_str}")
                 else:
                      desc.append(f"{label}: {count}")
+            
+            if floor_total_val > 0:
+                desc.append(f"\n**Floor Profit:** {format_trunc(floor_total_val)}")
+                
             embed.description = "\n".join(desc)
             if not desc:
                 embed.description = "No drops recorded yet."
             embed.set_footer(text=f"Select a drop to update • {self.target_user_name}")
-
+ 
         else:
             embed.title = f"RNG Tracker - {self.target_user_name}"
             user_stats = rng_manager.get_user_stats(self.target_user_id)
             desc = []
             
             total_drops_found = False
+            grand_total = 0
             
             for floor_name in RNG_DROPS.keys():
                 floor_stats = user_stats.get(floor_name, {})
@@ -668,16 +708,27 @@ class RngView(View):
                     if count > 0:
                         emoji = DROP_EMOJIS.get(item_name)
                         label = f"{emoji} {item_name}" if emoji else item_name
+                        
+                        item_id = DROP_IDS.get(item_name)
+                        price = float(prices.get(item_id, 0))
+                        chest_cost = CHEST_COSTS.get(item_name, 0)
+                        profit = max(0, price - chest_cost)
+                        
+                        val = profit * count
+                        grand_total += val
+                        
                         desc.append(f"**{label}:** {count}")
                         total_drops_found = True
 
             if not total_drops_found:
                  desc.append("No drops recorded yet.")
+            else:
+                 desc.append(f"\n**Total Profile Profit:** {format_trunc(grand_total)}")
                  
             desc.append("\nSelect a floor to view or edit drops.")
             embed.description = "\n".join(desc)
             embed.set_footer(text="Manage your RNG collection")
-
+ 
         return embed
 
 
@@ -812,7 +863,7 @@ def setup_commands(bot: commands.Bot):
                 pass
         
         view = RngView(target_user.id, target_user.display_name, interaction.user.id)
-        embed = view.get_embed()
+        embed = await view.get_embed()
         await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.describe(user="Default user to manage")

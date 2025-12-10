@@ -46,9 +46,7 @@ RNG_DROPS = {
         "Bonzo's Mask"
     ],
     "Floor 2 (Scarf)": [
-        "Adaptive Armor Pieces",
-        "Adaptive Blade",
-        "Scarf's Thesis"
+        "Scarf's Studies"
     ],
     "Floor 3 (Professor)": [
         "1st Master Star"
@@ -90,10 +88,8 @@ DROP_EMOJIS = {
     "Spirit Shortbow": "<:Minecraft_items_bow:1448311754164539462>",
     "Spirit Bone": "<:SkyBlock_items_spirit_bone:1448311755636736040>",
     "Spirit Wing": "<:SkyBlock_items_spirit_wing:1448311757087969311>",
-    "Scarf's Thesis": "<:SkyBlock_items_scarf_thesis:1448310358447231027>",
-    "Adaptive Blade": "<:Minecraft_items_stone_sword:1448310356781961297>",
+    "Scarf's Studies": "<:SkyBlock_items_scarf_thesis:1448310358447231027>",
     "Dark Claymore": "<:Minecraft_items_stone_sword:1448310356781961297>",
-    "Adaptive Armor Pieces": "<:SkyBlock_items_adaptive_helmet:1448310355209224223>",
     "Bonzo's Staff": "<:Minecraft_items_blaze_rod:1448310353166340248>",
     "Bonzo's Mask": "<:SkyBlock_items_bonzo_mask:1448310351631351929>",
     "1st Master Star": "<:SkyBlock_items_first_master_star:1448305520921411595>",
@@ -106,4 +102,59 @@ DROP_EMOJIS = {
     "Wither Shield": "<a:SkyBlock_items_scroll:1448304563923718194>",
     "Shadow Warp": "<a:SkyBlock_items_scroll:1448304563923718194>",
     "Necron's Handle": "<a:SkyBlock_items_necrons_handle:1448302537144008896>"
+}
+
+DROP_IDS = {
+    "Bonzo's Staff": "BONZO_STAFF",
+    "Bonzo's Mask": "BONZO_MASK",
+    "Scarf's Studies": "SCARF_STUDIES",
+    "1st Master Star": "FIRST_MASTER_STAR",
+    "Spirit Wing": "SPIRIT_WING",
+    "Spirit Bone": "SPIRIT_BONE", 
+    "Spirit Shortbow": "ITEM_SPIRIT_BOW",
+    "2nd Master Star": "SECOND_MASTER_STAR",
+    "Shadow Fury": "SHADOW_FURY",
+    "3rd Master Star": "THIRD_MASTER_STAR",
+    "Giant's Sword": "GIANTS_SWORD", 
+    "Precursor Eye": "PRECURSOR_EYEd",
+    "4th Master Star": "FOURTH_MASTER_STAR",
+    "Necron's Handle": "NECRON_HANDLE",
+    "Implosion": "IMPLOSION_SCROLL",
+    "Wither Shield": "WITHER_SHIELD_SCROLL",
+    "Shadow Warp": "SHADOW_WARP_SCROLL",
+    "5th Master Star": "FIFTH_MASTER_STAR",
+    "Master Skull - Tier 5": "MASTER_SKULL_TIER_5",
+    "Thunderlord VII": "ENCHANTMENT_THUNDERLORD_7",
+    "Dark Claymore": "DARK_CLAYMORE"
+}
+
+CHEST_COSTS = {
+    # F1
+    "Bonzo's Staff": 2_250_000,
+    "Bonzo's Mask": 1_250_000,
+    # F2
+    "Scarf's Studies": 500_000,
+    # F3
+    "1st Master Star": 5_000_000,
+    # F4
+    "Spirit Wing": 2_000_000,
+    "Spirit Bone": 1_500_000,
+    "Spirit Shortbow": 4_000_000,
+    "2nd Master Star": 6_000_000,
+    # F5
+    "Shadow Fury": 15_000_000,
+    "3rd Master Star": 7_000_000,
+    # F6
+    "Giant's Sword": 25_000_000,
+    "Precursor Eye": 30_000_000, 
+    "4th Master Star": 8_000_000,
+    # F7
+    "Necron's Handle": 100_000_000,
+    "Implosion": 50_000_000, 
+    "Wither Shield": 50_000_000,
+    "Shadow Warp": 50_000_000,
+    "5th Master Star": 9_000_000,
+    "Master Skull - Tier 5": 32_000_000,
+    "Thunderlord VII": 2_000_000, 
+    "Dark Claymore": 150_000_000
 }

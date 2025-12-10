@@ -5,46 +5,7 @@ from utils.logging import log_info, log_error, log_debug
 
 DATA_FILE = "rng_data.json"
 
-RNG_DROPS = {
-    "Floor 1 (Bonzo)": [
-        "Bonzo's Staff",
-        "Bonzo's Mask"
-    ],
-    "Floor 2 (Scarf)": [
-        "Adaptive Armor Pieces",
-        "Adaptive Blade",
-        "Scarf's Thesis"
-    ],
-    "Floor 3 (Professor)": [
-        "1st Master Star"
-    ],
-    "Floor 4 (Thorn)": [
-        "Spirit Wing",
-        "Spirit Bone",
-        "Spirit Bow",
-        "2nd Master Star"
-    ],
-    "Floor 5 (Livid)": [
-        "Shadow Fury",
-        "3rd Master Star"
-    ],
-    "Floor 6 (Sadan)": [
-        "Giant's Sword",
-        "Precursor Eye",
-        "4th Mas ter Star"
-    ],
-    "Floor 7 (Necron)": [
-        "Necron's Handle",
-        "Implosion",
-        "Wither Shield",
-        "Shadow Warp",
-        "5th Master Star",
-        "Master Skull - Tier 5",
-        "50% M7 Skeleton Master Chestplate",
-        "Thunderlord VII",
-        "Dark Claymore"
-    ]
-}
+from config import RNG_DROPS
 
 class RngManager:
     def __init__(self):

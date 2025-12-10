@@ -39,3 +39,71 @@ FLOOR_XP_MAP = {
 }
 
 CACHE_TTL = 60 # 1 minute
+
+RNG_DROPS = {
+    "Floor 1 (Bonzo)": [
+        "Bonzo's Staff",
+        "Bonzo's Mask"
+    ],
+    "Floor 2 (Scarf)": [
+        "Adaptive Armor Pieces",
+        "Adaptive Blade",
+        "Scarf's Thesis"
+    ],
+    "Floor 3 (Professor)": [
+        "1st Master Star"
+    ],
+    "Floor 4 (Thorn)": [
+        "Spirit Wing",
+        "Spirit Bone",
+        "Spirit Shortbow",
+        "2nd Master Star"
+    ],
+    "Floor 5 (Livid)": [
+        "Shadow Fury",
+        "3rd Master Star"
+    ],
+    "Floor 6 (Sadan)": [
+        "Giant's Sword",
+        "Precursor Eye",
+        "4th Master Star"
+    ],
+    "Floor 7 (Necron)": [
+        "Necron's Handle",
+        "Implosion",
+        "Wither Shield",
+        "Shadow Warp",
+        "5th Master Star",
+        "Master Skull - Tier 5",
+        "50% M7 Skeleton Master Chestplate",
+        "Thunderlord VII",
+        "Dark Claymore"
+    ]
+}
+
+DROP_EMOJIS = {
+    "Master Skull - Tier 5": "<:SkyBlock_items_master_skull:1448310369360809994>",
+    "Thunderlord VII": "<a:SkyBlock_items_enchanted_book:1448310367653728336>",
+    "Giant's Sword": "<:Minecraft_items_iron_sword:1448310365124563118>",
+    "Precursor Eye": "<:SkyBlock_items_precursor_eye:1448310361890750517>",
+    "Shadow Fury": "<:Minecraft_items_diamond_sword:1448310360003317911>",
+    "Spirit Shortbow": "<:Minecraft_items_bow:1448311754164539462>",
+    "Spirit Bone": "<:SkyBlock_items_spirit_bone:1448311755636736040>",
+    "Spirit Wing": "<:SkyBlock_items_spirit_wing:1448311757087969311>",
+    "Scarf's Thesis": "<:SkyBlock_items_scarf_thesis:1448310358447231027>",
+    "Adaptive Blade": "<:Minecraft_items_stone_sword:1448310356781961297>",
+    "Dark Claymore": "<:Minecraft_items_stone_sword:1448310356781961297>",
+    "Adaptive Armor Pieces": "<:SkyBlock_items_adaptive_helmet:1448310355209224223>",
+    "Bonzo's Staff": "<:Minecraft_items_blaze_rod:1448310353166340248>",
+    "Bonzo's Mask": "<:SkyBlock_items_bonzo_mask:1448310351631351929>",
+    "1st Master Star": "<:SkyBlock_items_first_master_star:1448305520921411595>",
+    "2nd Master Star": "<:SkyBlock_items_second_master_sta:1448305519021264987>",
+    "3rd Master Star": "<:SkyBlock_items_third_master_star:1448305516605603921>",
+    "4th Master Star": "<:SkyBlock_items_fourth_master_sta:1448305514776760520>",
+    "5th Master Star": "<:SkyBlock_items_fifth_master_star:1448305512876609732>",
+    "50% M7 Skeleton Master Chestplate": "<:SkyBlock_items_Skeleton_Master:1448305511488421968>",
+    "Implosion": "<a:SkyBlock_items_scroll:1448304563923718194>",
+    "Wither Shield": "<a:SkyBlock_items_scroll:1448304563923718194>",
+    "Shadow Warp": "<a:SkyBlock_items_scroll:1448304563923718194>",
+    "Necron's Handle": "<a:SkyBlock_items_necrons_handle:1448302537144008896>"
+}

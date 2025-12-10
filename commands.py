@@ -6,11 +6,11 @@ from discord import app_commands, TextStyle
 import time
 import math
 
-from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS
+from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS, RNG_DROPS, DROP_EMOJIS
 from utils.logging import log_info, log_debug, log_error
 from api import get_uuid, get_profile_data
 from simulation import simulate_to_level_all50
-from rng_manager import rng_manager, RNG_DROPS
+from rng_manager import rng_manager
 
 default_bonuses = {
     "ring": 0.1,
@@ -547,10 +547,13 @@ class RngFloorSelect(Select):
 
 class RngItemSelect(Select):
     def __init__(self, parent_view, floor):
-        options = [
-            discord.SelectOption(label=item, value=item)
-            for item in RNG_DROPS[floor]
-        ]
+        options = []
+        for item in RNG_DROPS[floor]:
+            opt = discord.SelectOption(label=item, value=item)
+            emoji = DROP_EMOJIS.get(item)
+            if emoji:
+                opt.emoji = discord.PartialEmoji.from_str(emoji)
+            options.append(opt)
         super().__init__(placeholder="Select a Drop...", options=options, custom_id="rng_item_select")
         self.parent_view = parent_view
 
@@ -627,7 +630,9 @@ class RngView(View):
         embed = discord.Embed(color=0x00ff99)
         
         if self.current_item:
-            embed.title = f"{self.current_item}"
+            emoji = DROP_EMOJIS.get(self.current_item)
+            label = f"{emoji} {self.current_item}" if emoji else self.current_item
+            embed.title = label
             count = rng_manager.get_floor_stats(self.target_user_id, self.current_floor).get(self.current_item, 0)
             embed.description = f"**Current Count:** {count}"
             embed.set_footer(text=f"{self.current_floor} • {self.target_user_name}")
@@ -638,10 +643,12 @@ class RngView(View):
             desc = []
             for item in RNG_DROPS[self.current_floor]:
                 count = stats.get(item, 0)
+                emoji = DROP_EMOJIS.get(item)
+                label = f"{emoji} {item}" if emoji else item
                 if count > 0:
-                     desc.append(f"**{item}:** {count}")
+                     desc.append(f"**{label}:** {count}")
                 else:
-                     desc.append(f"{item}: {count}")
+                     desc.append(f"{label}: {count}")
             embed.description = "\n".join(desc)
             if not desc:
                 embed.description = "No drops recorded yet."
@@ -659,7 +666,9 @@ class RngView(View):
                 for item_name in RNG_DROPS[floor_name]:
                     count = floor_stats.get(item_name, 0)
                     if count > 0:
-                        desc.append(f"**{item_name}:** {count}")
+                        emoji = DROP_EMOJIS.get(item_name)
+                        label = f"{emoji} {item_name}" if emoji else item_name
+                        desc.append(f"**{label}:** {count}")
                         total_drops_found = True
 
             if not total_drops_found:
@@ -788,13 +797,11 @@ def setup_commands(bot: commands.Bot):
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @bot.tree.command(name="rng", description="Track and manage your Skyblock RNG drops")
     async def rng(interaction: discord.Interaction):
-        # Allow anyone to use this command
         
         log_info(f"Command /rng called by {interaction.user}")
         
         target_user = interaction.user
         
-        # Check for default target override (set via /rngdefault, only by owners)
         default_target_id = rng_manager.get_default_target(str(interaction.user.id))
         if default_target_id:
             try:

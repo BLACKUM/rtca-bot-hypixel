@@ -12,32 +12,33 @@ RNG_DROPS = {
     ],
     "Floor 2 (Scarf)": [
         "Adaptive Armor Pieces",
-        "Adaptive Blade"
+        "Adaptive Blade",
+        "Scarf's Thesis"
     ],
     "Floor 3 (Professor)": [
-        "Master Star 1"
+        "1st Master Star"
     ],
     "Floor 4 (Thorn)": [
         "Spirit Wing",
         "Spirit Bone",
         "Spirit Bow",
-        "Master Star 2"
+        "2nd Master Star"
     ],
     "Floor 5 (Livid)": [
         "Shadow Fury",
-        "Master Star 3"
+        "3rd Master Star"
     ],
     "Floor 6 (Sadan)": [
         "Giant's Sword",
         "Precursor Eye",
-        "Master Star 4"
+        "4th Mas ter Star"
     ],
     "Floor 7 (Necron)": [
-        "Necron Handle",
+        "Necron's Handle",
         "Implosion",
         "Wither Shield",
         "Shadow Warp",
-        "Master Star 5",
+        "5th Master Star",
         "Master Skull - Tier 5",
         "50% M7 Skeleton Master Chestplate",
         "Thunderlord VII",

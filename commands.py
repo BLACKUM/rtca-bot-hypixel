@@ -11,6 +11,7 @@ from utils.logging import log_info, log_debug, log_error
 from api import get_uuid, get_profile_data, get_all_prices
 from simulation import simulate_to_level_all50
 from rng_manager import rng_manager
+from utils.link_manager import link_manager
 
 default_bonuses = {
     "ring": 0.1,
@@ -745,14 +746,20 @@ def setup_commands(bot: commands.Bot):
 
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    @app_commands.describe(ign="Minecraft IGN", floor="Dungeon floor (M7, M6, etc.)")
+    @app_commands.describe(ign="Minecraft IGN (optional if linked)", floor="Dungeon floor (M7, M6, etc.)")
     @bot.tree.command(name="rtca", description="Simulate runs until all dungeon classes reach level 50")
-    async def rtca(interaction: discord.Interaction, ign: str, floor: str = "M7"):
+    async def rtca(interaction: discord.Interaction, ign: str = None, floor: str = "M7"):
         start_time = time.perf_counter()
         await interaction.response.defer(thinking=True)
         log_debug(f"Defer sent after {(time.perf_counter() - start_time):.2f}s")
 
-        log_info(f"Command /rtca called by {interaction.user} → {ign}")
+        log_info(f"Command /rtca called by {interaction.user} → {ign if ign else '[Linked]'}")
+
+        if ign is None:
+            ign = link_manager.get_link(interaction.user.id)
+            if not ign:
+                await interaction.followup.send("❌ You must provide an IGN or link your account first using `/link <ign>`.", ephemeral=True)
+                return
 
         base_floor = FLOOR_XP_MAP.get(floor.upper(), XP_PER_RUN_DEFAULT)
 
@@ -876,3 +883,21 @@ def setup_commands(bot: commands.Bot):
         rng_manager.set_default_target(str(interaction.user.id), str(user.id))
         
         await interaction.response.send_message(f"✅ Default target for /rng set to **{user.mention}**.", ephemeral=True)
+
+    @bot.tree.command(name="link", description="Link your Discord account to a Hypixel IGN")
+    @app_commands.describe(ign="Your Minecraft IGN")
+    async def link(interaction: discord.Interaction, ign: str):
+        uuid = await get_uuid(ign)
+        if not uuid:
+            await interaction.response.send_message(f"❌ Could not find player with IGN: {ign}", ephemeral=True)
+            return
+
+        link_manager.link_user(interaction.user.id, ign)
+        await interaction.response.send_message(f"✅ Successfully linked your Discord account to **{ign}**!", ephemeral=True)
+
+    @bot.tree.command(name="unlink", description="Unlink your Discord account from any Hypixel IGN")
+    async def unlink(interaction: discord.Interaction):
+        if link_manager.unlink_user(interaction.user.id):
+            await interaction.response.send_message("✅ Successfully unlinked your account.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ You do not have a linked account.", ephemeral=True)

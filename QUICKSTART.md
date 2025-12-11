@@ -1,5 +1,15 @@
 # Quick Start
 
+## Installation
+
+First, clone the repository to your local machine:
+
+**Linux and Windows:**
+```bash
+git clone https://github.com/BLACKUM/rtca-bot-hypixel.git
+cd rtca-bot-hypixel
+```
+
 ## For Linux
 
 1. **Make the script executable:**

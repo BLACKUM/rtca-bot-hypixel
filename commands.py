@@ -8,9 +8,10 @@ import math
 
 from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS, RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS
 from utils.logging import log_info, log_debug, log_error
-from api import get_uuid, get_profile_data, get_all_prices, get_dungeon_runs, get_prices_expiry
+from api import get_uuid, get_profile_data, get_all_prices, get_dungeon_runs, get_prices_expiry, get_dungeon_xp
 from simulation import simulate_to_level_all50
 from rng_manager import rng_manager
+from daily_manager import daily_manager
 from utils.link_manager import link_manager
 
 default_bonuses = {
@@ -843,6 +844,169 @@ class RngView(View):
         return embed
 
 
+
+class DailyView(View):
+    def __init__(self, user_id, ign):
+        super().__init__(timeout=300)
+        self.user_id = str(user_id)
+        self.ign = ign
+        self.mode = "leaderboard"
+        self.msg = None
+
+    def _get_leaderboard_embed(self, type="daily"):
+        data = daily_manager.get_leaderboard(type)
+        title = "🏆 Daily Catacombs XP Leaderboard" if type == "daily" else "🏆 Monthly Catacombs XP Leaderboard"
+        
+        embed = discord.Embed(title=title, color=0xffd700)
+        
+        if not data:
+            embed.description = "No data recorded yet."
+            return embed
+            
+        desc = []
+        for i, entry in enumerate(data[:10], 1):
+            medal = ""
+            if i == 1: medal = "🥇"
+            elif i == 2: medal = "🥈"
+            elif i == 3: medal = "🥉"
+            else: medal = f"**#{i}**"
+            
+            desc.append(f"{medal} **{entry['ign']}**: +{entry['gained']:,.0f} XP")
+            
+        embed.description = "\n".join(desc)
+        embed.set_footer(text=f"Updates every 2 hours • Your IGN: {self.ign}")
+        return embed
+
+    def _get_personal_embed(self):
+        daily_stats = daily_manager.get_daily_stats(self.user_id)
+        monthly_stats = daily_manager.get_monthly_stats(self.user_id)
+        
+        embed = discord.Embed(title=f"📊 Personal Stats: {self.ign}", color=0x00ff99)
+        
+        if not daily_stats and not monthly_stats:
+            embed.description = "No data tracked yet. Wait for the next update or click 'Force Update'!"
+            return embed
+            
+        cata_val = ""
+        if daily_stats:
+             c_g = daily_stats['cata_gained']
+             c_s = daily_stats['cata_start_lvl']
+             c_c = daily_stats['cata_current_lvl']
+             cata_val += f"**Daily**: +{c_g:,.0f} XP (`{c_s:.2f}` ➤ `{c_c:.2f}`)\n"
+        else:
+             cata_val += "**Daily**: No data\n"
+             
+        if monthly_stats:
+             m_g = monthly_stats['cata_gained']
+             m_s = monthly_stats['cata_start_lvl']
+             m_c = monthly_stats['cata_current_lvl']
+             cata_val += f"**Monthly**: +{m_g:,.0f} XP (`{m_s:.2f}` ➤ `{m_c:.2f}`)"
+        else:
+             cata_val += "**Monthly**: No data"
+             
+        embed.add_field(name="Catacombs", value=cata_val, inline=False)
+        
+        class_lines = []
+        classes = ["archer", "berserk", "healer", "mage", "tank"]
+        
+        for cls in classes:
+            d_gain = daily_stats["classes"][cls]["gained"] if daily_stats and cls in daily_stats["classes"] else 0
+            m_gain = monthly_stats["classes"][cls]["gained"] if monthly_stats and cls in monthly_stats["classes"] else 0
+            
+            if d_gain > 0 or m_gain > 0:
+                line = f"**{cls.title()}**:"
+                if d_gain > 0:
+                    d_s = daily_stats["classes"][cls]["start_lvl"]
+                    d_c = daily_stats["classes"][cls]["current_lvl"]
+                    line += f"\n  Day: +{d_gain:,.0f} XP (`{d_s:.2f}` ➤ `{d_c:.2f}`)"
+                if m_gain > 0:
+                    m_s = monthly_stats["classes"][cls]["start_lvl"]
+                    m_c = monthly_stats["classes"][cls]["current_lvl"]
+                    line += f"\n  Month: +{m_gain:,.0f} XP (`{m_s:.2f}` ➤ `{m_c:.2f}`)"
+                class_lines.append(line)
+                
+        if class_lines:
+            embed.add_field(name="Class Progress", value="\n".join(class_lines), inline=False)
+        else:
+            embed.add_field(name="Class Progress", value="No class XP gained recently.", inline=False)
+
+        return embed
+
+    async def update_message(self, interaction):
+        await interaction.response.defer()
+        
+        if self.mode == "leaderboard":
+            embed = self._get_leaderboard_embed("daily")
+        elif self.mode == "monthly":
+             embed = self._get_leaderboard_embed("monthly")
+        elif self.mode == "personal":
+             embed = self._get_personal_embed()
+        
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    @discord.ui.button(label="Today", style=discord.ButtonStyle.primary, disabled=True)
+    async def today_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.mode = "leaderboard"
+        self.children[0].disabled = True
+        self.children[1].disabled = False
+        self.children[2].disabled = False
+        self.children[3].disabled = False
+        await self.update_message(interaction)
+
+    @discord.ui.button(label="Monthly", style=discord.ButtonStyle.secondary)
+    async def monthly_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.mode = "monthly"
+        self.children[0].disabled = False
+        self.children[1].disabled = True
+        self.children[2].disabled = False
+        self.children[3].disabled = False
+        await self.update_message(interaction)
+
+    @discord.ui.button(label="Personal", style=discord.ButtonStyle.success)
+    async def personal_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.mode = "personal"
+        self.children[0].disabled = False
+        self.children[1].disabled = False
+        self.children[2].disabled = True
+        self.children[3].disabled = False 
+        await self.update_message(interaction)
+
+    @discord.ui.button(label="Force Update", style=discord.ButtonStyle.danger)
+    async def force_update_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            uuid = None
+            if self.user_id in daily_manager.data["users"]:
+                uuid = daily_manager.data["users"][self.user_id]["uuid"]
+            
+            if not uuid:
+                await interaction.followup.send("❌ Could not find your tracked data. Try `/link` again.", ephemeral=True)
+                return
+
+            await interaction.followup.send("⏳ Fetching fresh data...", ephemeral=True)
+            
+            xp_data = await get_dungeon_xp(uuid)
+            if xp_data:
+                daily_manager.update_user_data(self.user_id, xp_data)
+                await interaction.followup.send("✅ Data updated! Refreshing view...", ephemeral=True)
+                
+                if self.mode == "leaderboard":
+                    embed = self._get_leaderboard_embed("daily")
+                elif self.mode == "monthly":
+                    embed = self._get_leaderboard_embed("monthly")
+                elif self.mode == "personal":
+                    embed = self._get_personal_embed()
+                    
+                await interaction.message.edit(embed=embed, view=self)
+            else:
+                 await interaction.followup.send("❌ Failed to fetch data from Hypixel API.", ephemeral=True)
+                 
+        except Exception as e:
+            log_error(f"Force update failed: {e}")
+            await interaction.followup.send("❌ An error occurred during update.", ephemeral=True)
+
+
 def setup_commands(bot: commands.Bot):
     
     @bot.event
@@ -870,6 +1034,13 @@ def setup_commands(bot: commands.Bot):
             if not ign:
                 await interaction.followup.send("❌ You must provide an IGN or link your account first using `/link <ign>`.", ephemeral=True)
                 return
+            
+            try:
+                 uuid_check = await get_uuid(ign)
+                 if uuid_check:
+                     daily_manager.register_user(interaction.user.id, ign, uuid_check)
+            except:
+                 pass
 
         base_floor = FLOOR_XP_MAP.get(floor.upper(), XP_PER_RUN_DEFAULT)
 
@@ -1021,6 +1192,7 @@ def setup_commands(bot: commands.Bot):
             return
 
         link_manager.link_user(interaction.user.id, ign)
+        daily_manager.register_user(interaction.user.id, ign, uuid)
         await interaction.response.send_message(f"✅ Successfully linked your Discord account to **{ign}**!", ephemeral=True)
 
     @bot.tree.command(name="unlink", description="Unlink your Discord account from any Hypixel IGN")
@@ -1029,3 +1201,20 @@ def setup_commands(bot: commands.Bot):
             await interaction.response.send_message("✅ Successfully unlinked your account.", ephemeral=True)
         else:
             await interaction.response.send_message("❌ You do not have a linked account.", ephemeral=True)
+
+    @bot.tree.command(name="daily", description="View daily Dungeon XP leaderboards and stats")
+    async def daily(interaction: discord.Interaction):
+        ign = link_manager.get_link(interaction.user.id)
+        if not ign:
+            await interaction.response.send_message("❌ You must link your account first using `/link <ign>`.", ephemeral=True)
+            return
+
+        uuid = await get_uuid(ign)
+        if uuid:
+            daily_manager.register_user(interaction.user.id, ign, uuid)
+
+        view = DailyView(interaction.user.id, ign)
+        embed = view._get_leaderboard_embed("daily")
+        
+        await interaction.response.send_message(embed=embed, view=view)
+

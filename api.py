@@ -162,3 +162,32 @@ async def get_dungeon_runs(uuid: str):
     
     log_debug(f"Fetched run counts for {uuid}: {run_counts}")
     return run_counts
+
+
+async def get_dungeon_xp(uuid: str):
+    profile_data = await get_profile_data(uuid)
+    if not profile_data:
+        return None
+    
+    profiles = profile_data.get("profiles")
+    if not profiles:
+        return None
+    
+    best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
+    member = best_profile.get("members", {}).get(uuid, {})
+    dungeons = member.get("dungeons", {})
+    
+    catacombs = dungeons.get("dungeon_types", {}).get("catacombs", {})
+    cata_xp = float(catacombs.get("experience", 0))
+    
+    classes = dungeons.get("player_classes", {})
+    class_xp = {}
+    
+    for cls in ["archer", "berserk", "healer", "mage", "tank"]:
+        cls_data = classes.get(cls, {})
+        class_xp[cls] = float(cls_data.get("experience", 0))
+        
+    return {
+        "catacombs": cata_xp,
+        "classes": class_xp
+    }

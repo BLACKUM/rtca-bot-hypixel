@@ -1202,6 +1202,24 @@ def setup_commands(bot: commands.Bot):
         else:
             await interaction.response.send_message("❌ You do not have a linked account.", ephemeral=True)
 
+    @bot.tree.command(name="adddaily", description="[OWNER] Manually add a user to the daily leaderboard")
+    @app_commands.describe(user="The Discord user to link", ign="The Minecraft IGN")
+    async def adddaily(interaction: discord.Interaction, user: discord.User, ign: str):
+        if interaction.user.id not in OWNER_IDS:
+            await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        
+        uuid = await get_uuid(ign)
+        
+        if not uuid:
+             await interaction.followup.send(f"❌ Could not find UUID for IGN: `{ign}`")
+             return
+             
+        daily_manager.register_user(str(user.id), ign, uuid)
+        await interaction.followup.send(f"✅ Manually registered {user.mention} as `{ign}` for daily tracking.")
+
     @bot.tree.command(name="daily", description="View daily Dungeon XP leaderboards and stats")
     async def daily(interaction: discord.Interaction):
         ign = link_manager.get_link(interaction.user.id)

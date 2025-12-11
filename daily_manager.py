@@ -150,6 +150,8 @@ class DailyManager:
         leaderboard.sort(key=lambda x: x["gained"], reverse=True)
         return leaderboard
 
+    # i have no idea why uuid was invalid in the first place, but i've made this function to fix it in the future
+    # somebody changed a name... ig that's why
     async def sanitize_data(self):
         log_info("Sanitizing daily data...")
         updates = False

@@ -2,13 +2,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import Select, View, Modal, TextInput
-from discord import app_commands, TextStyle
+from discord import app_commands, TextStyle, ButtonStyle
 import time
 import math
 
 from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS, RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS
 from utils.logging import log_info, log_debug, log_error
-from api import get_uuid, get_profile_data, get_all_prices, get_dungeon_runs
+from api import get_uuid, get_profile_data, get_all_prices, get_dungeon_runs, get_prices_expiry
 from simulation import simulate_to_level_all50
 from rng_manager import rng_manager
 from utils.link_manager import link_manager
@@ -599,6 +599,13 @@ class RngActionButton(discord.ui.Button):
              modal = RngAmountModal(self.parent_view)
              await interaction.response.send_modal(modal)
              return
+             
+        elif self.action == "filter_combined":
+             self.parent_view.filter_mode = "COMBINED"
+        elif self.action == "filter_master":
+             self.parent_view.filter_mode = "MASTER"
+        elif self.action == "filter_normal":
+             self.parent_view.filter_mode = "NORMAL"
 
         self.parent_view.update_view()
         await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
@@ -623,6 +630,7 @@ class RngView(View):
         self.current_item = None
         self.run_counts = run_counts or {}
         self.target_ign = target_ign
+        self.filter_mode = "COMBINED"
         self.update_view()
 
     def update_view(self):
@@ -636,8 +644,34 @@ class RngView(View):
         elif self.current_floor:
             self.add_item(RngItemSelect(self, self.current_floor))
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
+
+            style_combined = discord.ButtonStyle.success if self.filter_mode == "COMBINED" else discord.ButtonStyle.secondary
+            style_master = discord.ButtonStyle.success if self.filter_mode == "MASTER" else discord.ButtonStyle.secondary
+            style_normal = discord.ButtonStyle.success if self.filter_mode == "NORMAL" else discord.ButtonStyle.secondary
+            
+            self.add_item(RngActionButton(self, "Combined", style_combined, "rng_filter_combined", "filter_combined"))
+            self.add_item(RngActionButton(self, None, style_master, "rng_filter_master", "filter_master"))
+            self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_master:1448690270366335087>")
+            self.children[-1].label = None
+
+            self.add_item(RngActionButton(self, None, style_normal, "rng_filter_normal", "filter_normal"))
+            self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_catacombs:1448690272786448545>")
+            self.children[-1].label = None
         else:
             self.add_item(RngFloorSelect(self))
+            
+            style_combined = discord.ButtonStyle.success if self.filter_mode == "COMBINED" else discord.ButtonStyle.secondary
+            style_master = discord.ButtonStyle.success if self.filter_mode == "MASTER" else discord.ButtonStyle.secondary
+            style_normal = discord.ButtonStyle.success if self.filter_mode == "NORMAL" else discord.ButtonStyle.secondary
+            
+            self.add_item(RngActionButton(self, "Combined", style_combined, "rng_filter_combined", "filter_combined"))
+            self.add_item(RngActionButton(self, None, style_master, "rng_filter_master", "filter_master"))
+            self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_master:1448690270366335087>")
+            self.children[-1].label = None
+
+            self.add_item(RngActionButton(self, None, style_normal, "rng_filter_normal", "filter_normal"))
+            self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_catacombs:1448690272786448545>")
+            self.children[-1].label = None
 
     async def get_embed(self):
         embed = discord.Embed(color=0x00ff99)
@@ -661,13 +695,25 @@ class RngView(View):
             
             desc_lines = [f"**Current Count:** {count}", f"**Avg Price:** {price_text}", f"**Chest Cost:** {format_trunc(chest_cost)}", f"**Total Profit:** {val_text}"]
             
-            runs = self.run_counts.get(self.current_floor, 0)
+            desc_lines = [f"**Current Count:** {count}", f"**Avg Price:** {price_text}", f"**Chest Cost:** {format_trunc(chest_cost)}", f"**Total Profit:** {val_text}"]
+            
+            floor_runs_data = self.run_counts.get(self.current_floor, {"normal": 0, "master": 0})
+            if isinstance(floor_runs_data, int):
+                 floor_runs_data = {"normal": 0, "master": floor_runs_data}
+
+            runs = 0
+            if self.filter_mode == "COMBINED":
+                runs = floor_runs_data.get("normal", 0) + floor_runs_data.get("master", 0)
+            elif self.filter_mode == "MASTER":
+                runs = floor_runs_data.get("master", 0)
+            elif self.filter_mode == "NORMAL":
+                runs = floor_runs_data.get("normal", 0)
             if runs > 0 and count > 0:
                 profit_per_run = total_val / runs
                 desc_lines.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
-                desc_lines.append(f"**Total Runs:** {runs:,}")
+                desc_lines.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
             elif runs > 0:
-                desc_lines.append(f"**Total Runs:** {runs:,}")
+                desc_lines.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
             
             embed.description = "\n".join(desc_lines)
             embed.set_footer(text=f"{self.current_floor} • {self.target_user_name}")
@@ -698,7 +744,18 @@ class RngView(View):
                 else:
                      desc.append(f"{label}: {count}")
             
-            runs = self.run_counts.get(self.current_floor, 0)
+            floor_runs_data = self.run_counts.get(self.current_floor, {"normal": 0, "master": 0})
+            if isinstance(floor_runs_data, int):
+                 floor_runs_data = {"normal": 0, "master": floor_runs_data}
+            
+            runs = 0
+            if self.filter_mode == "COMBINED":
+                runs = floor_runs_data.get("normal", 0) + floor_runs_data.get("master", 0)
+            elif self.filter_mode == "MASTER":
+                runs = floor_runs_data.get("master", 0)
+            elif self.filter_mode == "NORMAL":
+                runs = floor_runs_data.get("normal", 0)
+            log_debug(f"Floor {self.current_floor}: Runs={runs}, Profit={floor_total_val}")
             
             if floor_total_val > 0:
                 desc.append(f"\n**Floor Profit:** {format_trunc(floor_total_val)}")
@@ -706,9 +763,9 @@ class RngView(View):
                 if runs > 0:
                     profit_per_run = floor_total_val / runs
                     desc.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
-                    desc.append(f"**Total Runs:** {runs:,}")
+                    desc.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
             elif runs > 0:
-                desc.append(f"\n**Total Runs:** {runs:,}")
+                desc.append(f"\n**Total Runs:** {runs:,} ({self.filter_mode.title()})")
                 
             embed.description = "\n".join(desc)
             if not desc:
@@ -742,7 +799,18 @@ class RngView(View):
                         desc.append(f"**{label}:** {count}")
                         total_drops_found = True
 
-            total_runs = sum(self.run_counts.values())
+            total_runs = 0
+            for floor_data in self.run_counts.values():
+                if isinstance(floor_data, int):
+                    if self.filter_mode in ["COMBINED", "MASTER"]:
+                        total_runs += floor_data
+                elif isinstance(floor_data, dict):
+                    if self.filter_mode == "COMBINED":
+                        total_runs += floor_data.get("normal", 0) + floor_data.get("master", 0)
+                    elif self.filter_mode == "MASTER":
+                        total_runs += floor_data.get("master", 0)
+                    elif self.filter_mode == "NORMAL":
+                         total_runs += floor_data.get("normal", 0)
             
             if not total_drops_found:
                  desc.append("No drops recorded yet.")
@@ -752,7 +820,7 @@ class RngView(View):
                  if total_runs > 0:
                      avg_profit_per_run = grand_total / total_runs
                      desc.append(f"**Avg Profit/Run:** {format_trunc(avg_profit_per_run)}")
-                     desc.append(f"**Total Runs:** {total_runs:,}")
+                     desc.append(f"**Total Runs:** {total_runs:,} ({self.filter_mode.title()})")
             
             if total_runs > 0 and not total_drops_found:
                 desc.append(f"\n**Total Runs:** {total_runs:,}")
@@ -760,9 +828,16 @@ class RngView(View):
             desc.append("\nSelect a floor to view or edit drops.")
             embed.description = "\n".join(desc)
             
+            expiry = get_prices_expiry()
+            if expiry:
+                desc.append(f"\n*(Prices cached • Updates <t:{int(expiry)}:R>)*")
+
+            embed.description = "\n".join(desc)
+            
             footer_text = "Manage your RNG collection"
             if self.target_ign:
                 footer_text += f" • {self.target_ign}"
+                
             embed.set_footer(text=footer_text)
  
         return embed
@@ -893,7 +968,6 @@ def setup_commands(bot: commands.Bot):
         
         log_info(f"Command /rng called by {interaction.user}")
         
-        # Defer early to prevent timeout
         target_ign = link_manager.get_link(interaction.user.id)
         default_target_id = rng_manager.get_default_target(str(interaction.user.id))
         
@@ -907,7 +981,6 @@ def setup_commands(bot: commands.Bot):
                 fetched = await bot.fetch_user(int(default_target_id))
                 if fetched:
                     target_user = fetched
-                    # Re-check IGN for the target user
                     target_ign = link_manager.get_link(target_user.id)
             except:
                 pass

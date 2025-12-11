@@ -1,19 +1,28 @@
 import aiohttp
 import asyncio
-from utils.logging import log_debug, log_error
-from cache import cache_get, cache_set
+from urllib.parse import quote
+from config import PROFILE_CACHE_TTL, PRICES_CACHE_TTL, SKELETON_MASTER_CHESTPLATE_50
+from utils.logging import log_debug, log_error, log_info
+from cache import cache_get, cache_set, get_cache_expiry
 
 
 async def get_uuid(name: str):
+    cached = cache_get(name.lower())
+    if cached:
+        log_debug(f"Using cached UUID for {name}")
+        return cached
+
     log_debug(f"Requesting UUID for {name}")
     async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://playerdb.co/api/player/minecraft/{name}") as r:
+        msg = quote(name)
+        async with session.get(f"https://playerdb.co/api/player/minecraft/{msg}") as r:
             if r.status != 200:
                 log_error(f"UUID request failed ({r.status})")
                 return None
             data = await r.json()
             uuid = data["data"]["player"]["raw_id"]
             log_debug(f"UUID fetched: {uuid}")
+            cache_set(name.lower(), uuid, ttl=PROFILE_CACHE_TTL)
             return uuid
 
 
@@ -31,7 +40,7 @@ async def get_profile_data(uuid: str):
                     log_error(f"Profile request failed ({r.status})")
                     return None
                 data = await r.json()
-                cache_set(uuid, data)
+                cache_set(uuid, data, ttl=PROFILE_CACHE_TTL)
                 return data
         except asyncio.TimeoutError:
             log_error("Profile request timed out (15s)")
@@ -40,7 +49,7 @@ async def get_profile_data(uuid: str):
 
 async def get_bazaar_prices():
     cached = cache_get("bazaar_prices")
-    if cached:
+    if cached is not None:
         return cached
     
     url = "https://api.hypixel.net/skyblock/bazaar"
@@ -51,6 +60,7 @@ async def get_bazaar_prices():
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 if r.status != 200:
                     log_error(f"Bazaar request failed ({r.status})")
+                    cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
                     return {}
                 data = await r.json()
                 products = data.get("products", {})
@@ -58,32 +68,36 @@ async def get_bazaar_prices():
                     pid: info["quick_status"]["sellPrice"] 
                     for pid, info in products.items()
                 }
-                cache_set("bazaar_prices", prices)
+                cache_set("bazaar_prices", prices, ttl=PRICES_CACHE_TTL)
                 return prices
         except Exception as e:
             log_error(f"Failed to fetch Bazaar prices: {e}")
+            cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
             return {}
 
 
 async def get_ah_prices():
     cached = cache_get("ah_prices")
-    if cached:
+    if cached is not None:
         return cached
         
     url = "https://moulberry.codes/auction_averages_lbin/3day.json"
     log_debug("Fetching AH prices (3-day avg)")
     
     async with aiohttp.ClientSession() as session:
+        log_debug(f"Requesting AH prices: {url}")
         try:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 if r.status != 200:
                     log_error(f"AH request failed ({r.status})")
+                    cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
                     return {}
                 prices = await r.json()
-                cache_set("ah_prices", prices)
+                cache_set("ah_prices", prices, ttl=PRICES_CACHE_TTL)
                 return prices
         except Exception as e:
             log_error(f"Failed to fetch AH prices: {e}")
+            cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
             return {}
 
 
@@ -95,7 +109,15 @@ async def get_all_prices():
     
     prices = bz_prices.copy()
     prices.update(ah_prices)
+    
+    # Yeah i really cba to make another price checker just for this thing
+    prices[SKELETON_MASTER_CHESTPLATE_50] = 40_000_000
+    
     return prices
+
+
+def get_prices_expiry():
+    return get_cache_expiry("ah_prices")
 
 
 async def get_dungeon_runs(uuid: str):
@@ -112,10 +134,11 @@ async def get_dungeon_runs(uuid: str):
     dungeons = member.get("dungeons", {})
     
     catacombs_data = dungeons.get("dungeon_types", {}).get("catacombs", {})
-    normal_completions = catacombs_data.get("tier_completions", {})
-    master_completions = catacombs_data.get("master_tier_completions", {})
+    master_catacombs_data = dungeons.get("dungeon_types", {}).get("master_catacombs", {})
     
-    log_debug(f"Normal completions: {normal_completions}")
+    master_completions = master_catacombs_data.get("tier_completions", {})
+    normal_completions = catacombs_data.get("tier_completions", {})
+    
     log_debug(f"Master completions: {master_completions}")
 
     tier_to_floor = {
@@ -130,9 +153,12 @@ async def get_dungeon_runs(uuid: str):
     
     run_counts = {}
     for tier_key, floor_name in tier_to_floor.items():
-        normal_runs = int(normal_completions.get(tier_key, 0))
         master_runs = int(master_completions.get(tier_key, 0))
-        run_counts[floor_name] = normal_runs + master_runs
+        normal_runs = int(normal_completions.get(tier_key, 0))
+        run_counts[floor_name] = {
+            "normal": normal_runs,
+            "master": master_runs
+        }
     
     log_debug(f"Fetched run counts for {uuid}: {run_counts}")
     return run_counts

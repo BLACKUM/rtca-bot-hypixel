@@ -10,6 +10,7 @@ except ImportError:
 XP_PER_RUN_DEFAULT = 300000.0
 TARGET_LEVEL = 50
 DEBUG_MODE = True
+SKELETON_MASTER_CHESTPLATE_50 = "SKELETON_MASTER_CHESTPLATE_50"
 
 OWNER_IDS = [
     377351386637271041, # BLACKUM
@@ -38,34 +39,10 @@ FLOOR_XP_MAP = {
     "F3": 560, "F2": 220, "F1": 110, "ENTRANCE": 55
 }
 
-CACHE_TTL = 60 # 1 minute
+PROFILE_CACHE_TTL = 60 # 1 minute
+PRICES_CACHE_TTL = 3600 # 1 hour
 
 RNG_DROPS = {
-    "Floor 1 (Bonzo)": [
-        "Bonzo's Staff",
-        "Bonzo's Mask"
-    ],
-    "Floor 2 (Scarf)": [
-        "Scarf's Studies"
-    ],
-    "Floor 3 (Professor)": [
-        "1st Master Star"
-    ],
-    "Floor 4 (Thorn)": [
-        "Spirit Wing",
-        "Spirit Bone",
-        "Spirit Shortbow",
-        "2nd Master Star"
-    ],
-    "Floor 5 (Livid)": [
-        "Shadow Fury",
-        "3rd Master Star"
-    ],
-    "Floor 6 (Sadan)": [
-        "Giant's Sword",
-        "Precursor Eye",
-        "4th Master Star"
-    ],
     "Floor 7 (Necron)": [
         "Necron's Handle",
         "Implosion",
@@ -76,6 +53,31 @@ RNG_DROPS = {
         "50% M7 Skeleton Master Chestplate",
         "Thunderlord VII",
         "Dark Claymore"
+    ],
+    "Floor 6 (Sadan)": [
+        "Giant's Sword",
+        "Precursor Eye",
+        "4th Master Star"
+    ],
+    "Floor 5 (Livid)": [
+        "Shadow Fury",
+        "3rd Master Star"
+    ],
+    "Floor 4 (Thorn)": [
+        "Spirit Wing",
+        "Spirit Bone",
+        "Spirit Shortbow",
+        "2nd Master Star"
+    ],
+    "Floor 3 (Professor)": [
+        "1st Master Star"
+    ],
+    "Floor 2 (Scarf)": [
+        "Scarf's Studies"
+    ],
+    "Floor 1 (Bonzo)": [
+        "Bonzo's Staff",
+        "Bonzo's Mask"
     ]
 }
 
@@ -125,29 +127,11 @@ DROP_IDS = {
     "5th Master Star": "FIFTH_MASTER_STAR",
     "Master Skull - Tier 5": "MASTER_SKULL_TIER_5",
     "Thunderlord VII": "ENCHANTMENT_THUNDERLORD_7",
-    "Dark Claymore": "DARK_CLAYMORE"
+    "Dark Claymore": "DARK_CLAYMORE",
+    "50% M7 Skeleton Master Chestplate": "SKELETON_MASTER_CHESTPLATE_50"
 }
 
 CHEST_COSTS = {
-    # F1
-    "Bonzo's Staff": 2_250_000,
-    "Bonzo's Mask": 1_250_000,
-    # F2
-    "Scarf's Studies": 500_000,
-    # F3
-    "1st Master Star": 5_000_000,
-    # F4
-    "Spirit Wing": 2_000_000,
-    "Spirit Bone": 1_500_000,
-    "Spirit Shortbow": 4_000_000,
-    "2nd Master Star": 6_000_000,
-    # F5
-    "Shadow Fury": 15_000_000,
-    "3rd Master Star": 7_000_000,
-    # F6
-    "Giant's Sword": 25_000_000,
-    "Precursor Eye": 30_000_000, 
-    "4th Master Star": 8_000_000,
     # F7
     "Necron's Handle": 100_000_000,
     "Implosion": 50_000_000, 
@@ -156,5 +140,30 @@ CHEST_COSTS = {
     "5th Master Star": 9_000_000,
     "Master Skull - Tier 5": 32_000_000,
     "Thunderlord VII": 2_000_000, 
-    "Dark Claymore": 150_000_000
+    "Dark Claymore": 150_000_000,
+    # F6
+    "Giant's Sword": 25_000_000,
+    "Precursor Eye": 30_000_000, 
+    "4th Master Star": 8_000_000,
+    # F5
+    "Shadow Fury": 15_000_000,
+    "3rd Master Star": 7_000_000,
+    # F4
+    "Spirit Wing": 2_000_000,
+    "Spirit Bone": 1_500_000,
+    "Spirit Shortbow": 4_000_000,
+    "2nd Master Star": 6_000_000,
+    # F3
+    "1st Master Star": 5_000_000,
+    # F2
+    "Scarf's Studies": 500_000,
+    # F1
+    "Bonzo's Staff": 2_250_000,
+    "Bonzo's Mask": 1_250_000,
+    
+    
+    
+    
+    
+    
 }

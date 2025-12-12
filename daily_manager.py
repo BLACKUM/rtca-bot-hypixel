@@ -17,7 +17,8 @@ class DailyManager:
             "monthly_snapshots": {},
             "current_xp": {},
             "last_daily_reset": 0,
-            "last_monthly_reset": 0
+            "last_monthly_reset": 0,
+            "last_updated": 0
         }
         self.load_data()
 
@@ -76,6 +77,7 @@ class DailyManager:
         if user_id not in self.data["monthly_snapshots"]:
              self.data["monthly_snapshots"][user_id] = self.data["current_xp"][user_id]
              
+        self.data["last_updated"] = now
         self._save_data()
 
     def check_resets(self):
@@ -98,6 +100,9 @@ class DailyManager:
             self.data["monthly_snapshots"] = self.data["current_xp"].copy()
             self.data["last_monthly_reset"] = int(now.timestamp())
             self._save_data()
+
+    def get_last_updated(self) -> int:
+        return self.data.get("last_updated", 0)
 
     def get_daily_stats(self, user_id: str):
         return self._calculate_stats(user_id, "daily_snapshots")
@@ -136,17 +141,20 @@ class DailyManager:
 
     def get_leaderboard(self, type="daily"):
         snapshot_key = "daily_snapshots" if type == "daily" else "monthly_snapshots"
-        leaderboard = []
+        leaderboard_map = {}
         
         for user_id, info in self.data["users"].items():
             stats = self._calculate_stats(user_id, snapshot_key)
             if stats:
-                leaderboard.append({
-                    "ign": info["ign"],
-                    "gained": stats["cata_gained"],
-                    "user_id": user_id
-                })
+                ign = info["ign"]
+                if ign not in leaderboard_map or stats["cata_gained"] > leaderboard_map[ign]["gained"]:
+                    leaderboard_map[ign] = {
+                        "ign": ign,
+                        "gained": stats["cata_gained"],
+                        "user_id": user_id
+                    }
         
+        leaderboard = list(leaderboard_map.values())
         leaderboard.sort(key=lambda x: x["gained"], reverse=True)
         return leaderboard
 

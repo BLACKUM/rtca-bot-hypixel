@@ -1324,6 +1324,8 @@ def setup_commands(bot: commands.Bot):
         
         await interaction.response.send_message(f"✅ Default target for /rng set to **{user.mention}**.", ephemeral=True)
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @bot.tree.command(name="link", description="Link your Discord account to a Hypixel IGN")
     @app_commands.describe(ign="Your Minecraft IGN")
     async def link(interaction: discord.Interaction, ign: str):
@@ -1361,6 +1363,8 @@ def setup_commands(bot: commands.Bot):
         daily_manager.register_user(str(user.id), ign, uuid)
         await interaction.followup.send(f"✅ Manually registered {user.mention} as `{ign}` for daily tracking.")
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @bot.tree.command(name="daily", description="View daily Dungeon XP leaderboards and stats")
     async def daily(interaction: discord.Interaction):
         ign = link_manager.get_link(interaction.user.id)

@@ -51,7 +51,6 @@ async def load_extensions():
         "modules.dungeons",
         "modules.rng",
         "modules.leaderboard",
-        "modules.leaderboard",
         "modules.settings",
         "modules.error_handler"
     ]

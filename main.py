@@ -1,11 +1,10 @@
 from discord.ext import commands, tasks
-from config import TOKEN, INTENTS
-from commands import setup_commands
-from utils.logging import log_info, log_error
-from daily_manager import daily_manager
-from api import get_dungeon_xp
+from core.config import TOKEN, INTENTS
+from core.logger import log_info, log_error
+from services.daily_manager import daily_manager
+from services.api import get_dungeon_xp
 import asyncio
-
+import os
 
 bot = commands.Bot(command_prefix="!", intents=INTENTS)
 
@@ -38,18 +37,38 @@ async def on_ready():
     await daily_manager.sanitize_data()
     if not track_daily_stats.is_running():
         track_daily_stats.start()
+    
+    log_info(f"✅ Logged in as {bot.user}")
+    try:
+        synced = await bot.tree.sync()
+        log_info(f"🔁 Synced {len(synced)} global commands")
+    except Exception as e:
+        log_error(f"❌ Sync failed: {e}")
 
-def main():
+async def load_extensions():
+    extensions = [
+        "modules.dungeons",
+        "modules.rng",
+        "modules.leaderboard",
+        "modules.settings"
+    ]
+    for ext in extensions:
+        try:
+            await bot.load_extension(ext)
+            log_info(f"Loaded extension: {ext}")
+        except Exception as e:
+            log_error(f"Failed to load extension {ext}: {e}")
+
+async def main():
     log_info("Starting RTCA Discord Bot...")
     
-    setup_commands(bot)
+    await load_extensions()
     
     try:
-        bot.run(TOKEN)
+        await bot.start(TOKEN)
     except Exception as e:
         log_error(f"Failed to start bot: {e}")
         raise
 
-
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

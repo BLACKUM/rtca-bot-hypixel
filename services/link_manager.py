@@ -1,9 +1,9 @@
 import json
 import os
 from typing import Dict, Optional
-from utils.logging import log_info, log_error
+from core.logger import log_info, log_error
 
-LINK_FILE = "user_links.json"
+LINK_FILE = "data/user_links.json"
 
 class LinkManager:
     def __init__(self):

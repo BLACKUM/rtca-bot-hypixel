@@ -1,11 +1,11 @@
 import json
 import os
 from typing import Dict, List, Optional
-from utils.logging import log_info, log_error, log_debug
+from core.logger import log_info, log_error, log_debug
 
-DATA_FILE = "rng_data.json"
+DATA_FILE = "data/rng_data.json"
 
-from config import RNG_DROPS
+from core.config import RNG_DROPS
 
 class RngManager:
     def __init__(self):

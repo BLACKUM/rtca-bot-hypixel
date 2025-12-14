@@ -1,4 +1,4 @@
-from config import DEBUG_MODE
+from core.config import DEBUG_MODE
 
 
 def log_info(msg):

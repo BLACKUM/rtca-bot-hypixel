@@ -3,11 +3,11 @@ import os
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
-from utils.logging import log_info, log_error, log_debug
-from xp_calculations import get_dungeon_level
-from api import get_uuid
+from core.logger import log_info, log_error, log_debug
+from services.xp_calculations import get_dungeon_level
+from services.api import get_uuid
 
-DAILY_DATA_FILE = "daily_data.json"
+DAILY_DATA_FILE = "data/daily_data.json"
 
 class DailyManager:
     def __init__(self):

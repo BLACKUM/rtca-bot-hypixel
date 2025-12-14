@@ -1,7 +1,7 @@
 import time
-from utils.logging import log_info, log_debug
-from xp_calculations import get_dungeon_level, get_total_xp_for_level
-from config import TARGET_LEVEL
+from core.logger import log_info, log_debug
+from services.xp_calculations import get_dungeon_level, get_total_xp_for_level
+from core.config import TARGET_LEVEL
 
 
 def simulate_to_level_all50(dungeon_classes: dict, floor_xp: float, bonuses: dict,

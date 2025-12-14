@@ -6,7 +6,11 @@ from pathlib import Path
 def package_release():
     project_root = Path(__file__).parent.parent
     release_dir = project_root / "release"
-    output_filename = "rtca-bot-hypixel-release.zip"
+    version = os.environ.get("RELEASE_VERSION")
+    if version:
+        output_filename = f"rtca-bot-hypixel-{version}.zip"
+    else:
+        output_filename = "rtca-bot-hypixel-release.zip"
     
     release_dir.mkdir(exist_ok=True)
     

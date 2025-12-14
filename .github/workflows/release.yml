@@ -22,12 +22,14 @@ jobs:
 
       - name: Create Release Zip
         run: python scripts/package_release.py
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: release/rtca-bot-hypixel-release.zip
+          files: release/rtca-bot-hypixel-*.zip
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false

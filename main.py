@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from core.config import TOKEN, INTENTS
+from core.config import TOKEN, INTENTS, validate_config
 from core.logger import log_info, log_error
 from services.daily_manager import daily_manager
 from services.api import get_dungeon_xp
@@ -51,7 +51,9 @@ async def load_extensions():
         "modules.dungeons",
         "modules.rng",
         "modules.leaderboard",
-        "modules.settings"
+        "modules.leaderboard",
+        "modules.settings",
+        "modules.error_handler"
     ]
     for ext in extensions:
         try:
@@ -61,6 +63,7 @@ async def load_extensions():
             log_error(f"Failed to load extension {ext}: {e}")
 
 async def main():
+    validate_config()
     log_info("Starting RTCA Discord Bot...")
     
     await load_extensions()

@@ -173,3 +173,9 @@ CHEST_COSTS = {
     
     
 }
+
+def validate_config():
+    if not TOKEN:
+        raise ValueError("TOKEN is missing in secrets.py!")
+    if not OWNER_IDS:
+        print("Warning: OWNER_IDS is empty!")

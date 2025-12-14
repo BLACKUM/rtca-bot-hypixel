@@ -147,6 +147,65 @@ class MainSelect(Select):
             log_error(f"Failed to edit message in MainSelect: {e}")
 
 
+
+def _create_option_list(option: str, current_val: float) -> list[discord.SelectOption]:
+    if option == "ring":
+        return [
+            discord.SelectOption(label="Yes", value="0.1", description="10% bonus", default=(abs(current_val - 0.1) < 0.0001)),
+            discord.SelectOption(label="No", value="0", description="No bonus", default=(abs(current_val - 0.0) < 0.0001)),
+        ]
+    elif option == "hecatomb":
+        return [
+            discord.SelectOption(label="X", value="0.02", description="2% (default)", default=(abs(current_val - 0.02) < 0.0001)),
+            discord.SelectOption(label="IX", value="0.0184", description="1.84%", default=(abs(current_val - 0.0184) < 0.0001)),
+            discord.SelectOption(label="VIII", value="0.0168", description="1.68%", default=(abs(current_val - 0.0168) < 0.0001)),
+            discord.SelectOption(label="VII", value="0.0152", description="1.52%", default=(abs(current_val - 0.0152) < 0.0001)),
+            discord.SelectOption(label="VI", value="0.0136", description="1.36%", default=(abs(current_val - 0.0136) < 0.0001)),
+            discord.SelectOption(label="V", value="0.012", description="1.2%", default=(abs(current_val - 0.012) < 0.0001)),
+            discord.SelectOption(label="IV", value="0.0104", description="1.04%", default=(abs(current_val - 0.0104) < 0.0001)),
+            discord.SelectOption(label="III", value="0.0088", description="0.88%", default=(abs(current_val - 0.0088) < 0.0001)),
+            discord.SelectOption(label="II", value="0.0072", description="0.72%", default=(abs(current_val - 0.0072) < 0.0001)),
+            discord.SelectOption(label="I", value="0.0056", description="0.56%", default=(abs(current_val - 0.0056) < 0.0001)),
+            discord.SelectOption(label="0", value="0", description="No Hecatomb", default=(abs(current_val - 0.0) < 0.0001)),
+        ]
+    elif option == "scarf_accessory":
+        return [
+            discord.SelectOption(label="Grimoire (6%)", value="0.06", description="6% bonus", default=(abs(current_val - 0.06) < 0.0001)),
+            discord.SelectOption(label="Thesis (4%)", value="0.04", description="4% bonus", default=(abs(current_val - 0.04) < 0.0001)),
+            discord.SelectOption(label="Studies (2%)", value="0.02", description="2% bonus", default=(abs(current_val - 0.02) < 0.0001)),
+            discord.SelectOption(label="None", value="0.0", description="No scarf accessory", default=(abs(current_val - 0.0) < 0.0001)),
+        ]
+    elif option == "scarf_attribute":
+        return [
+            discord.SelectOption(label="0 (0%)", value="0", description="No attribute", default=(abs(current_val - 0.0) < 0.0001)),
+            discord.SelectOption(label="I (2%)", value="0.02", description="2% bonus", default=(abs(current_val - 0.02) < 0.0001)),
+            discord.SelectOption(label="II (4%)", value="0.04", description="4% bonus", default=(abs(current_val - 0.04) < 0.0001)),
+            discord.SelectOption(label="III (6%)", value="0.06", description="6% bonus", default=(abs(current_val - 0.06) < 0.0001)),
+            discord.SelectOption(label="IV (8%)", value="0.08", description="8% bonus", default=(abs(current_val - 0.08) < 0.0001)),
+            discord.SelectOption(label="V (10%)", value="0.1", description="10% bonus", default=(abs(current_val - 0.1) < 0.0001)),
+            discord.SelectOption(label="VI (12%)", value="0.12", description="12% bonus", default=(abs(current_val - 0.12) < 0.0001)),
+            discord.SelectOption(label="VII (14%)", value="0.14", description="14% bonus", default=(abs(current_val - 0.14) < 0.0001)),
+            discord.SelectOption(label="VIII (16%)", value="0.16", description="16% bonus", default=(abs(current_val - 0.16) < 0.0001)),
+            discord.SelectOption(label="IX (18%)", value="0.18", description="18% bonus", default=(abs(current_val - 0.18) < 0.0001)),
+            discord.SelectOption(label="X (20%)", value="0.2", description="20% bonus", default=(abs(current_val - 0.2) < 0.0001)),
+        ]
+    elif option == "global":
+        return [
+            discord.SelectOption(label="0%", value="1", description="No boost", default=(abs(current_val - 1.0) < 0.0001)),
+            discord.SelectOption(label="5%", value="1.05", description="5% boost", default=(abs(current_val - 1.05) < 0.0001)),
+            discord.SelectOption(label="10%", value="1.1", description="10% boost", default=(abs(current_val - 1.1) < 0.0001)),
+            discord.SelectOption(label="15%", value="1.15", description="15% boost", default=(abs(current_val - 1.15) < 0.0001)),
+            discord.SelectOption(label="20%", value="1.2", description="20% boost", default=(abs(current_val - 1.2) < 0.0001)),
+            discord.SelectOption(label="30%", value="1.3", description="30% boost", default=(abs(current_val - 1.3) < 0.0001)),
+        ]
+    elif option == "mayor":
+        return [
+            discord.SelectOption(label="0%", value="1", description="No boost", default=(abs(current_val - 1.0) < 0.0001)),
+            discord.SelectOption(label="Derpy (50%)", value="1.5", description="50% boost", default=(abs(current_val - 1.5) < 0.0001)),
+            discord.SelectOption(label="Aura (55%, probably bugged. select Derpy)", value="1.55", description="55% boost", default=(abs(current_val - 1.55) < 0.0001)),
+        ]
+    return None
+
 class BonusSelectView(View):
     
     def __init__(self, bot: commands.Bot, dungeon_classes: dict, base_floor: float, 
@@ -165,71 +224,12 @@ class BonusSelectView(View):
         self.add_item(self.main_select)
     
     def _create_value_select(self, option: str) -> ValueSelect:
-        if option == "ring":
-            current_val = self.bonuses.get("ring", default_bonuses["ring"])
-            options = [
-                discord.SelectOption(label="Yes", value="0.1", description="10% bonus", default=(abs(current_val - 0.1) < 0.0001)),
-                discord.SelectOption(label="No", value="0", description="No bonus", default=(abs(current_val - 0.0) < 0.0001)),
-            ]
-        elif option == "hecatomb":
-            current_val = self.bonuses.get("hecatomb", default_bonuses["hecatomb"])
-            options = [
-                discord.SelectOption(label="X", value="0.02", description="2% (default)", default=(abs(current_val - 0.02) < 0.0001)),
-                discord.SelectOption(label="IX", value="0.0184", description="1.84%", default=(abs(current_val - 0.0184) < 0.0001)),
-                discord.SelectOption(label="VIII", value="0.0168", description="1.68%", default=(abs(current_val - 0.0168) < 0.0001)),
-                discord.SelectOption(label="VII", value="0.0152", description="1.52%", default=(abs(current_val - 0.0152) < 0.0001)),
-                discord.SelectOption(label="VI", value="0.0136", description="1.36%", default=(abs(current_val - 0.0136) < 0.0001)),
-                discord.SelectOption(label="V", value="0.012", description="1.2%", default=(abs(current_val - 0.012) < 0.0001)),
-                discord.SelectOption(label="IV", value="0.0104", description="1.04%", default=(abs(current_val - 0.0104) < 0.0001)),
-                discord.SelectOption(label="III", value="0.0088", description="0.88%", default=(abs(current_val - 0.0088) < 0.0001)),
-                discord.SelectOption(label="II", value="0.0072", description="0.72%", default=(abs(current_val - 0.0072) < 0.0001)),
-                discord.SelectOption(label="I", value="0.0056", description="0.56%", default=(abs(current_val - 0.0056) < 0.0001)),
-                discord.SelectOption(label="0", value="0", description="No Hecatomb", default=(abs(current_val - 0.0) < 0.0001)),
-            ]
-        elif option == "scarf_accessory":
-            current_val = self.bonuses.get("scarf_accessory", default_bonuses["scarf_accessory"])
-            options = [
-                discord.SelectOption(label="Grimoire (6%)", value="0.06", description="6% bonus", default=(abs(current_val - 0.06) < 0.0001)),
-                discord.SelectOption(label="Thesis (4%)", value="0.04", description="4% bonus", default=(abs(current_val - 0.04) < 0.0001)),
-                discord.SelectOption(label="Studies (2%)", value="0.02", description="2% bonus", default=(abs(current_val - 0.02) < 0.0001)),
-                discord.SelectOption(label="None", value="0.0", description="No scarf accessory", default=(abs(current_val - 0.0) < 0.0001)),
-            ]
-        elif option == "scarf_attribute":
-            current_val = self.bonuses.get("scarf_attribute", default_bonuses["scarf_attribute"])
-            options = [
-                discord.SelectOption(label="0 (0%)", value="0", description="No attribute", default=(abs(current_val - 0.0) < 0.0001)),
-                discord.SelectOption(label="I (2%)", value="0.02", description="2% bonus", default=(abs(current_val - 0.02) < 0.0001)),
-                discord.SelectOption(label="II (4%)", value="0.04", description="4% bonus", default=(abs(current_val - 0.04) < 0.0001)),
-                discord.SelectOption(label="III (6%)", value="0.06", description="6% bonus", default=(abs(current_val - 0.06) < 0.0001)),
-                discord.SelectOption(label="IV (8%)", value="0.08", description="8% bonus", default=(abs(current_val - 0.08) < 0.0001)),
-                discord.SelectOption(label="V (10%)", value="0.1", description="10% bonus", default=(abs(current_val - 0.1) < 0.0001)),
-                discord.SelectOption(label="VI (12%)", value="0.12", description="12% bonus", default=(abs(current_val - 0.12) < 0.0001)),
-                discord.SelectOption(label="VII (14%)", value="0.14", description="14% bonus", default=(abs(current_val - 0.14) < 0.0001)),
-                discord.SelectOption(label="VIII (16%)", value="0.16", description="16% bonus", default=(abs(current_val - 0.16) < 0.0001)),
-                discord.SelectOption(label="IX (18%)", value="0.18", description="18% bonus", default=(abs(current_val - 0.18) < 0.0001)),
-                discord.SelectOption(label="X (20%)", value="0.2", description="20% bonus", default=(abs(current_val - 0.2) < 0.0001)),
-            ]
-        elif option == "global":
-            current_val = self.bonuses.get("global", default_bonuses["global"])
-            options = [
-                discord.SelectOption(label="0%", value="1", description="No boost", default=(abs(current_val - 1.0) < 0.0001)),
-                discord.SelectOption(label="5%", value="1.05", description="5% boost", default=(abs(current_val - 1.05) < 0.0001)),
-                discord.SelectOption(label="10%", value="1.1", description="10% boost", default=(abs(current_val - 1.1) < 0.0001)),
-                discord.SelectOption(label="15%", value="1.15", description="15% boost", default=(abs(current_val - 1.15) < 0.0001)),
-                discord.SelectOption(label="20%", value="1.2", description="20% boost", default=(abs(current_val - 1.2) < 0.0001)),
-                discord.SelectOption(label="30%", value="1.3", description="30% boost", default=(abs(current_val - 1.3) < 0.0001)),
-            ]
-        elif option == "mayor":
-            current_val = self.bonuses.get("mayor", default_bonuses["mayor"])
-            options = [
-                discord.SelectOption(label="0%", value="1", description="No boost", default=(abs(current_val - 1.0) < 0.0001)),
-                discord.SelectOption(label="Derpy (50%)", value="1.5", description="50% boost", default=(abs(current_val - 1.5) < 0.0001)),
-                discord.SelectOption(label="Aura (55%, probably bugged. select Derpy)", value="1.55", description="55% boost", default=(abs(current_val - 1.55) < 0.0001)),
-            ]
-        else:
-            return None
+        current_val = self.bonuses.get(option, default_bonuses.get(option, 0))
+        options = _create_option_list(option, current_val)
         
-        return ValueSelect(self, option, options)
+        if options:
+            return ValueSelect(self, option, options)
+        return None
     
     def _reset_view(self):
         self.clear_items()
@@ -371,71 +371,12 @@ class DefaultSelectView(View):
         self.add_item(self.main_select)
     
     def _create_value_select(self, option: str) -> DefaultValueSelect:
-        if option == "ring":
-            current_val = default_bonuses.get("ring", 0.1)
-            options = [
-                discord.SelectOption(label="Yes", value="0.1", description="10% bonus", default=(abs(current_val - 0.1) < 0.0001)),
-                discord.SelectOption(label="No", value="0", description="No bonus", default=(abs(current_val - 0.0) < 0.0001)),
-            ]
-        elif option == "hecatomb":
-            current_val = default_bonuses.get("hecatomb", 0.02)
-            options = [
-                discord.SelectOption(label="X", value="0.02", description="2% (default)", default=(abs(current_val - 0.02) < 0.0001)),
-                discord.SelectOption(label="IX", value="0.0184", description="1.84%", default=(abs(current_val - 0.0184) < 0.0001)),
-                discord.SelectOption(label="VIII", value="0.0168", description="1.68%", default=(abs(current_val - 0.0168) < 0.0001)),
-                discord.SelectOption(label="VII", value="0.0152", description="1.52%", default=(abs(current_val - 0.0152) < 0.0001)),
-                discord.SelectOption(label="VI", value="0.0136", description="1.36%", default=(abs(current_val - 0.0136) < 0.0001)),
-                discord.SelectOption(label="V", value="0.012", description="1.2%", default=(abs(current_val - 0.012) < 0.0001)),
-                discord.SelectOption(label="IV", value="0.0104", description="1.04%", default=(abs(current_val - 0.0104) < 0.0001)),
-                discord.SelectOption(label="III", value="0.0088", description="0.88%", default=(abs(current_val - 0.0088) < 0.0001)),
-                discord.SelectOption(label="II", value="0.0072", description="0.72%", default=(abs(current_val - 0.0072) < 0.0001)),
-                discord.SelectOption(label="I", value="0.0056", description="0.56%", default=(abs(current_val - 0.0056) < 0.0001)),
-                discord.SelectOption(label="0", value="0", description="No Hecatomb", default=(abs(current_val - 0.0) < 0.0001)),
-            ]
-        elif option == "scarf_accessory":
-            current_val = default_bonuses.get("scarf_accessory", 0.06)
-            options = [
-                discord.SelectOption(label="Grimoire (6%)", value="0.06", description="6% bonus", default=(abs(current_val - 0.06) < 0.0001)),
-                discord.SelectOption(label="Thesis (4%)", value="0.04", description="4% bonus", default=(abs(current_val - 0.04) < 0.0001)),
-                discord.SelectOption(label="Studies (2%)", value="0.02", description="2% bonus", default=(abs(current_val - 0.02) < 0.0001)),
-                discord.SelectOption(label="None", value="0.0", description="No scarf accessory", default=(abs(current_val - 0.0) < 0.0001)),
-            ]
-        elif option == "scarf_attribute":
-            current_val = default_bonuses.get("scarf_attribute", 0.0)
-            options = [
-                discord.SelectOption(label="0 (0%)", value="0", description="No attribute", default=(abs(current_val - 0.0) < 0.0001)),
-                discord.SelectOption(label="I (2%)", value="0.02", description="2% bonus", default=(abs(current_val - 0.02) < 0.0001)),
-                discord.SelectOption(label="II (4%)", value="0.04", description="4% bonus", default=(abs(current_val - 0.04) < 0.0001)),
-                discord.SelectOption(label="III (6%)", value="0.06", description="6% bonus", default=(abs(current_val - 0.06) < 0.0001)),
-                discord.SelectOption(label="IV (8%)", value="0.08", description="8% bonus", default=(abs(current_val - 0.08) < 0.0001)),
-                discord.SelectOption(label="V (10%)", value="0.1", description="10% bonus", default=(abs(current_val - 0.1) < 0.0001)),
-                discord.SelectOption(label="VI (12%)", value="0.12", description="12% bonus", default=(abs(current_val - 0.12) < 0.0001)),
-                discord.SelectOption(label="VII (14%)", value="0.14", description="14% bonus", default=(abs(current_val - 0.14) < 0.0001)),
-                discord.SelectOption(label="VIII (16%)", value="0.16", description="16% bonus", default=(abs(current_val - 0.16) < 0.0001)),
-                discord.SelectOption(label="IX (18%)", value="0.18", description="18% bonus", default=(abs(current_val - 0.18) < 0.0001)),
-                discord.SelectOption(label="X (20%)", value="0.2", description="20% bonus", default=(abs(current_val - 0.2) < 0.0001)),
-            ]
-        elif option == "global":
-            current_val = default_bonuses.get("global", 1.0)
-            options = [
-                discord.SelectOption(label="0%", value="1", description="No boost", default=(abs(current_val - 1.0) < 0.0001)),
-                discord.SelectOption(label="5%", value="1.05", description="5% boost", default=(abs(current_val - 1.05) < 0.0001)),
-                discord.SelectOption(label="10%", value="1.1", description="10% boost", default=(abs(current_val - 1.1) < 0.0001)),
-                discord.SelectOption(label="15%", value="1.15", description="15% boost", default=(abs(current_val - 1.15) < 0.0001)),
-                discord.SelectOption(label="20%", value="1.2", description="20% boost", default=(abs(current_val - 1.2) < 0.0001)),
-                discord.SelectOption(label="30%", value="1.3", description="30% boost", default=(abs(current_val - 1.3) < 0.0001)),
-            ]
-        elif option == "mayor":
-            current_val = default_bonuses.get("mayor", 1.0)
-            options = [
-                discord.SelectOption(label="0%", value="1", description="No boost", default=(abs(current_val - 1.0) < 0.0001)),
-                discord.SelectOption(label="Derpy (50%)", value="1.5", description="50% boost", default=(abs(current_val - 1.5) < 0.0001)),
-                discord.SelectOption(label="Aura (55%, probably bugged. select Derpy)", value="1.55", description="55% boost", default=(abs(current_val - 1.55) < 0.0001)),
-            ]
-        else:
-            return None
+        current_val = default_bonuses.get(option, 0)
+        options = _create_option_list(option, current_val)
         
-        return DefaultValueSelect(self, option, options)
+        if options:
+            return DefaultValueSelect(self, option, options)
+        return None
     
     def _reset_view(self):
         self.clear_items()
@@ -507,7 +448,7 @@ class Dungeons(commands.Cog):
             try:
                 uuid_check = await get_uuid(ign)
                 if uuid_check:
-                    daily_manager.register_user(interaction.user.id, ign, uuid_check)
+                    await daily_manager.register_user(interaction.user.id, ign, uuid_check)
             except:
                 pass
         

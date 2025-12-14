@@ -4,7 +4,7 @@ from discord.ext import commands
 from services.link_manager import link_manager
 from services.daily_manager import daily_manager
 from services.api import get_uuid
-from core.config import OWNER_IDS
+
 
 class Settings(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -21,7 +21,7 @@ class Settings(commands.Cog):
             return
 
         link_manager.link_user(interaction.user.id, ign)
-        daily_manager.register_user(interaction.user.id, ign, uuid)
+        await daily_manager.register_user(interaction.user.id, ign, uuid)
         await interaction.response.send_message(f"✅ Successfully linked your Discord account to **{ign}**!", ephemeral=True)
 
     @app_commands.command(name="unlink", description="Unlink your Discord account from any Hypixel IGN")

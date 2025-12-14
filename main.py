@@ -12,7 +12,7 @@ bot = commands.Bot(command_prefix="!", intents=INTENTS)
 async def track_daily_stats():
     log_info("Running scheduled daily stats update...")
     
-    daily_manager.check_resets()
+    await daily_manager.check_resets()
     
     users = daily_manager.get_tracked_users()
     if not users:
@@ -24,7 +24,7 @@ async def track_daily_stats():
         try:
             xp_data = await get_dungeon_xp(uuid)
             if xp_data:
-                daily_manager.update_user_data(user_id, xp_data)
+                await daily_manager.update_user_data(user_id, xp_data)
         except Exception as e:
             log_error(f"Error updating user {uuid}: {e}")
         
@@ -34,6 +34,7 @@ async def track_daily_stats():
 
 @bot.listen()
 async def on_ready():
+    await daily_manager.initialize()
     await daily_manager.sanitize_data()
     if not track_daily_stats.is_running():
         track_daily_stats.start()

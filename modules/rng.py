@@ -81,7 +81,6 @@ class RngItemSelect(Select):
     def __init__(self, parent_view, floor):
         options = []
         
-        # Add floor specific drops
         for item in RNG_DROPS[floor]:
             opt = discord.SelectOption(label=item, value=item)
             emoji = DROP_EMOJIS.get(item)
@@ -159,7 +158,6 @@ class RngActionButton(discord.ui.Button):
         self.parent_view.update_view()
         await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
 
-
 class RngView(View):
     def __init__(self, target_user_id, target_user_name, invoker_id, run_counts=None, target_ign=None):
         super().__init__(timeout=300)
@@ -213,27 +211,46 @@ class RngView(View):
             self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_catacombs:1448690272786448545>")
             self.children[-1].label = None
 
+
+    def _calculate_item_details(self, item_name: str, count: int, prices: dict) -> tuple[float, list[str]]:
+        emoji = DROP_EMOJIS.get(item_name)
+        label = f"{emoji} {item_name}" if emoji else item_name
+        
+        item_id = DROP_IDS.get(item_name)
+        price = float(prices.get(item_id, 0))
+        chest_cost = CHEST_COSTS.get(item_name, 0)
+        profit = max(0, price - chest_cost)
+        
+        val = profit * count
+        
+        return val, label, price, chest_cost, profit
+
+    def _calculate_runs_for_filter(self, floor_runs_data: dict | int):
+        if isinstance(floor_runs_data, int):
+             floor_runs_data = {"normal": 0, "master": floor_runs_data}
+             
+        if self.filter_mode == "COMBINED":
+            return floor_runs_data.get("normal", 0) + floor_runs_data.get("master", 0)
+        elif self.filter_mode == "MASTER":
+            return floor_runs_data.get("master", 0)
+        elif self.filter_mode == "NORMAL":
+            return floor_runs_data.get("normal", 0)
+        return 0
+
     async def get_embed(self):
         embed = discord.Embed(color=0x00ff99)
         prices = await get_all_prices()
         
         if self.current_item:
-            emoji = DROP_EMOJIS.get(self.current_item)
-            label = f"{emoji} {self.current_item}" if emoji else self.current_item
-            embed.title = label
-            
             floor_key = self.current_floor
             if self.current_item in GLOBAL_DROPS:
                 floor_key = "Global"
                 
             count = rng_manager.get_floor_stats(self.target_user_id, floor_key).get(self.current_item, 0)
             
-            item_id = DROP_IDS.get(self.current_item)
-            price = float(prices.get(item_id, 0))
-            chest_cost = CHEST_COSTS.get(self.current_item, 0)
-            profit = max(0, price - chest_cost)
+            total_val, label, price, chest_cost, profit = self._calculate_item_details(self.current_item, count, prices)
             
-            total_val = profit * count
+            embed.title = label
             
             price_text = format_trunc(price) if price > 0 else "?"
             val_text = format_trunc(total_val)
@@ -241,22 +258,12 @@ class RngView(View):
             desc_lines = [f"**Current Count:** {count}", f"**Avg Price:** {price_text}", f"**Chest Cost:** {format_trunc(chest_cost)}", f"**Total Profit:** {val_text}"]
             
             floor_runs_data = self.run_counts.get(self.current_floor, {"normal": 0, "master": 0})
-            if isinstance(floor_runs_data, int):
-                 floor_runs_data = {"normal": 0, "master": floor_runs_data}
+            runs = self._calculate_runs_for_filter(floor_runs_data)
 
-            runs = 0
-            if self.filter_mode == "COMBINED":
-                runs = floor_runs_data.get("normal", 0) + floor_runs_data.get("master", 0)
-            elif self.filter_mode == "MASTER":
-                runs = floor_runs_data.get("master", 0)
-            elif self.filter_mode == "NORMAL":
-                runs = floor_runs_data.get("normal", 0)
-                
-            if runs > 0 and count > 0:
-                profit_per_run = total_val / runs
-                desc_lines.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
-                desc_lines.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
-            elif runs > 0:
+            if runs > 0:
+                if count > 0:
+                    profit_per_run = total_val / runs
+                    desc_lines.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
                 desc_lines.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
             
             embed.description = "\n".join(desc_lines)
@@ -270,15 +277,7 @@ class RngView(View):
             
             for item in RNG_DROPS[self.current_floor]:
                 count = stats.get(item, 0)
-                emoji = DROP_EMOJIS.get(item)
-                label = f"{emoji} {item}" if emoji else item
-                
-                item_id = DROP_IDS.get(item)
-                price = float(prices.get(item_id, 0))
-                chest_cost = CHEST_COSTS.get(item, 0)
-                profit = max(0, price - chest_cost)
-                
-                val = profit * count
+                val, label, price, chest_cost, profit = self._calculate_item_details(item, count, prices)
                 floor_total_val += val
                 
                 price_str = f"({format_trunc(profit)})" if price > 0 else ""
@@ -289,27 +288,18 @@ class RngView(View):
                      desc.append(f"{label}: {count}")
             
             floor_runs_data = self.run_counts.get(self.current_floor, {"normal": 0, "master": 0})
-            if isinstance(floor_runs_data, int):
-                 floor_runs_data = {"normal": 0, "master": floor_runs_data}
-            
-            runs = 0
-            if self.filter_mode == "COMBINED":
-                runs = floor_runs_data.get("normal", 0) + floor_runs_data.get("master", 0)
-            elif self.filter_mode == "MASTER":
-                runs = floor_runs_data.get("master", 0)
-            elif self.filter_mode == "NORMAL":
-                runs = floor_runs_data.get("normal", 0)
+            runs = self._calculate_runs_for_filter(floor_runs_data)
+
             log_debug(f"Floor {self.current_floor}: Runs={runs}, Profit={floor_total_val}")
             
             if floor_total_val > 0:
                 desc.append(f"\n**Floor Profit:** {format_trunc(floor_total_val)}")
-                
                 if runs > 0:
                     profit_per_run = floor_total_val / runs
                     desc.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
-                    desc.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
-            elif runs > 0:
-                desc.append(f"\n**Total Runs:** {runs:,} ({self.filter_mode.title()})")
+            
+            if runs > 0:
+                desc.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
                 
             embed.description = "\n".join(desc)
             if not desc:
@@ -329,19 +319,10 @@ class RngView(View):
                 for item_name in RNG_DROPS[floor_name]:
                     count = floor_stats.get(item_name, 0)
                     if count > 0:
-                        emoji = DROP_EMOJIS.get(item_name)
-                        label = f"{emoji} {item_name}" if emoji else item_name
-                        
-                        item_id = DROP_IDS.get(item_name)
-                        price = float(prices.get(item_id, 0))
-                        chest_cost = CHEST_COSTS.get(item_name, 0)
-                        profit = max(0, price - chest_cost)
-                        
-                        val = profit * count
-                        grand_total += val
-                        
-                        desc.append(f"**{label}:** {count}")
                         total_drops_found = True
+                        val, label, price, chest_cost, profit = self._calculate_item_details(item_name, count, prices)
+                        grand_total += val
+                        desc.append(f"**{label}:** {count}")
 
             global_stats = user_stats.get("Global", {})
             has_global = False
@@ -352,17 +333,8 @@ class RngView(View):
                 if count > 0:
                     has_global = True
                     total_drops_found = True
-                    emoji = DROP_EMOJIS.get(item_name, "")
-                    
-                    item_id = DROP_IDS.get(item_name)
-                    price = float(prices.get(item_id, 0))
-                    chest_cost = CHEST_COSTS.get(item_name, 0)
-                    profit = max(0, price - chest_cost)
-                    
-                    val = profit * count
+                    val, label, price, chest_cost, profit = self._calculate_item_details(item_name, count, prices)
                     grand_total += val
-                    
-                    label = f"{emoji} {item_name}" if emoji else item_name
                     global_desc.append(f"**{label}:** {count}")
             
             if has_global:
@@ -371,16 +343,7 @@ class RngView(View):
 
             total_runs = 0
             for floor_data in self.run_counts.values():
-                if isinstance(floor_data, int):
-                    if self.filter_mode in ["COMBINED", "MASTER"]:
-                        total_runs += floor_data
-                elif isinstance(floor_data, dict):
-                    if self.filter_mode == "COMBINED":
-                        total_runs += floor_data.get("normal", 0) + floor_data.get("master", 0)
-                    elif self.filter_mode == "MASTER":
-                        total_runs += floor_data.get("master", 0)
-                    elif self.filter_mode == "NORMAL":
-                         total_runs += floor_data.get("normal", 0)
+                total_runs += self._calculate_runs_for_filter(floor_data)
             
             if not total_drops_found:
                  desc.append("No drops recorded yet.")
@@ -390,10 +353,9 @@ class RngView(View):
                  if total_runs > 0:
                      avg_profit_per_run = grand_total / total_runs
                      desc.append(f"**Avg Profit/Run:** {format_trunc(avg_profit_per_run)}")
-                     desc.append(f"**Total Runs:** {total_runs:,} ({self.filter_mode.title()})")
             
-            if total_runs > 0 and not total_drops_found:
-                desc.append(f"\n**Total Runs:** {total_runs:,}")
+            if total_runs > 0:
+                desc.append(f"**Total Runs:** {total_runs:,} ({self.filter_mode.title()})")
                  
             desc.append("\nSelect a floor to view or edit drops.")
             embed.description = "\n".join(desc)

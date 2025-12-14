@@ -7,7 +7,7 @@ import math
 from datetime import datetime, timedelta, timezone
 from core.config import OWNER_IDS
 from core.logger import log_info, log_error
-from services.api import get_uuid
+from services.api import get_uuid, get_dungeon_xp
 from services.daily_manager import daily_manager
 from services.link_manager import link_manager
 
@@ -80,8 +80,6 @@ class DailyView(View):
         self.page = 1
         self.total_pages = 1
 
-        # Define buttons here so they are registered
-        # Row 0
         self.add_item(discord.ui.Button(label="Today", style=discord.ButtonStyle.primary, disabled=True, row=0, custom_id="daily_today"))
         self.children[0].callback = self.today_btn
         
@@ -94,7 +92,6 @@ class DailyView(View):
         self.add_item(discord.ui.Button(label="Force Update", style=discord.ButtonStyle.danger, row=0, custom_id="daily_force"))
         self.children[3].callback = self.force_update_btn
         
-        # Row 1
         self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, row=1, custom_id="daily_prev"))
         self.children[4].callback = self.prev_btn
         
@@ -147,15 +144,7 @@ class DailyView(View):
             desc.append(line)
             
         
-        now = datetime.now(timezone.utc)
-        target_daily = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        next_daily_ts = int(target_daily.timestamp())
-        
-        if now.month == 12:
-            target_monthly = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:
-            target_monthly = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        next_monthly_ts = int(target_monthly.timestamp())
+        next_daily_ts, next_monthly_ts = daily_manager.get_reset_timestamps()
 
         desc.append(f"\nResets: **Daily** <t:{next_daily_ts}:R> • **Monthly** <t:{next_monthly_ts}:R>\nNext global update: {update_str} • Last update: {last_update_str}")
         
@@ -267,39 +256,13 @@ class DailyView(View):
         
         try:
             tracked_users = daily_manager.get_tracked_users()
-            total_users = len(tracked_users)
-            
-            if total_users == 0:
+            if not tracked_users:
                 await interaction.followup.send("❌ No users to update.", ephemeral=True)
                 return
 
-            status_msg = await interaction.followup.send(f"🔄 **Force Update Started**\nQueue: {total_users} users...")
+            status_msg = await interaction.followup.send(f"🔄 **Force Update Started**\nQueue: {len(tracked_users)} users...")
             
-            updated_count = 0
-            errors = 0
-            
-            for i, (user_id, uuid) in enumerate(tracked_users, 1):
-                try:
-                    if i <= 5 or i % 5 == 0:
-                         await status_msg.edit(content=f"🔄 **Force Update In Progress**\nProcessing: {i}/{total_users}\nUpdated: {updated_count}\nErrors: {errors}")
-                    
-                    if not uuid:
-                        log_error(f"Skipping update for {user_id}: No UUID")
-                        errors += 1
-                        continue
-
-                    # Need to import get_dungeon_xp here or top level
-                    from services.api import get_dungeon_xp
-                    xp_data = await get_dungeon_xp(uuid)
-                    if xp_data:
-                        daily_manager.update_user_data(user_id, xp_data)
-                        updated_count += 1
-                    else:
-                        errors += 1
-                        
-                except Exception as e:
-                    log_error(f"Error updating user {user_id}: {e}")
-                    errors += 1
+            updated_count, errors, total_users = await daily_manager.force_update_all(status_msg)
             
             await status_msg.edit(content=f"✅ **Force Update Complete**\nTotal: {total_users}\nUpdated: {updated_count}\nErrors: {errors}")
             
@@ -352,9 +315,9 @@ class Leaderboard(commands.Cog):
         try:
             uuid = await get_uuid(ign)
             if uuid:
-                daily_manager.register_user(interaction.user.id, ign, uuid)
+                await daily_manager.register_user(interaction.user.id, ign, uuid)
         except Exception:
-            pass # Continue even if uuid fetch fails temporarily, maybe we have data
+            pass
 
         view = DailyView(interaction.user.id, ign)
         embed = view._get_leaderboard_embed("daily")

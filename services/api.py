@@ -28,6 +28,10 @@ async def get_uuid(name: str):
 
     log_debug(f"Requesting UUID for {name}")
     async with aiohttp.ClientSession() as session:
+        if not name.replace("_", "").isalnum():
+            log_error(f"Invalid name format: {name}")
+            return None
+            
         msg = quote(name)
         async with session.get(f"https://playerdb.co/api/player/minecraft/{msg}", headers=HEADERS) as r:
             if r.status != 200:
@@ -45,6 +49,10 @@ async def get_profile_data(uuid: str):
     if cached:
         log_debug(f"Using cached data for {uuid}")
         return cached
+    if not uuid or len(uuid) != 32 or not all(c in '0123456789abcdefABCDEF' for c in uuid):
+        log_error(f"Invalid UUID format: {uuid}")
+        return None
+        
     url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/skyblock/profiles?uuid={uuid}"
     log_debug(f"Requesting profile data: {url}")
     async with aiohttp.ClientSession() as session:

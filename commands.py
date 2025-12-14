@@ -7,7 +7,7 @@ import time
 import math
 from datetime import datetime, timedelta, timezone
 
-from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS, RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS
+from config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS, RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS, GLOBAL_DROPS
 from utils.logging import log_info, log_debug, log_error
 from api import get_uuid, get_profile_data, get_all_prices, get_dungeon_runs, get_prices_expiry, get_dungeon_xp
 from simulation import simulate_to_level_all50
@@ -551,12 +551,22 @@ class RngFloorSelect(Select):
 class RngItemSelect(Select):
     def __init__(self, parent_view, floor):
         options = []
+        
+        # Add floor specific drops
         for item in RNG_DROPS[floor]:
             opt = discord.SelectOption(label=item, value=item)
             emoji = DROP_EMOJIS.get(item)
             if emoji:
                 opt.emoji = discord.PartialEmoji.from_str(emoji)
             options.append(opt)
+            
+        for item in GLOBAL_DROPS:
+            opt = discord.SelectOption(label=item, value=item)
+            emoji = DROP_EMOJIS.get(item)
+            if emoji:
+                opt.emoji = discord.PartialEmoji.from_str(emoji)
+            options.append(opt)
+            
         super().__init__(placeholder="Select a Drop...", options=options, custom_id="rng_item_select")
         self.parent_view = parent_view
 
@@ -582,10 +592,18 @@ class RngActionButton(discord.ui.Button):
              return
 
         if self.action == "add":
-            rng_manager.update_drop(self.parent_view.target_user_id, self.parent_view.current_floor, self.parent_view.current_item, 1)
+            floor_key = self.parent_view.current_floor
+            if self.parent_view.current_item in GLOBAL_DROPS:
+                floor_key = "Global"
+            
+            rng_manager.update_drop(self.parent_view.target_user_id, floor_key, self.parent_view.current_item, 1)
             log_info(f"RNG View ({self.parent_view.target_user_name}): Added {self.parent_view.current_item}")
         elif self.action == "subtract":
-            rng_manager.update_drop(self.parent_view.target_user_id, self.parent_view.current_floor, self.parent_view.current_item, -1)
+            floor_key = self.parent_view.current_floor
+            if self.parent_view.current_item in GLOBAL_DROPS:
+                floor_key = "Global"
+
+            rng_manager.update_drop(self.parent_view.target_user_id, floor_key, self.parent_view.current_item, -1)
             log_info(f"RNG View ({self.parent_view.target_user_name}): Removed {self.parent_view.current_item}")
         elif self.action == "back":
             log_info(f"RNG View ({self.parent_view.target_user_name}): Go back")
@@ -683,7 +701,12 @@ class RngView(View):
             emoji = DROP_EMOJIS.get(self.current_item)
             label = f"{emoji} {self.current_item}" if emoji else self.current_item
             embed.title = label
-            count = rng_manager.get_floor_stats(self.target_user_id, self.current_floor).get(self.current_item, 0)
+            
+            floor_key = self.current_floor
+            if self.current_item in GLOBAL_DROPS:
+                floor_key = "Global"
+                
+            count = rng_manager.get_floor_stats(self.target_user_id, floor_key).get(self.current_item, 0)
             
             item_id = DROP_IDS.get(self.current_item)
             price = float(prices.get(item_id, 0))
@@ -800,6 +823,32 @@ class RngView(View):
                         
                         desc.append(f"**{label}:** {count}")
                         total_drops_found = True
+
+            global_stats = user_stats.get("Global", {})
+            has_global = False
+            global_desc = []
+            
+            for item_name in GLOBAL_DROPS:
+                count = global_stats.get(item_name, 0)
+                if count > 0:
+                    has_global = True
+                    total_drops_found = True
+                    emoji = DROP_EMOJIS.get(item_name, "")
+                    
+                    item_id = DROP_IDS.get(item_name)
+                    price = float(prices.get(item_id, 0))
+                    chest_cost = CHEST_COSTS.get(item_name, 0)
+                    profit = max(0, price - chest_cost)
+                    
+                    val = profit * count
+                    grand_total += val
+                    
+                    label = f"{emoji} {item_name}" if emoji else item_name
+                    global_desc.append(f"**{label}:** {count}")
+            
+            if has_global:
+                 desc.append("\n**Global Drops**")
+                 desc.extend(global_desc)
 
             total_runs = 0
             for floor_data in self.run_counts.values():

@@ -42,6 +42,10 @@ FLOOR_XP_MAP = {
 PROFILE_CACHE_TTL = 60 # 1 minute
 PRICES_CACHE_TTL = 3600 # 1 hour
 
+GLOBAL_DROPS = [
+    "Ice Spray"
+]
+
 RNG_DROPS = {
     "Floor 7 (Necron)": [
         "Necron's Handle",
@@ -103,7 +107,8 @@ DROP_EMOJIS = {
     "Implosion": "<a:SkyBlock_items_scroll:1448304563923718194>",
     "Wither Shield": "<a:SkyBlock_items_scroll:1448304563923718194>",
     "Shadow Warp": "<a:SkyBlock_items_scroll:1448304563923718194>",
-    "Necron's Handle": "<a:SkyBlock_items_necrons_handle:1448302537144008896>"
+    "Necron's Handle": "<a:SkyBlock_items_necrons_handle:1448302537144008896>",
+    "Ice Spray": "<a:SkyBlock_items_enchanted_stick:1449788369709039637>"
 }
 
 DROP_IDS = {
@@ -128,7 +133,8 @@ DROP_IDS = {
     "Master Skull - Tier 5": "MASTER_SKULL_TIER_5",
     "Thunderlord VII": "ENCHANTMENT_THUNDERLORD_7",
     "Dark Claymore": "DARK_CLAYMORE",
-    "50% M7 Skeleton Master Chestplate": "SKELETON_MASTER_CHESTPLATE_50"
+    "50% M7 Skeleton Master Chestplate": "SKELETON_MASTER_CHESTPLATE_50",
+    "Ice Spray": "ICE_SPRAY_WAND"
 }
 
 CHEST_COSTS = {

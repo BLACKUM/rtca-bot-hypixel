@@ -6,10 +6,17 @@ from utils.logging import log_debug, log_error, log_info
 from cache import cache_get, cache_set, get_cache_expiry
 
 
-
+# cloudflare bypass, i hate i even have to do this
 HEADERS = {
-    "User-Agent": "RTCA-Hypixel-Bot/1.0",
-    "Accept": "application/json"
+    "User-Agent": "Mozilla/5.0 (Windows NT 6.2; WOW64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
 }
 
 
@@ -44,7 +51,11 @@ async def get_profile_data(uuid: str):
         try:
             async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as r:
                 if r.status != 200:
-                    log_error(f"Profile request failed ({r.status})")
+                    try:
+                        text = await r.text()
+                        log_error(f"Profile request failed ({r.status}): {text[:200]}")
+                    except:
+                        log_error(f"Profile request failed ({r.status})")
                     return None
                 data = await r.json()
                 cache_set(uuid, data, ttl=PROFILE_CACHE_TTL)
@@ -66,7 +77,11 @@ async def get_bazaar_prices():
         try:
             async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 if r.status != 200:
-                    log_error(f"Bazaar request failed ({r.status})")
+                    try:
+                        text = await r.text()
+                        log_error(f"Bazaar request failed ({r.status}): {text[:200]}")
+                    except:
+                        log_error(f"Bazaar request failed ({r.status})")
                     cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
                     return {}
                 data = await r.json()
@@ -96,7 +111,11 @@ async def get_ah_prices():
         try:
             async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 if r.status != 200:
-                    log_error(f"AH request failed ({r.status})")
+                    try:
+                        text = await r.text()
+                        log_error(f"AH request failed ({r.status}): {text[:200]}")
+                    except:
+                        log_error(f"AH request failed ({r.status})")
                     cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
                     return {}
                 prices = await r.json()
@@ -106,8 +125,6 @@ async def get_ah_prices():
             log_error(f"Failed to fetch AH prices: {e}")
             cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
             return {}
-
-
 
 async def get_all_prices():
     bz_future = get_bazaar_prices()

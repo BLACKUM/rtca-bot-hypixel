@@ -14,7 +14,7 @@ def cache_get(key: str):
     return data
 
 
-MAX_CACHE_SIZE = 1000
+MAX_CACHE_SIZE = 10000
 
 def _cleanup_cache():
     now = time.time()

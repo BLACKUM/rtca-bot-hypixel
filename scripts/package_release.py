@@ -4,15 +4,12 @@ import shutil
 from pathlib import Path
 
 def package_release():
-    # Define paths
     project_root = Path(__file__).parent.parent
     release_dir = project_root / "release"
     output_filename = "rtca-bot-hypixel-release.zip"
     
-    # Create release directory
     release_dir.mkdir(exist_ok=True)
     
-    # Files/Dirs to exclude
     excludes = {
         '.git', '.gitignore', '.venv', 'venv', '__pycache__', 
         '.vscode', '.idea', 'release', 'scripts', '.github',
@@ -25,7 +22,6 @@ def package_release():
     
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(project_root):
-            # Modify dirs in-place to skip excluded directories
             dirs[:] = [d for d in dirs if d not in excludes]
             
             for file in files:
@@ -37,8 +33,7 @@ def package_release():
                 
                 print(f"Adding: {archive_name}")
                 zipf.write(file_path, archive_name)
-    
-        # Add empty data directory
+                    
         zip_info = zipfile.ZipInfo("data/")
         zipf.writestr(zip_info, "")
         print("Adding: data/ (empty)")

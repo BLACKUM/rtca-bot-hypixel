@@ -6,6 +6,13 @@ from utils.logging import log_debug, log_error, log_info
 from cache import cache_get, cache_set, get_cache_expiry
 
 
+
+HEADERS = {
+    "User-Agent": "RTCA-Hypixel-Bot/1.0",
+    "Accept": "application/json"
+}
+
+
 async def get_uuid(name: str):
     cached = cache_get(name.lower())
     if cached:
@@ -15,7 +22,7 @@ async def get_uuid(name: str):
     log_debug(f"Requesting UUID for {name}")
     async with aiohttp.ClientSession() as session:
         msg = quote(name)
-        async with session.get(f"https://playerdb.co/api/player/minecraft/{msg}") as r:
+        async with session.get(f"https://playerdb.co/api/player/minecraft/{msg}", headers=HEADERS) as r:
             if r.status != 200:
                 log_error(f"UUID request failed ({r.status})")
                 return None
@@ -35,7 +42,7 @@ async def get_profile_data(uuid: str):
     log_debug(f"Requesting profile data: {url}")
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+            async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as r:
                 if r.status != 200:
                     log_error(f"Profile request failed ({r.status})")
                     return None
@@ -57,7 +64,7 @@ async def get_bazaar_prices():
     
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 if r.status != 200:
                     log_error(f"Bazaar request failed ({r.status})")
                     cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
@@ -87,7 +94,7 @@ async def get_ah_prices():
     async with aiohttp.ClientSession() as session:
         log_debug(f"Requesting AH prices: {url}")
         try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10)) as r:
                 if r.status != 200:
                     log_error(f"AH request failed ({r.status})")
                     cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
@@ -99,6 +106,7 @@ async def get_ah_prices():
             log_error(f"Failed to fetch AH prices: {e}")
             cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
             return {}
+
 
 
 async def get_all_prices():

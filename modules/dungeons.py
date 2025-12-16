@@ -88,15 +88,12 @@ class ValueSelect(Select):
         
         self.parent_view._reset_view()
         
-        target_message = self.parent_view.message if self.parent_view.message else message
         try:
-            await target_message.edit(embed=embed, view=self.parent_view)
-            self.parent_view.message = target_message
+            await interaction.edit_original_response(embed=embed, view=self.parent_view)
         except Exception as e:
             log_error(f"Failed to edit message: {e}")
             try:
-                await interaction.message.edit(embed=embed, view=self.parent_view)
-                self.parent_view.message = interaction.message
+                await interaction.edit_original_response(embed=embed, view=self.parent_view)
             except Exception as e2:
                 log_error(f"Failed to edit message with interaction.message: {e2}")
         
@@ -122,8 +119,6 @@ class MainSelect(Select):
     async def callback(self, interaction: discord.Interaction):
         option = self.values[0]
         
-        message = interaction.message
-        
         try:
             await interaction.response.defer(ephemeral=False)
         except (discord.errors.NotFound, discord.errors.InteractionResponded) as e:
@@ -141,8 +136,7 @@ class MainSelect(Select):
             self.parent_view.add_item(value_select)
         
         try:
-            await message.edit(view=self.parent_view)
-            self.parent_view.message = message
+            await interaction.edit_original_response(view=self.parent_view)
         except Exception as e:
             log_error(f"Failed to edit message in MainSelect: {e}")
 
@@ -299,15 +293,12 @@ class DefaultValueSelect(Select):
         
         self.parent_view._reset_view()
         
-        target_message = self.parent_view.message if self.parent_view.message else message
         try:
-            await target_message.edit(embed=embed, view=self.parent_view)
-            self.parent_view.message = target_message
+            await interaction.edit_original_response(embed=embed, view=self.parent_view)
         except Exception as e:
             log_error(f"Failed to edit message: {e}")
             try:
-                await interaction.message.edit(embed=embed, view=self.parent_view)
-                self.parent_view.message = interaction.message
+                await interaction.edit_original_response(embed=embed, view=self.parent_view)
             except Exception as e2:
                 log_error(f"Failed to edit message with interaction.message: {e2}")
 
@@ -335,8 +326,6 @@ class DefaultMainSelect(Select):
         
         option = self.values[0]
         
-        message = interaction.message
-        
         try:
             await interaction.response.defer(ephemeral=False)
         except (discord.errors.NotFound, discord.errors.InteractionResponded) as e:
@@ -354,8 +343,7 @@ class DefaultMainSelect(Select):
             self.parent_view.add_item(value_select)
         
         try:
-            await message.edit(view=self.parent_view)
-            self.parent_view.message = message
+            await interaction.edit_original_response(view=self.parent_view)
         except Exception as e:
             log_error(f"Failed to edit message in DefaultMainSelect: {e}")
 

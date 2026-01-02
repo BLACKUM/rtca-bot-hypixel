@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Select, View, Modal, TextInput, Button
 import time
-from core.config import RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS, GLOBAL_DROPS, OWNER_IDS
+from core.config import RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS, GLOBAL_DROPS, OWNER_IDS, RNG_CATEGORIES
 from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_all_prices, get_dungeon_runs, get_prices_expiry
 from services.rng_manager import rng_manager
@@ -42,7 +42,7 @@ class RngAmountModal(Modal):
                 
             rng_manager.set_drop_count(
                 self.parent_view.target_user_id, 
-                self.parent_view.current_floor, 
+                self.parent_view.current_subcategory, 
                 self.parent_view.current_item, 
                 amount
             )
@@ -56,13 +56,13 @@ class RngAmountModal(Modal):
             log_error(f"Error in RngAmountModal: {e}")
             await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
 
-class RngFloorSelect(Select):
+class RngCategorySelect(Select):
     def __init__(self, parent_view):
         options = [
-            discord.SelectOption(label=floor, value=floor)
-            for floor in RNG_DROPS.keys()
+            discord.SelectOption(label=cat, value=cat)
+            for cat in RNG_CATEGORIES.keys()
         ]
-        super().__init__(placeholder="Select a Floor...", options=options, custom_id="rng_floor_select")
+        super().__init__(placeholder="Select a Category...", options=options, custom_id="rng_category_select")
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
@@ -70,30 +70,52 @@ class RngFloorSelect(Select):
              await interaction.response.send_message("❌ This is not your menu.", ephemeral=True)
              return
 
-        self.parent_view.current_floor = self.values[0]
+        self.parent_view.current_category = self.values[0]
+        self.parent_view.current_subcategory = None
         self.parent_view.current_item = None
         self.parent_view.update_view()
-        log_info(f"RNG View ({self.parent_view.target_user_name}): Selected floor {self.parent_view.current_floor}")
+        await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
+
+class RngSubCategorySelect(Select):
+    def __init__(self, parent_view, category):
+        options = []
+        for sub in RNG_CATEGORIES.get(category, []):
+             options.append(discord.SelectOption(label=sub, value=sub))
+             
+        super().__init__(placeholder=f"Select {category}...", options=options, custom_id="rng_sub_select")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.parent_view.invoker_id:
+             await interaction.response.send_message("❌ This is not your menu.", ephemeral=True)
+             return
+
+        self.parent_view.current_subcategory = self.values[0]
+        self.parent_view.current_item = None
+        self.parent_view.update_view()
+        log_info(f"RNG View ({self.parent_view.target_user_name}): Selected sub {self.parent_view.current_subcategory}")
         await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
 
 
 class RngItemSelect(Select):
-    def __init__(self, parent_view, floor):
+    def __init__(self, parent_view, subcategory):
         options = []
         
-        for item in RNG_DROPS[floor]:
+        for item in RNG_DROPS.get(subcategory, []):
             opt = discord.SelectOption(label=item, value=item)
             emoji = DROP_EMOJIS.get(item)
             if emoji:
                 opt.emoji = discord.PartialEmoji.from_str(emoji)
             options.append(opt)
             
-        for item in GLOBAL_DROPS:
-            opt = discord.SelectOption(label=item, value=item)
-            emoji = DROP_EMOJIS.get(item)
-            if emoji:
-                opt.emoji = discord.PartialEmoji.from_str(emoji)
-            options.append(opt)
+        if parent_view.current_category == "Dungeons":
+            for item in GLOBAL_DROPS:
+                if item not in [o.value for o in options]:
+                     opt = discord.SelectOption(label=item, value=item)
+                     emoji = DROP_EMOJIS.get(item)
+                     if emoji:
+                         opt.emoji = discord.PartialEmoji.from_str(emoji)
+                     options.append(opt)
             
         super().__init__(placeholder="Select a Drop...", options=options, custom_id="rng_item_select")
         self.parent_view = parent_view
@@ -120,25 +142,28 @@ class RngActionButton(discord.ui.Button):
              return
 
         if self.action == "add":
-            floor_key = self.parent_view.current_floor
+            key = self.parent_view.current_subcategory
             if self.parent_view.current_item in GLOBAL_DROPS:
-                floor_key = "Global"
+                key = "Global"
             
-            rng_manager.update_drop(self.parent_view.target_user_id, floor_key, self.parent_view.current_item, 1)
+            rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, 1)
             log_info(f"RNG View ({self.parent_view.target_user_name}): Added {self.parent_view.current_item}")
         elif self.action == "subtract":
-            floor_key = self.parent_view.current_floor
+            key = self.parent_view.current_subcategory
             if self.parent_view.current_item in GLOBAL_DROPS:
-                floor_key = "Global"
+                key = "Global"
 
-            rng_manager.update_drop(self.parent_view.target_user_id, floor_key, self.parent_view.current_item, -1)
+            rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, -1)
             log_info(f"RNG View ({self.parent_view.target_user_name}): Removed {self.parent_view.current_item}")
         elif self.action == "back":
             log_info(f"RNG View ({self.parent_view.target_user_name}): Go back")
             if self.parent_view.current_item:
                 self.parent_view.current_item = None
-            elif self.parent_view.current_floor:
-                self.parent_view.current_floor = None
+            elif self.parent_view.current_subcategory:
+                self.parent_view.current_subcategory = None
+            elif self.parent_view.current_category:
+                self.parent_view.current_category = None
+                
             self.parent_view.update_view()
             await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
             return
@@ -164,8 +189,11 @@ class RngView(View):
         self.target_user_id = str(target_user_id)
         self.target_user_name = target_user_name
         self.invoker_id = invoker_id
-        self.current_floor = None
+        
+        self.current_category = None
+        self.current_subcategory = None
         self.current_item = None
+        
         self.run_counts = run_counts or {}
         self.target_ign = target_ign
         self.filter_mode = "COMBINED"
@@ -179,38 +207,31 @@ class RngView(View):
             self.add_item(RngActionButton(self, "+", discord.ButtonStyle.success, "rng_add", "add"))
             self.add_item(RngActionButton(self, "Set", discord.ButtonStyle.primary, "rng_set", "set"))
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
-        elif self.current_floor:
-            self.add_item(RngItemSelect(self, self.current_floor))
+            
+        elif self.current_subcategory:
+            self.add_item(RngItemSelect(self, self.current_subcategory))
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
 
-            style_combined = discord.ButtonStyle.success if self.filter_mode == "COMBINED" else discord.ButtonStyle.secondary
-            style_master = discord.ButtonStyle.success if self.filter_mode == "MASTER" else discord.ButtonStyle.secondary
-            style_normal = discord.ButtonStyle.success if self.filter_mode == "NORMAL" else discord.ButtonStyle.secondary
+            if self.current_category == "Dungeons":
+                style_combined = discord.ButtonStyle.success if self.filter_mode == "COMBINED" else discord.ButtonStyle.secondary
+                style_master = discord.ButtonStyle.success if self.filter_mode == "MASTER" else discord.ButtonStyle.secondary
+                style_normal = discord.ButtonStyle.success if self.filter_mode == "NORMAL" else discord.ButtonStyle.secondary
+                
+                self.add_item(RngActionButton(self, "Combined", style_combined, "rng_filter_combined", "filter_combined"))
+                self.add_item(RngActionButton(self, None, style_master, "rng_filter_master", "filter_master"))
+                self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_master:1448690270366335087>")
+                self.children[-1].label = None
+    
+                self.add_item(RngActionButton(self, None, style_normal, "rng_filter_normal", "filter_normal"))
+                self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_catacombs:1448690272786448545>")
+                self.children[-1].label = None
+                
+        elif self.current_category:
+            self.add_item(RngSubCategorySelect(self, self.current_category))
+            self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
             
-            self.add_item(RngActionButton(self, "Combined", style_combined, "rng_filter_combined", "filter_combined"))
-            self.add_item(RngActionButton(self, None, style_master, "rng_filter_master", "filter_master"))
-            self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_master:1448690270366335087>")
-            self.children[-1].label = None
-
-            self.add_item(RngActionButton(self, None, style_normal, "rng_filter_normal", "filter_normal"))
-            self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_catacombs:1448690272786448545>")
-            self.children[-1].label = None
         else:
-            self.add_item(RngFloorSelect(self))
-            
-            style_combined = discord.ButtonStyle.success if self.filter_mode == "COMBINED" else discord.ButtonStyle.secondary
-            style_master = discord.ButtonStyle.success if self.filter_mode == "MASTER" else discord.ButtonStyle.secondary
-            style_normal = discord.ButtonStyle.success if self.filter_mode == "NORMAL" else discord.ButtonStyle.secondary
-            
-            self.add_item(RngActionButton(self, "Combined", style_combined, "rng_filter_combined", "filter_combined"))
-            self.add_item(RngActionButton(self, None, style_master, "rng_filter_master", "filter_master"))
-            self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_master:1448690270366335087>")
-            self.children[-1].label = None
-
-            self.add_item(RngActionButton(self, None, style_normal, "rng_filter_normal", "filter_normal"))
-            self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_catacombs:1448690272786448545>")
-            self.children[-1].label = None
-
+            self.add_item(RngCategorySelect(self))
 
     def _calculate_item_details(self, item_name: str, count: int, prices: dict) -> tuple[float, list[str]]:
         emoji = DROP_EMOJIS.get(item_name)
@@ -242,11 +263,11 @@ class RngView(View):
         prices = await get_all_prices()
         
         if self.current_item:
-            floor_key = self.current_floor
+            key = self.current_subcategory
             if self.current_item in GLOBAL_DROPS:
-                floor_key = "Global"
+                key = "Global"
                 
-            count = rng_manager.get_floor_stats(self.target_user_id, floor_key).get(self.current_item, 0)
+            count = rng_manager.get_floor_stats(self.target_user_id, key).get(self.current_item, 0)
             
             total_val, label, price, chest_cost, profit = self._calculate_item_details(self.current_item, count, prices)
             
@@ -257,30 +278,38 @@ class RngView(View):
             
             desc_lines = [f"**Current Count:** {count}", f"**Avg Price:** {price_text}", f"**Chest Cost:** {format_trunc(chest_cost)}", f"**Total Profit:** {val_text}"]
             
-            floor_runs_data = self.run_counts.get(self.current_floor, {"normal": 0, "master": 0})
-            runs = self._calculate_runs_for_filter(floor_runs_data)
-
-            if runs > 0:
-                if count > 0:
-                    profit_per_run = total_val / runs
-                    desc_lines.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
-                desc_lines.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
+            if self.current_category == "Dungeons":
+                 floor_map = {
+                    "Floor 7 (Necron)": "F7", "Floor 6 (Sadan)": "F6", "Floor 5 (Livid)": "F5",
+                    "Floor 4 (Thorn)": "F4", "Floor 3 (Professor)": "F3", "Floor 2 (Scarf)": "F2",
+                    "Floor 1 (Bonzo)": "F1"
+                 }
+                 short_key = floor_map.get(self.current_subcategory, self.current_subcategory)
+                 floor_runs_data = self.run_counts.get(short_key, {"normal": 0, "master": 0})
+                 runs = self._calculate_runs_for_filter(floor_runs_data)
+    
+                 if runs > 0:
+                     if count > 0:
+                         profit_per_run = total_val / runs
+                         desc_lines.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
+                     desc_lines.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
             
             embed.description = "\n".join(desc_lines)
-            embed.set_footer(text=f"{self.current_floor} • {self.target_user_name}")
+            embed.set_footer(text=f"{self.current_subcategory} • {self.target_user_name}")
             
-        elif self.current_floor:
-            embed.title = f"{self.current_floor} Drops"
-            stats = rng_manager.get_floor_stats(self.target_user_id, self.current_floor)
+        elif self.current_subcategory:
+            embed.title = f"{self.current_subcategory} Drops"
+            stats = rng_manager.get_floor_stats(self.target_user_id, self.current_subcategory)
             desc = []
-            floor_total_val = 0
+            sub_total_val = 0
             
-            for item in RNG_DROPS[self.current_floor]:
+            items = RNG_DROPS.get(self.current_subcategory, [])
+            
+            for item in items:
                 count = stats.get(item, 0)
                 val, label, price, chest_cost, profit = self._calculate_item_details(item, count, prices)
-                floor_total_val += val
+                sub_total_val += val
                 
-                # Show TOTAL profit for this line, not per-item profit
                 price_str = f"({format_trunc(val)})" if val > 0 else ""
 
                 if count > 0:
@@ -288,78 +317,92 @@ class RngView(View):
                 else:
                      desc.append(f"{label}: {count}")
             
-            floor_runs_data = self.run_counts.get(self.current_floor, {"normal": 0, "master": 0})
-            runs = self._calculate_runs_for_filter(floor_runs_data)
+            if self.current_category == "Dungeons":
+                 floor_map = {
+                    "Floor 7 (Necron)": "F7", "Floor 6 (Sadan)": "F6", "Floor 5 (Livid)": "F5",
+                    "Floor 4 (Thorn)": "F4", "Floor 3 (Professor)": "F3", "Floor 2 (Scarf)": "F2",
+                    "Floor 1 (Bonzo)": "F1"
+                 }
+                 short_key = floor_map.get(self.current_subcategory, self.current_subcategory)
+                 floor_runs_data = self.run_counts.get(short_key, {"normal": 0, "master": 0})
+                 runs = self._calculate_runs_for_filter(floor_runs_data)
+                 
+                 if sub_total_val > 0:
+                     desc.append(f"\n**Total Profit:** {format_trunc(sub_total_val)}")
+                     if runs > 0:
+                         profit_per_run = sub_total_val / runs
+                         desc.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
+                 
+                 if runs > 0:
+                     desc.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
+            else:
+                 if sub_total_val > 0:
+                     desc.append(f"\n**Total Profit:** {format_trunc(sub_total_val)}")
 
-            log_debug(f"Floor {self.current_floor}: Runs={runs}, Profit={floor_total_val}")
-            
-            if floor_total_val > 0:
-                desc.append(f"\n**Floor Profit:** {format_trunc(floor_total_val)}")
-                if runs > 0:
-                    profit_per_run = floor_total_val / runs
-                    desc.append(f"**Profit/Run:** {format_trunc(profit_per_run)}")
-            
-            if runs > 0:
-                desc.append(f"**Total Runs:** {runs:,} ({self.filter_mode.title()})")
-                
             embed.description = "\n".join(desc)
             if not desc:
-                embed.description = "No drops recorded yet."
+                embed.description = "No drops found."
             embed.set_footer(text=f"Select a drop to update • {self.target_user_name}")
- 
+
+        elif self.current_category:
+             embed.title = f"{self.current_category} Overview"
+             desc = []
+             cat_total = 0
+             
+             for sub in RNG_CATEGORIES.get(self.current_category, []):
+                 stats = rng_manager.get_floor_stats(self.target_user_id, sub)
+                 sub_val = 0
+                 sub_count = 0
+                 for item in RNG_DROPS.get(sub, []):
+                      c = stats.get(item, 0)
+                      if c > 0:
+                           v, _, _, _, _ = self._calculate_item_details(item, c, prices)
+                           sub_val += v
+                           sub_count += c
+                 
+                 cat_total += sub_val
+                 if sub_val > 0:
+                      desc.append(f"**{sub}:** {format_trunc(sub_val)} ({sub_count} drops)")
+                 else:
+                      desc.append(f"{sub}")
+             
+             if cat_total > 0:
+                  desc.append(f"\n**Category Total:** {format_trunc(cat_total)}")
+             
+             embed.description = "\n".join(desc)
+             embed.set_footer(text=f"Select a subcategory • {self.target_user_name}")
+
         else:
             embed.title = f"RNG Tracker - {self.target_user_name}"
-            user_stats = rng_manager.get_user_stats(self.target_user_id)
-            desc = []
-            
-            total_drops_found = False
+            desc = ["**Select a Category:**\n"]
             grand_total = 0
             
+            user_stats = rng_manager.get_user_stats(self.target_user_id)
             for floor_name in RNG_DROPS.keys():
-                floor_stats = user_stats.get(floor_name, {})
-                for item_name in RNG_DROPS[floor_name]:
-                    count = floor_stats.get(item_name, 0)
-                    if count > 0:
-                        total_drops_found = True
-                        val, label, price, chest_cost, profit = self._calculate_item_details(item_name, count, prices)
-                        grand_total += val
-                        desc.append(f"**{label}:** {count}")
+                 floor_stats = user_stats.get(floor_name, {})
+                 for item_name in RNG_DROPS[floor_name]:
+                      count = floor_stats.get(item_name, 0)
+                      if count > 0:
+                           v, _, _, _, _ = self._calculate_item_details(item_name, count, prices)
+                           grand_total += v
 
-            global_stats = user_stats.get("Global", {})
-            has_global = False
-            global_desc = []
-            
-            for item_name in GLOBAL_DROPS:
-                count = global_stats.get(item_name, 0)
-                if count > 0:
-                    has_global = True
-                    total_drops_found = True
-                    val, label, price, chest_cost, profit = self._calculate_item_details(item_name, count, prices)
-                    grand_total += val
-                    global_desc.append(f"**{label}:** {count}")
-            
-            if has_global:
-                 desc.append("\n**Global Drops**")
-                 desc.extend(global_desc)
+            for cat in RNG_CATEGORIES.keys():
+                 cat_val = 0
+                 for sub in RNG_CATEGORIES[cat]:
+                      stats = user_stats.get(sub, {})
+                      for item in RNG_DROPS.get(sub, []):
+                           c = stats.get(item, 0)
+                           if c > 0:
+                                v, _, _, _, _ = self._calculate_item_details(item, c, prices)
+                                cat_val += v
+                 
+                 if cat_val > 0:
+                      desc.append(f"**{cat}**: {format_trunc(cat_val)}")
+                 else:
+                      desc.append(f"{cat}")
 
-            total_runs = 0
-            for floor_data in self.run_counts.values():
-                total_runs += self._calculate_runs_for_filter(floor_data)
-            
-            if not total_drops_found:
-                 desc.append("No drops recorded yet.")
-            else:
+            if grand_total > 0:
                  desc.append(f"\n**Total Profile Profit:** {format_trunc(grand_total)}")
-                 
-                 if total_runs > 0:
-                     avg_profit_per_run = grand_total / total_runs
-                     desc.append(f"**Avg Profit/Run:** {format_trunc(avg_profit_per_run)}")
-            
-            if total_runs > 0:
-                desc.append(f"**Total Runs:** {total_runs:,} ({self.filter_mode.title()})")
-                 
-            desc.append("\nSelect a floor to view or edit drops.")
-            embed.description = "\n".join(desc)
             
             expiry = get_prices_expiry()
             if expiry:

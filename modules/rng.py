@@ -101,7 +101,10 @@ class RngSubCategorySelect(Select):
         self.parent_view.page = 0
         self.parent_view.update_view()
         log_info(f"RNG View ({self.parent_view.target_user_name}): Selected sub {self.parent_view.current_subcategory}")
-        await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
+        try:
+            await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
+        except Exception as e:
+            log_error(f"Failed to edit message in SubCategorySelect: {e}")
 
 
 class RngItemSelect(Select):
@@ -126,8 +129,12 @@ class RngItemSelect(Select):
         for item in page_items:
             opt = discord.SelectOption(label=item, value=item)
             emoji = DROP_EMOJIS.get(item)
-            if emoji:
-                opt.emoji = discord.PartialEmoji.from_str(emoji)
+            try:
+                if emoji:
+                     opt.emoji = discord.PartialEmoji.from_str(emoji)
+            except Exception as e:
+                log_error(f"Failed to parse emoji for item '{item}' (String: {emoji}): {e}")
+                
             options.append(opt)
             
         placeholder = f"Select Drop ({start+1}-{min(end, len(all_items))})..." if len(all_items) > 25 else "Select a Drop..."
@@ -234,8 +241,10 @@ class RngView(View):
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
             
         elif self.current_subcategory:
-            log_debug(f"DEBUG: Adding ItemSelect for {self.current_subcategory}")
-            self.add_item(RngItemSelect(self, self.current_subcategory))
+            try:
+                self.add_item(RngItemSelect(self, self.current_subcategory))
+            except Exception as e:
+                log_error(f"Error creating ItemSelect for {self.current_subcategory}: {e}")
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
 
             if self.current_category == "Dungeons":

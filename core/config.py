@@ -140,9 +140,9 @@ DROP_EMOJIS = {
     "Bonzo's Staff": "<:Minecraft_items_blaze_rod:1448310353166340248>",
     "Bonzo's Mask": "<:SkyBlock_items_bonzo_mask:1448310351631351929>",
     "1st Master Star": "<:SkyBlock_items_first_master_star:1448305520921411595>",
-    "2nd Master Star": "<:SkyBlock_items_second_master_sta:1448305519021264987>",
+    "2nd Master Star": "<:SkyBlock_items_second_master_star:1448305519021264987>",
     "3rd Master Star": "<:SkyBlock_items_third_master_star:1448305516605603921>",
-    "4th Master Star": "<:SkyBlock_items_fourth_master_sta:1448305514776760520>",
+    "4th Master Star": "<:SkyBlock_items_fourth_master_star:1448305514776760520>",
     "5th Master Star": "<:SkyBlock_items_fifth_master_star:1448305512876609732>",
     "50% M7 Skeleton Master Chestplate": "<:SkyBlock_items_Skeleton_Master:1448305511488421968>",
     "Implosion": "<a:SkyBlock_items_scroll:1448304563923718194>",
@@ -250,7 +250,6 @@ DROP_IDS = {
     "Prosecute VI": "ENCHANTMENT_PROSECUTE_6",
     "Cleave VI": "ENCHANTMENT_CLEAVE_6",
     "Execute VI": "ENCHANTMENT_EXECUTE_6",
-
     "Venomous VI": "ENCHANTMENT_VENOMOUS_6",
     "Sharpness VII": "ENCHANTMENT_SHARPNESS_7",
     "Protection VII": "ENCHANTMENT_PROTECTION_7",
@@ -267,7 +266,6 @@ DROP_IDS = {
     "Luck VII": "ENCHANTMENT_LUCK_7",
     "Critical VII": "ENCHANTMENT_CRITICAL_7",
     "Titan Killer VII": "ENCHANTMENT_TITAN_KILLER_7",
-
     "Golden Bounty": "GOLDEN_BOUNTY",
     "Pesthunting Guide": "PESTHUNTING_GUIDE",
     "Big Brain V": "ENCHANTMENT_BIG_BRAIN_5",

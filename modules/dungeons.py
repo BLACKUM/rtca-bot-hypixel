@@ -203,7 +203,7 @@ def _create_option_list(option: str, current_val: float) -> list[discord.SelectO
 class BonusSelectView(View):
     
     def __init__(self, bot: commands.Bot, dungeon_classes: dict, base_floor: float, 
-                 initial_bonuses: dict, ign: str, floor: str, xp_per_run: float):
+                 initial_bonuses: dict, ign: str, floor: str, xp_per_run: float, current_cata_xp: float):
         super().__init__(timeout=300)
         self.bot = bot
         self.dungeon_classes = dungeon_classes
@@ -213,6 +213,7 @@ class BonusSelectView(View):
         self.floor = floor
         self.message = None
         self.xp_per_run = xp_per_run
+        self.current_cata_xp = current_cata_xp
         
         self.main_select = MainSelect(self)
         self.add_item(self.main_select)
@@ -238,6 +239,16 @@ class BonusSelectView(View):
             description=f"Floor: {self.floor} ({self.base_floor:,} base XP)\n{xp_description}",
             color=0x00ff99
         )
+
+        CATA_50_XP = 569809640
+        if self.current_cata_xp < CATA_50_XP:
+            remaining = CATA_50_XP - self.current_cata_xp
+            runs_needed = math.ceil(remaining / self.xp_per_run)
+            embed.add_field(
+                name="Catacombs 50",
+                value=f"Runs needed: **{runs_needed:,}**\nRemaining: {remaining:,.0f} XP",
+                inline=False
+            )
         
         for cls in ["archer", "berserk", "healer", "mage", "tank"]:
             info = results.get(cls, {"current_level": 0.0, "remaining_xp": 0, "runs_done": 0})
@@ -517,7 +528,7 @@ class Dungeons(commands.Cog):
             embed.set_image(url=gif)
             
             await interaction.followup.send(embed=embed)
-            log_info(f"✅ {ign} already has CA50. Sent congrats message.")
+            log_info(f"✅ {ign} already has CA50. Sent congrats message. GIF: {gif}")
             return
 
         ring = bonuses.get("ring", default_bonuses["ring"])
@@ -529,9 +540,11 @@ class Dungeons(commands.Cog):
         
         log_debug(f"Dungeon XP per run: {dungeon_xp:,.0f}")
         
+        current_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
+        
         runs_total, results = simulate_to_level_all50(dungeon_classes, base_floor, bonuses)
         
-        view = BonusSelectView(self.bot, dungeon_classes, base_floor, bonuses, ign, floor, dungeon_xp)
+        view = BonusSelectView(self.bot, dungeon_classes, base_floor, bonuses, ign, floor, dungeon_xp, current_cata_xp)
         
         embed = view._create_embed(results, runs_total)
         

@@ -101,10 +101,7 @@ class RngSubCategorySelect(Select):
         self.parent_view.page = 0
         self.parent_view.update_view()
         log_info(f"RNG View ({self.parent_view.target_user_name}): Selected sub {self.parent_view.current_subcategory}")
-        try:
-            await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
-        except Exception as e:
-            log_error(f"Failed to edit message in SubCategorySelect: {e}")
+        await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
 
 
 class RngItemSelect(Select):
@@ -114,8 +111,6 @@ class RngItemSelect(Select):
         all_items = []
         for item in RNG_DROPS.get(subcategory, []):
             all_items.append(item)
-            
-        log_debug(f"DEBUG: RngItemSelect Init. Sub: {subcategory}. Items found: {len(all_items)}")
             
         if parent_view.current_category == "Dungeons":
              for item in GLOBAL_DROPS:
@@ -129,12 +124,8 @@ class RngItemSelect(Select):
         for item in page_items:
             opt = discord.SelectOption(label=item, value=item)
             emoji = DROP_EMOJIS.get(item)
-            try:
-                if emoji:
-                     opt.emoji = discord.PartialEmoji.from_str(emoji)
-            except Exception as e:
-                log_error(f"Failed to parse emoji for item '{item}' (String: {emoji}): {e}")
-                
+            if emoji:
+                opt.emoji = discord.PartialEmoji.from_str(emoji)
             options.append(opt)
             
         placeholder = f"Select Drop ({start+1}-{min(end, len(all_items))})..." if len(all_items) > 25 else "Select a Drop..."
@@ -231,7 +222,6 @@ class RngView(View):
         self.update_view()
 
     def update_view(self):
-        log_debug(f"DEBUG: update_view called. Cat: {self.current_category}, Sub: {self.current_subcategory}, Item: {self.current_item}")
         self.clear_items()
         
         if self.current_item:
@@ -241,10 +231,7 @@ class RngView(View):
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
             
         elif self.current_subcategory:
-            try:
-                self.add_item(RngItemSelect(self, self.current_subcategory))
-            except Exception as e:
-                log_error(f"Error creating ItemSelect for {self.current_subcategory}: {e}")
+            self.add_item(RngItemSelect(self, self.current_subcategory))
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
 
             if self.current_category == "Dungeons":
@@ -258,6 +245,7 @@ class RngView(View):
                 self.children[-1].label = None
     
                 self.add_item(RngActionButton(self, None, style_normal, "rng_filter_normal", "filter_normal"))
+                self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_catacombs:1448690272786448545>")
                 self.children[-1].label = None
                 
             all_items = RNG_DROPS.get(self.current_subcategory, []) + (GLOBAL_DROPS if self.current_category == "Dungeons" else [])

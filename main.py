@@ -24,9 +24,7 @@ async def track_daily_stats():
         try:
             xp_data = await get_dungeon_xp(uuid)
             if xp_data:
-                msgs = await daily_manager.update_user_data(user_id, xp_data)
-                for ign, msg, gif in msgs:
-                    log_info(f"🎉 {ign} hit Class Average 50! GIF: {gif}")
+                await daily_manager.update_user_data(user_id, xp_data)
         except Exception as e:
             log_error(f"Error updating user {uuid}: {e}")
         

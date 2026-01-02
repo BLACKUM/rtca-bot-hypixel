@@ -85,12 +85,11 @@ class DailyManager:
         total_users = len(tracked_users)
         
         if total_users == 0:
-            return 0, 0, 0, [] # updated, errors, total, messages
+            return 0, 0, 0 # updated, errors, total
             
         updated_count = 0
         errors = 0
         processed_count = 0
-        all_messages = []
         sem = asyncio.Semaphore(5)
         
         async def update_user(user_id, uuid):
@@ -103,9 +102,7 @@ class DailyManager:
                     else:
                         xp_data = await get_dungeon_xp(uuid)
                         if xp_data:
-                            msgs = await self.update_user_data(user_id, xp_data)
-                            if msgs:
-                                all_messages.extend(msgs)
+                            await self.update_user_data(user_id, xp_data)
                             updated_count += 1
                         else:
                             errors += 1
@@ -125,7 +122,7 @@ class DailyManager:
         tasks = [update_user(uid, uuid) for uid, uuid in tracked_users]
         await asyncio.gather(*tasks)
                 
-        return updated_count, errors, total_users, all_messages
+        return updated_count, errors, total_users
 
     async def load_data(self):
         if not os.path.exists(DAILY_DATA_FILE):
@@ -167,27 +164,15 @@ class DailyManager:
     def get_tracked_users(self) -> List[Tuple[str, str]]:
         return [(uid, info["uuid"]) for uid, info in self.data["users"].items()]
 
-    async def update_user_data(self, user_id: str, xp_data: dict) -> List[Tuple[str, str, str]]:
+    async def update_user_data(self, user_id: str, xp_data: dict):
         user_id = str(user_id)
         now = int(time.time())
-        messages = []
-        
-        old_average = 0.0
-        if user_id in self.data["current_xp"]:
-            old_average = get_class_average(self.data["current_xp"][user_id]["classes"])
         
         self.data["current_xp"][user_id] = {
             "timestamp": now,
             "cata_xp": xp_data["catacombs"],
             "classes": xp_data["classes"]
         }
-        
-        new_average = get_class_average(xp_data["classes"])
-        
-        if old_average < 50.0 and new_average >= 50.0:
-            ign = self.data["users"].get(user_id, {}).get("ign", "Unknown")
-            gif = random.choice(CONGRATS_GIFS)
-            messages.append((ign, f"🎉 Congratulations **{ign}**, you just hit **Class Average 50**!", gif))
         
         if user_id not in self.data["daily_snapshots"]:
              self.data["daily_snapshots"][user_id] = self.data["current_xp"][user_id]
@@ -197,7 +182,6 @@ class DailyManager:
              
         self.data["last_updated"] = now
         await self._save_data()
-        return messages
 
     async def check_resets(self):
         now = datetime.now(timezone.utc)

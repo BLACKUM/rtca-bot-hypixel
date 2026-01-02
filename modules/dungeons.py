@@ -502,6 +502,22 @@ class Dungeons(commands.Cog):
         
         log_debug(f"Detected bonuses: {bonuses}")
         
+        # Calculate current average to see if they already hit 50
+        from services.xp_calculations import get_class_average
+        current_average = get_class_average(dungeon_classes)
+        log_debug(f"Checking Class Average 50: {ign} is at {current_average}")
+        
+        if current_average >= 50.0:
+            import random
+            from services.daily_manager import CONGRATS_GIFS
+            
+            gif = random.choice(CONGRATS_GIFS)
+            msg = f"🎉 **Congratulations {ign}, you already hit Class Average 50!** 🎉\n> You don't need this simulation anymore. Go touch some grass! 🌱"
+            
+            await interaction.followup.send(f"{msg}\n{gif}")
+            log_info(f"✅ {ign} already has CA50. Sent congrats message.")
+            return
+
         ring = bonuses.get("ring", default_bonuses["ring"])
         hecatomb = bonuses.get("hecatomb", default_bonuses["hecatomb"])
         global_mult = bonuses.get("global", default_bonuses["global"])

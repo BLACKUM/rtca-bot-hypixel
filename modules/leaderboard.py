@@ -262,16 +262,9 @@ class DailyView(View):
 
             status_msg = await interaction.followup.send(f"🔄 **Force Update Started**\nQueue: {len(tracked_users)} users...")
             
-            updated_count, errors, total_users, messages = await daily_manager.force_update_all(status_msg)
+            updated_count, errors, total_users = await daily_manager.force_update_all(status_msg)
             
             await status_msg.edit(content=f"✅ **Force Update Complete**\nTotal: {total_users}\nUpdated: {updated_count}\nErrors: {errors}")
-            
-            if messages:
-                for ign, msg, gif in messages:
-                    try:
-                        await interaction.channel.send(f"{msg}\n{gif}")
-                    except Exception as e:
-                        log_error(f"Failed to send congrats message for {ign}: {e}")
             
             await self.update_message(interaction)
              

@@ -280,7 +280,8 @@ class RngView(View):
                 val, label, price, chest_cost, profit = self._calculate_item_details(item, count, prices)
                 floor_total_val += val
                 
-                price_str = f"({format_trunc(profit)})" if price > 0 else ""
+                # Show TOTAL profit for this line, not per-item profit
+                price_str = f"({format_trunc(val)})" if val > 0 else ""
 
                 if count > 0:
                      desc.append(f"**{label}:** {count} {price_str}")

@@ -109,6 +109,7 @@ DROP_EMOJIS = {
     "Wither Shield": "<a:SkyBlock_items_scroll:1448304563923718194>",
     "Shadow Warp": "<a:SkyBlock_items_scroll:1448304563923718194>",
     "Necron's Handle": "<a:SkyBlock_items_necrons_handle:1448302537144008896>",
+    "Shiny Necron's Handle": "<a:SkyBlock_items_necrons_handle:1448302537144008896>",
     "Ice Spray": "<a:SkyBlock_items_enchanted_stick:1449788369709039637>"
 }
 
@@ -127,6 +128,7 @@ DROP_IDS = {
     "Precursor Eye": "PRECURSOR_EYEd",
     "4th Master Star": "FOURTH_MASTER_STAR",
     "Necron's Handle": "NECRON_HANDLE",
+    "Shiny Necron's Handle": "SHINY_NECRON_HANDLE",
     "Implosion": "IMPLOSION_SCROLL",
     "Wither Shield": "WITHER_SHIELD_SCROLL",
     "Shadow Warp": "SHADOW_WARP_SCROLL",

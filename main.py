@@ -18,19 +18,12 @@ async def track_daily_stats():
     if not users:
         return
 
-    log_info(f"Updating stats for {len(users)} tracked users.")
+    updated, errors, total = await daily_manager.force_update_all()
     
-    for user_id, uuid in users:
-        try:
-            xp_data = await get_dungeon_xp(uuid)
-            if xp_data:
-                await daily_manager.update_user_data(user_id, xp_data)
-        except Exception as e:
-            log_error(f"Error updating user {uuid}: {e}")
-        
-        await asyncio.sleep(10)
-        
-    log_info("Daily stats update completed.")
+    if updated > 0:
+        log_info(f"Daily stats update completed: {updated}/{total} updated, {errors} errors.")
+    else:
+        log_info("Daily stats update skipped or completed with no changes.")
 
 @bot.listen()
 async def on_ready():

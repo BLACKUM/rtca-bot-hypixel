@@ -515,7 +515,8 @@ class Dungeons(commands.Cog):
             
             embed = discord.Embed(description=msg, color=0xFFD700)
             
-            await interaction.followup.send(content=gif, embed=embed)
+            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(content=gif, ephemeral=True)
             log_info(f"✅ {ign} already has CA50. Sent congrats message.")
             return
 

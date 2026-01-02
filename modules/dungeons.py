@@ -514,9 +514,8 @@ class Dungeons(commands.Cog):
             msg = f"🎉 **Congratulations {ign}, you already hit Class Average 50!** 🎉\n> You don't need this simulation anymore. Go touch some grass! 🌱"
             
             embed = discord.Embed(description=msg, color=0xFFD700)
-            embed.set_image(url=gif)
             
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(content=gif, embed=embed)
             log_info(f"✅ {ign} already has CA50. Sent congrats message.")
             return
 

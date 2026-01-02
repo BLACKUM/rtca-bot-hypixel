@@ -48,6 +48,7 @@ GLOBAL_DROPS = [
 
 RNG_DROPS = {
     "Floor 7 (Necron)": [
+        "Shiny Necron's Handle",
         "Necron's Handle",
         "Implosion",
         "Wither Shield",
@@ -139,6 +140,7 @@ DROP_IDS = {
 
 CHEST_COSTS = {
     # F7
+    "Shiny Necron's Handle": 100_000_000,
     "Necron's Handle": 100_000_000,
     "Implosion": 50_000_000, 
     "Wither Shield": 50_000_000,
@@ -165,13 +167,7 @@ CHEST_COSTS = {
     "Scarf's Studies": 500_000,
     # F1
     "Bonzo's Staff": 2_250_000,
-    "Bonzo's Mask": 1_250_000,
-    
-    
-    
-    
-    
-    
+    "Bonzo's Mask": 1_250_000
 }
 
 def validate_config():

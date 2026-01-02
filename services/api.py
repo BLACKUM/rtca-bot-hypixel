@@ -134,17 +134,50 @@ async def get_ah_prices():
             cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
             return {}
 
+async def get_special_prices():
+    urls = {
+        "SHINY_NECRON_HANDLE": "https://sky.coflnet.com/api/item/price/NECRON_HANDLE?IsShiny=true",
+        SKELETON_MASTER_CHESTPLATE_50: "https://sky.coflnet.com/api/item/price/SKELETON_MASTER_CHESTPLATE?ItemTier=10-10&NoOtherValuableEnchants=true&BaseStatBoost=50"
+    }
+    
+    special_prices = {}
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for key, url in urls.items():
+            tasks.append(fetch_special_price(session, key, url))
+        
+        results = await asyncio.gather(*tasks)
+        for key, price in results:
+            if price is not None:
+                special_prices[key] = price
+                
+    return special_prices
+
+async def fetch_special_price(session, key, url):
+    try:
+        async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=5)) as r:
+            if r.status == 200:
+                data = await r.json()
+                price = data.get("median", data.get("min", 0))
+                return key, price
+    except Exception as e:
+        log_error(f"Failed to fetch special price for {key}: {e}")
+    return key, None
+
 async def get_all_prices():
     bz_future = get_bazaar_prices()
     ah_future = get_ah_prices()
+    special_future = get_special_prices()
     
-    bz_prices, ah_prices = await asyncio.gather(bz_future, ah_future)
+    bz_prices, ah_prices, special_prices = await asyncio.gather(bz_future, ah_future, special_future)
     
     prices = bz_prices.copy()
     prices.update(ah_prices)
+    prices.update(special_prices)
     
-    # Yeah i really cba to make another price checker just for this thing
-    prices[SKELETON_MASTER_CHESTPLATE_50] = 40_000_000
+    if SKELETON_MASTER_CHESTPLATE_50 not in prices:
+        prices[SKELETON_MASTER_CHESTPLATE_50] = 40_000_000
     
     return prices
 

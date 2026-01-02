@@ -112,6 +112,8 @@ class RngItemSelect(Select):
         for item in RNG_DROPS.get(subcategory, []):
             all_items.append(item)
             
+        log_debug(f"DEBUG: RngItemSelect Init. Sub: {subcategory}. Items found: {len(all_items)}")
+            
         if parent_view.current_category == "Dungeons":
              for item in GLOBAL_DROPS:
                  if item not in all_items:
@@ -222,6 +224,7 @@ class RngView(View):
         self.update_view()
 
     def update_view(self):
+        log_debug(f"DEBUG: update_view called. Cat: {self.current_category}, Sub: {self.current_subcategory}, Item: {self.current_item}")
         self.clear_items()
         
         if self.current_item:
@@ -231,6 +234,7 @@ class RngView(View):
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
             
         elif self.current_subcategory:
+            log_debug(f"DEBUG: Adding ItemSelect for {self.current_subcategory}")
             self.add_item(RngItemSelect(self, self.current_subcategory))
             self.add_item(RngActionButton(self, "Back", discord.ButtonStyle.secondary, "rng_back", "back"))
 

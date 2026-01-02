@@ -172,7 +172,12 @@ class RngActionButton(discord.ui.Button):
             if self.parent_view.current_item:
                 self.parent_view.current_item = None
             elif self.parent_view.current_subcategory:
-                self.parent_view.current_subcategory = None
+                subcats = RNG_CATEGORIES.get(self.parent_view.current_category, [])
+                if len(subcats) == 1:
+                    self.parent_view.current_subcategory = None
+                    self.parent_view.current_category = None
+                else:
+                    self.parent_view.current_subcategory = None
             elif self.parent_view.current_category:
                 self.parent_view.current_category = None
                 

@@ -9,8 +9,49 @@ from services.xp_calculations import get_dungeon_level
 from services.api import get_uuid, get_dungeon_xp
 from datetime import timedelta
 import asyncio
+import random
+from services.xp_calculations import get_dungeon_level, get_class_average
 
 DAILY_DATA_FILE = "data/daily_data.json"
+
+CONGRATS_GIFS = [
+    "https://media1.tenor.com/m/n5-r2F_JeGMAAAAd/hypixel-skyblock.gif",
+    "https://media1.tenor.com/m/xAW8c7Z8-3cAAAAd/hypixel.gif",
+    "https://media1.tenor.com/m/4YDfECEyEtwAAAAd/crash-dupe.gif",
+    "https://media1.tenor.com/m/8Zvt_ouixT8AAAAd/marina-hypixel-skyblock.gif",
+    "https://media1.tenor.com/m/I5LkHI4yrRcAAAAd/skyblock-cheating.gif",
+    "https://media1.tenor.com/m/JDUuuveDLeQAAAAd/hypixel-skyblock.gif",
+    "https://media1.tenor.com/m/Xqc4YXfCySEAAAAd/elite-skyblock-farmers-elite-farmers.gif",
+    "https://media1.tenor.com/m/UgvKJP8OIHoAAAAd/hypixel-skyblock-hypixel-ban.gif",
+    "https://media1.tenor.com/m/O57p6KOsleoAAAAd/yuri-yuri-kiss.gif",
+    "https://media1.tenor.com/m/gdBh7nScJMYAAAAd/yuri-yuri-kiss.gif",
+    "https://media1.tenor.com/m/mamnZXgZxqIAAAAd/yuri-hypixel-skyblock.gif",
+    "https://media1.tenor.com/m/lfbOYamuNSoAAAAd/skyblock-tips-elite-skyblock-farmers.gif",
+    "https://media1.tenor.com/m/8WpxdEqUcWEAAAAd/floorseven-hypixel.gif",
+    "https://media1.tenor.com/m/jI79BCqsw68AAAAd/skyblock-hypixel.gif",
+    "https://media1.tenor.com/m/XgzhRq264JcAAAAd/astolfo-skyblock.gif",
+    "https://media1.tenor.com/m/VngFH2yD0RAAAAAC/astolfo-astolfo-text.gif",
+    "https://media1.tenor.com/m/JEFazVKAde0AAAAd/skyblock.gif",
+    "https://media1.tenor.com/m/GEAz2m-SWAsAAAAd/oringo-skyblock.gif",
+    "https://media1.tenor.com/m/LcsbStHRMCMAAAAC/monke-hael9.gif",
+    "https://media1.tenor.com/m/Dgmg1Dzjq-oAAAAd/thealoz-hypixel-skyblock.gif",
+    "https://media.tenor.com/UlNu8AJREWwAAAAM/kermit-the-frog-go-the-fuck-outside-punk.gif",
+    "https://i.imgflip.com/8axaft.gif",
+    "https://media.tenor.com/0lsV1eolzSMAAAAM/shower-soap.gif",
+    "https://media.tenor.com/jcG6b0cZgQEAAAAM/homer-bath.gif",
+    "https://media.tenor.com/XX7CWmfJ8ZIAAAAM/shower-dogs.gif",
+    "https://img1.picmix.com/output/pic/normal/2/8/0/6/11396082_40409.gif",
+    "https://media.tenor.com/MMo4B6tp-GMAAAAM/job-application.gif",
+    "https://media.tenor.com/Rs-PNa8EBFcAAAAM/job-jumpscare-job-application.gif",
+    "https://media.tenor.com/JkMtMAjXHS8AAAAM/job-job-application.gif",
+    "https://media1.tenor.com/m/xyMEZ2xCttcAAAAC/job-application-job-application-meme.gif",
+    "https://media.tenor.com/Kp0_YKtqqXIAAAAe/job-application.png",
+    "https://media.tenor.com/Gk2yr271HUsAAAAe/job-application.png",
+    "https://media.tenor.com/UsDCL6bOIT4AAAAM/touch-grass-touch.gif",
+    "https://i.imgflip.com/6f5788.gif",
+    "https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyODIyMXFzamljbm9sc2d1NnVzdDJvYXllN2Jjcm14Y25kYm00cGF5ZSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/bum2UBz4nR9IxZmWde/giphy-downsized.gif",
+    "https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUyODVzb2JyeXpveng0Z2FocHdsczF6enZqbDN6NDBiZmhuaWlndXl1NiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/JyOtBwVBKFoeIQ14Po/200w_d.gif"
+]
 
 class DailyManager:
     def __init__(self):
@@ -44,11 +85,12 @@ class DailyManager:
         total_users = len(tracked_users)
         
         if total_users == 0:
-            return 0, 0, 0 # updated, errors, total
+            return 0, 0, 0, [] # updated, errors, total, messages
             
         updated_count = 0
         errors = 0
         processed_count = 0
+        all_messages = []
         sem = asyncio.Semaphore(5)
         
         async def update_user(user_id, uuid):
@@ -61,7 +103,9 @@ class DailyManager:
                     else:
                         xp_data = await get_dungeon_xp(uuid)
                         if xp_data:
-                            self.update_user_data(user_id, xp_data)
+                            msgs = await self.update_user_data(user_id, xp_data)
+                            if msgs:
+                                all_messages.extend(msgs)
                             updated_count += 1
                         else:
                             errors += 1
@@ -81,7 +125,7 @@ class DailyManager:
         tasks = [update_user(uid, uuid) for uid, uuid in tracked_users]
         await asyncio.gather(*tasks)
                 
-        return updated_count, errors, total_users
+        return updated_count, errors, total_users, all_messages
 
     async def load_data(self):
         if not os.path.exists(DAILY_DATA_FILE):
@@ -123,15 +167,27 @@ class DailyManager:
     def get_tracked_users(self) -> List[Tuple[str, str]]:
         return [(uid, info["uuid"]) for uid, info in self.data["users"].items()]
 
-    async def update_user_data(self, user_id: str, xp_data: dict):
+    async def update_user_data(self, user_id: str, xp_data: dict) -> List[Tuple[str, str, str]]:
         user_id = str(user_id)
         now = int(time.time())
+        messages = []
+        
+        old_average = 0.0
+        if user_id in self.data["current_xp"]:
+            old_average = get_class_average(self.data["current_xp"][user_id]["classes"])
         
         self.data["current_xp"][user_id] = {
             "timestamp": now,
             "cata_xp": xp_data["catacombs"],
             "classes": xp_data["classes"]
         }
+        
+        new_average = get_class_average(xp_data["classes"])
+        
+        if old_average < 50.0 and new_average >= 50.0:
+            ign = self.data["users"].get(user_id, {}).get("ign", "Unknown")
+            gif = random.choice(CONGRATS_GIFS)
+            messages.append((ign, f"🎉 Congratulations **{ign}**, you just hit **Class Average 50**!", gif))
         
         if user_id not in self.data["daily_snapshots"]:
              self.data["daily_snapshots"][user_id] = self.data["current_xp"][user_id]
@@ -141,6 +197,7 @@ class DailyManager:
              
         self.data["last_updated"] = now
         await self._save_data()
+        return messages
 
     async def check_resets(self):
         now = datetime.now(timezone.utc)

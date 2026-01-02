@@ -35,3 +35,20 @@ def get_dungeon_level(xp: float) -> float:
     extra = xp - total
     extra_levels = extra / DUNGEON_XP[-1]
     return round((len(DUNGEON_XP) - 1) + extra_levels, 2)
+
+
+def get_class_average(classes_data: dict) -> float:
+    if not classes_data:
+        return 0.0
+    
+    total_level = 0.0
+    count = 0
+    
+    # Standard 5 classes
+    for cls in ["archer", "berserk", "healer", "mage", "tank"]:
+        xp = float(classes_data.get(cls, 0))
+        level = get_dungeon_level(xp)
+        total_level += level
+        count += 1
+        
+    return round(total_level / count, 2) if count > 0 else 0.0

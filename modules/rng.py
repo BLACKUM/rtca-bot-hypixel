@@ -73,6 +73,12 @@ class RngCategorySelect(Select):
         self.parent_view.current_category = self.values[0]
         self.parent_view.current_subcategory = None
         self.parent_view.current_item = None
+        self.parent_view.page = 0
+        
+        subcats = RNG_CATEGORIES.get(self.parent_view.current_category, [])
+        if len(subcats) == 1:
+            self.parent_view.current_subcategory = subcats[0]
+            
         self.parent_view.update_view()
         await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
 
@@ -92,6 +98,7 @@ class RngSubCategorySelect(Select):
 
         self.parent_view.current_subcategory = self.values[0]
         self.parent_view.current_item = None
+        self.parent_view.page = 0
         self.parent_view.update_view()
         log_info(f"RNG View ({self.parent_view.target_user_name}): Selected sub {self.parent_view.current_subcategory}")
         await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
@@ -101,23 +108,28 @@ class RngItemSelect(Select):
     def __init__(self, parent_view, subcategory):
         options = []
         
+        all_items = []
         for item in RNG_DROPS.get(subcategory, []):
+            all_items.append(item)
+            
+        if parent_view.current_category == "Dungeons":
+             for item in GLOBAL_DROPS:
+                 if item not in all_items:
+                      all_items.append(item)
+        
+        start = parent_view.page * 25
+        end = start + 25
+        page_items = all_items[start:end]
+        
+        for item in page_items:
             opt = discord.SelectOption(label=item, value=item)
             emoji = DROP_EMOJIS.get(item)
             if emoji:
                 opt.emoji = discord.PartialEmoji.from_str(emoji)
             options.append(opt)
             
-        if parent_view.current_category == "Dungeons":
-            for item in GLOBAL_DROPS:
-                if item not in [o.value for o in options]:
-                     opt = discord.SelectOption(label=item, value=item)
-                     emoji = DROP_EMOJIS.get(item)
-                     if emoji:
-                         opt.emoji = discord.PartialEmoji.from_str(emoji)
-                     options.append(opt)
-            
-        super().__init__(placeholder="Select a Drop...", options=options, custom_id="rng_item_select")
+        placeholder = f"Select Drop ({start+1}-{min(end, len(all_items))})..." if len(all_items) > 25 else "Select a Drop..."
+        super().__init__(placeholder=placeholder, options=options, custom_id="rng_item_select")
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
@@ -179,6 +191,10 @@ class RngActionButton(discord.ui.Button):
              self.parent_view.filter_mode = "MASTER"
         elif self.action == "filter_normal":
              self.parent_view.filter_mode = "NORMAL"
+        elif self.action == "prev_page":
+             self.parent_view.page = max(0, self.parent_view.page - 1)
+        elif self.action == "next_page":
+             self.parent_view.page += 1
 
         self.parent_view.update_view()
         await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
@@ -197,6 +213,7 @@ class RngView(View):
         self.run_counts = run_counts or {}
         self.target_ign = target_ign
         self.filter_mode = "COMBINED"
+        self.page = 0
         self.update_view()
 
     def update_view(self):
@@ -223,8 +240,17 @@ class RngView(View):
                 self.children[-1].label = None
     
                 self.add_item(RngActionButton(self, None, style_normal, "rng_filter_normal", "filter_normal"))
-                self.children[-1].emoji = discord.PartialEmoji.from_str("<:SkyBlock_items_catacombs:1448690272786448545>")
                 self.children[-1].label = None
+                
+            all_items = RNG_DROPS.get(self.current_subcategory, []) + (GLOBAL_DROPS if self.current_category == "Dungeons" else [])
+            total_items = len(all_items)
+            
+            if total_items > 25:
+                 if self.page > 0:
+                     self.add_item(RngActionButton(self, "Previous", discord.ButtonStyle.primary, "rng_prev", "prev_page"))
+                 
+                 if (self.page + 1) * 25 < total_items:
+                     self.add_item(RngActionButton(self, "Next", discord.ButtonStyle.primary, "rng_next", "next_page"))
                 
         elif self.current_category:
             self.add_item(RngSubCategorySelect(self, self.current_category))

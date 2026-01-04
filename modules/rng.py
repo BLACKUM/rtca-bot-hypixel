@@ -6,8 +6,7 @@ import time
 from core.config import RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS, GLOBAL_DROPS, OWNER_IDS, RNG_CATEGORIES
 from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_all_prices, get_dungeon_runs, get_prices_expiry
-from services.rng_manager import rng_manager
-from services.link_manager import link_manager
+from services.api import get_uuid, get_all_prices, get_dungeon_runs, get_prices_expiry
 
 def format_trunc(value: float) -> str:
     if value >= 1_000_000_000:
@@ -40,7 +39,7 @@ class RngAmountModal(Modal):
             if amount < 0:
                 raise ValueError("Amount must be non-negative")
                 
-            await rng_manager.set_drop_count(
+            await interaction.client.rng_manager.set_drop_count(
                 self.parent_view.target_user_id, 
                 self.parent_view.current_subcategory, 
                 self.parent_view.current_item, 
@@ -409,7 +408,7 @@ class RngView(View):
             desc = ["**Select a Category:**\n"]
             grand_total = 0
             
-            user_stats = rng_manager.get_user_stats(self.target_user_id)
+            user_stats = interaction.client.rng_manager.get_user_stats(self.target_user_id)
             for floor_name in RNG_DROPS.keys():
                  floor_stats = user_stats.get(floor_name, {})
                  for item_name in RNG_DROPS[floor_name]:

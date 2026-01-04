@@ -50,5 +50,3 @@ class LinkManager:
 
     def get_link(self, discord_id: int) -> Optional[str]:
         return self.links.get(str(discord_id))
-
-link_manager = LinkManager()

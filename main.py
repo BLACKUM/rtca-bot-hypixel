@@ -1,9 +1,9 @@
 from discord.ext import commands, tasks
 from core.config import TOKEN, INTENTS, validate_config
 from core.logger import log_info, log_error
-from services.daily_manager import daily_manager
-from services.rng_manager import rng_manager
-from services.link_manager import link_manager
+from services.daily_manager import DailyManager
+from services.rng_manager import RngManager
+from services.link_manager import LinkManager
 from services.api import get_dungeon_xp, init_session
 from core.cache import initialize as init_cache
 import asyncio
@@ -11,17 +11,22 @@ import os
 
 bot = commands.Bot(command_prefix="!", intents=INTENTS)
 
+# Initialize Managers
+bot.daily_manager = DailyManager()
+bot.rng_manager = RngManager()
+bot.link_manager = LinkManager()
+
 @tasks.loop(hours=2)
 async def track_daily_stats():
     log_info("Running scheduled daily stats update...")
     
-    await daily_manager.check_resets()
+    await bot.daily_manager.check_resets()
     
-    users = daily_manager.get_tracked_users()
+    users = bot.daily_manager.get_tracked_users()
     if not users:
         return
 
-    updated, errors, total = await daily_manager.force_update_all()
+    updated, errors, total = await bot.daily_manager.force_update_all()
     
     if updated > 0:
         log_info(f"Daily stats update completed: {updated}/{total} updated, {errors} errors.")
@@ -32,10 +37,10 @@ async def track_daily_stats():
 async def on_ready():
     await init_cache()
     await init_session()
-    await link_manager.initialize()
-    await daily_manager.initialize()
-    await rng_manager.initialize()
-    await daily_manager.sanitize_data()
+    await bot.link_manager.initialize()
+    await bot.daily_manager.initialize()
+    await bot.rng_manager.initialize()
+    await bot.daily_manager.sanitize_data()
     if not track_daily_stats.is_running():
         track_daily_stats.start()
     

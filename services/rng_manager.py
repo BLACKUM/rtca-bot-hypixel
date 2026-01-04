@@ -136,5 +136,3 @@ class RngManager:
         self.data[user_id]["_settings"]["default_target"] = target_id
         await self.save_data()
         log_info(f"Set default target search for {user_id} to {target_id}")
-
-rng_manager = RngManager()

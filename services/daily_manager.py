@@ -271,5 +271,3 @@ class DailyManager:
             log_info("Daily data sanitized and saved.")
         else:
             log_info("Daily data is clean.")
-
-daily_manager = DailyManager()

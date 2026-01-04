@@ -7,9 +7,8 @@ import math
 from core.config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS
 from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_profile_data
+from services.api import get_uuid, get_profile_data
 from services.simulation_logic import simulate_async
-from services.daily_manager import daily_manager
-from services.link_manager import link_manager
 
 default_bonuses = {
     "ring": 0.1,
@@ -439,7 +438,7 @@ class Dungeons(commands.Cog):
         log_info(f"Command /rtca called by {interaction.user} → {ign if ign else '[Linked]'}")
         
         if ign is None:
-            ign = link_manager.get_link(interaction.user.id)
+            ign = self.bot.link_manager.get_link(interaction.user.id)
             if not ign:
                 await interaction.followup.send("❌ You must provide an IGN or link your account first using `/link <ign>`.", ephemeral=True)
                 return
@@ -447,7 +446,7 @@ class Dungeons(commands.Cog):
             try:
                 uuid_check = await get_uuid(ign)
                 if uuid_check:
-                    await daily_manager.register_user(interaction.user.id, ign, uuid_check)
+                    await self.bot.daily_manager.register_user(interaction.user.id, ign, uuid_check)
             except:
                 pass
         

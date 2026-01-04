@@ -8,8 +8,7 @@ from datetime import datetime, timedelta, timezone
 from core.config import OWNER_IDS
 from core.logger import log_info, log_error
 from services.api import get_uuid, get_dungeon_xp
-from services.daily_manager import daily_manager
-from services.link_manager import link_manager
+from services.api import get_uuid, get_dungeon_xp
 
 class SearchModal(Modal):
     def __init__(self, view):
@@ -52,7 +51,7 @@ class SearchModal(Modal):
 
         if ign_val:
             ign_val_lower = ign_val.lower()
-            data = daily_manager.get_leaderboard("daily" if self.view.mode == "leaderboard" else "monthly")
+            data = interaction.client.daily_manager.get_leaderboard("daily" if self.view.mode == "leaderboard" else "monthly")
             
             found_index = -1
             for i, entry in enumerate(data):
@@ -255,14 +254,14 @@ class DailyView(View):
         await interaction.response.defer(ephemeral=False)
         
         try:
-            tracked_users = daily_manager.get_tracked_users()
+            tracked_users = interaction.client.daily_manager.get_tracked_users()
             if not tracked_users:
                 await interaction.followup.send("❌ No users to update.", ephemeral=True)
                 return
 
             status_msg = await interaction.followup.send(f"🔄 **Force Update Started**\nQueue: {len(tracked_users)} users...")
             
-            updated_count, errors, total_users = await daily_manager.force_update_all(status_msg)
+            updated_count, errors, total_users = await interaction.client.daily_manager.force_update_all(status_msg)
             
             await status_msg.edit(content=f"✅ **Force Update Complete**\nTotal: {total_users}\nUpdated: {updated_count}\nErrors: {errors}")
             
@@ -284,7 +283,7 @@ class DailyView(View):
         await self.update_message(interaction)
         
     async def show_me_btn(self, interaction: discord.Interaction):
-        data = daily_manager.get_leaderboard("daily" if self.mode == "leaderboard" else "monthly")
+        data = interaction.client.daily_manager.get_leaderboard("daily" if self.mode == "leaderboard" else "monthly")
         
         found_index = -1
         for i, entry in enumerate(data):

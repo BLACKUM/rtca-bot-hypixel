@@ -157,14 +157,14 @@ class RngActionButton(discord.ui.Button):
             if self.parent_view.current_item in GLOBAL_DROPS:
                 key = "Global"
             
-            await rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, 1)
+            await interaction.client.rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, 1)
             log_info(f"RNG View ({self.parent_view.target_user_name}): Added {self.parent_view.current_item}")
         elif self.action == "subtract":
             key = self.parent_view.current_subcategory
             if self.parent_view.current_item in GLOBAL_DROPS:
                 key = "Global"
 
-            await rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, -1)
+            await interaction.client.rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, -1)
             log_info(f"RNG View ({self.parent_view.target_user_name}): Removed {self.parent_view.current_item}")
         elif self.action == "back":
             log_info(f"RNG View ({self.parent_view.target_user_name}): Go back")
@@ -204,8 +204,9 @@ class RngActionButton(discord.ui.Button):
         await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
 
 class RngView(View):
-    def __init__(self, target_user_id, target_user_name, invoker_id, run_counts=None, target_ign=None):
+    def __init__(self, bot, target_user_id, target_user_name, invoker_id, run_counts=None, target_ign=None):
         super().__init__(timeout=300)
+        self.bot = bot
         self.target_user_id = str(target_user_id)
         self.target_user_name = target_user_name
         self.invoker_id = invoker_id
@@ -298,7 +299,7 @@ class RngView(View):
             if self.current_item in GLOBAL_DROPS:
                 key = "Global"
                 
-            count = rng_manager.get_floor_stats(self.target_user_id, key).get(self.current_item, 0)
+            count = self.bot.rng_manager.get_floor_stats(self.target_user_id, key).get(self.current_item, 0)
             
             total_val, label, price, chest_cost, profit = self._calculate_item_details(self.current_item, count, prices)
             
@@ -330,7 +331,7 @@ class RngView(View):
             
         elif self.current_subcategory:
             embed.title = f"{self.current_subcategory} Drops"
-            stats = rng_manager.get_floor_stats(self.target_user_id, self.current_subcategory)
+            stats = self.bot.rng_manager.get_floor_stats(self.target_user_id, self.current_subcategory)
             desc = []
             sub_total_val = 0
             
@@ -381,7 +382,7 @@ class RngView(View):
              cat_total = 0
              
              for sub in RNG_CATEGORIES.get(self.current_category, []):
-                 stats = rng_manager.get_floor_stats(self.target_user_id, sub)
+                 stats = self.bot.rng_manager.get_floor_stats(self.target_user_id, sub)
                  sub_val = 0
                  sub_count = 0
                  for item in RNG_DROPS.get(sub, []):
@@ -408,7 +409,7 @@ class RngView(View):
             desc = ["**Select a Category:**\n"]
             grand_total = 0
             
-            user_stats = interaction.client.rng_manager.get_user_stats(self.target_user_id)
+            user_stats = self.bot.rng_manager.get_user_stats(self.target_user_id)
             for floor_name in RNG_DROPS.keys():
                  floor_stats = user_stats.get(floor_name, {})
                  for item_name in RNG_DROPS[floor_name]:
@@ -460,8 +461,8 @@ class Rng(commands.Cog):
         
         log_info(f"Command /rng called by {interaction.user}")
         
-        target_ign = link_manager.get_link(interaction.user.id)
-        default_target_id = rng_manager.get_default_target(str(interaction.user.id))
+        target_ign = self.bot.link_manager.get_link(interaction.user.id)
+        default_target_id = self.bot.rng_manager.get_default_target(str(interaction.user.id))
         
         if target_ign or default_target_id:
             await interaction.response.defer(thinking=True)
@@ -473,7 +474,7 @@ class Rng(commands.Cog):
                 fetched = await self.bot.fetch_user(int(default_target_id))
                 if fetched:
                     target_user = fetched
-                    target_ign = link_manager.get_link(target_user.id)
+                    target_ign = self.bot.link_manager.get_link(target_user.id)
             except:
                 pass
         
@@ -485,7 +486,7 @@ class Rng(commands.Cog):
                 run_counts = await get_dungeon_runs(uuid)
                 log_debug(f"Fetched run counts for {target_ign}: {run_counts}")
         
-        view = RngView(target_user.id, target_user.display_name, interaction.user.id, run_counts, target_ign)
+        view = RngView(self.bot, target_user.id, target_user.display_name, interaction.user.id, run_counts, target_ign)
         embed = await view.get_embed()
         
         if interaction.response.is_done():
@@ -500,7 +501,7 @@ class Rng(commands.Cog):
             await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
             return
             
-        await rng_manager.set_default_target(str(interaction.user.id), str(user.id))
+        await self.bot.rng_manager.set_default_target(str(interaction.user.id), str(user.id))
         
         await interaction.response.send_message(f"✅ Default target for /rng set to **{user.mention}**.", ephemeral=True)
 

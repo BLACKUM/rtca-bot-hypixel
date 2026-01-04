@@ -51,7 +51,7 @@ class SearchModal(Modal):
 
         if ign_val:
             ign_val_lower = ign_val.lower()
-            data = interaction.client.daily_manager.get_leaderboard("daily" if self.view.mode == "leaderboard" else "monthly")
+            data = self.view.bot.daily_manager.get_leaderboard("daily" if self.view.mode == "leaderboard" else "monthly")
             
             found_index = -1
             for i, entry in enumerate(data):
@@ -70,8 +70,9 @@ class SearchModal(Modal):
         await interaction.response.send_message("❌ Please enter an IGN or Page Number.", ephemeral=True)
 
 class DailyView(View):
-    def __init__(self, user_id, ign):
+    def __init__(self, bot, user_id, ign):
         super().__init__(timeout=300)
+        self.bot = bot
         self.user_id = str(user_id)
         self.ign = ign
         self.mode = "leaderboard"
@@ -105,12 +106,12 @@ class DailyView(View):
 
 
     def _get_leaderboard_embed(self, type="daily"):
-        data = daily_manager.get_leaderboard(type)
+        data = self.bot.daily_manager.get_leaderboard(type)
         title = "🏆 Daily Catacombs XP Leaderboard" if type == "daily" else "🏆 Monthly Catacombs XP Leaderboard"
         
         embed = discord.Embed(title=title, color=0xffd700)
         
-        last_updated = daily_manager.get_last_updated()
+        last_updated = self.bot.daily_manager.get_last_updated()
         next_update_ts = int(last_updated) + 7200 if last_updated else None
         last_update_ts = int(last_updated) if last_updated else None
         update_str = f"<t:{next_update_ts}:R>" if next_update_ts else "Soon"
@@ -143,7 +144,7 @@ class DailyView(View):
             desc.append(line)
             
         
-        next_daily_ts, next_monthly_ts = daily_manager.get_reset_timestamps()
+        next_daily_ts, next_monthly_ts = self.bot.daily_manager.get_reset_timestamps()
 
         desc.append(f"\nResets: **Daily** <t:{next_daily_ts}:R> • **Monthly** <t:{next_monthly_ts}:R>\nNext global update: {update_str} • Last update: {last_update_str}")
         
@@ -152,8 +153,8 @@ class DailyView(View):
         return embed
 
     def _get_personal_embed(self):
-        daily_stats = daily_manager.get_daily_stats(self.user_id)
-        monthly_stats = daily_manager.get_monthly_stats(self.user_id)
+        daily_stats = self.bot.daily_manager.get_daily_stats(self.user_id)
+        monthly_stats = self.bot.daily_manager.get_monthly_stats(self.user_id)
         
         embed = discord.Embed(title=f"📊 Personal Stats: {self.ign}", color=0x00ff99)
         
@@ -306,7 +307,7 @@ class Leaderboard(commands.Cog):
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.command(name="daily", description="View daily Dungeon XP leaderboards and stats")
     async def daily(self, interaction: discord.Interaction):
-        ign = link_manager.get_link(interaction.user.id)
+        ign = self.bot.link_manager.get_link(interaction.user.id)
         if not ign:
             await interaction.response.send_message("❌ You must link your account first using `/link <ign>`.", ephemeral=True)
             return
@@ -314,11 +315,11 @@ class Leaderboard(commands.Cog):
         try:
             uuid = await get_uuid(ign)
             if uuid:
-                await daily_manager.register_user(interaction.user.id, ign, uuid)
+                await self.bot.daily_manager.register_user(interaction.user.id, ign, uuid)
         except Exception:
             pass
 
-        view = DailyView(interaction.user.id, ign)
+        view = DailyView(self.bot, interaction.user.id, ign)
         embed = view._get_leaderboard_embed("daily")
         
         await interaction.response.send_message(embed=embed, view=view)
@@ -338,7 +339,7 @@ class Leaderboard(commands.Cog):
              await interaction.followup.send(f"❌ Could not find UUID for IGN: `{ign}`")
              return
              
-        await daily_manager.register_user(str(user.id), ign, uuid)
+        await self.bot.daily_manager.register_user(str(user.id), ign, uuid)
         await interaction.followup.send(f"✅ Manually registered {user.mention} as `{ign}` for daily tracking.")
 
 async def setup(bot: commands.Bot):

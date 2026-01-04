@@ -21,7 +21,7 @@ HEADERS = {
 
 
 async def get_uuid(name: str):
-    cached = cache_get(name.lower())
+    cached = await cache_get(name.lower())
     if cached:
         log_debug(f"Using cached UUID for {name}")
         return cached
@@ -40,12 +40,12 @@ async def get_uuid(name: str):
             data = await r.json()
             uuid = data["data"]["player"]["raw_id"]
             log_debug(f"UUID fetched: {uuid}")
-            cache_set(name.lower(), uuid, ttl=PROFILE_CACHE_TTL)
+            await cache_set(name.lower(), uuid, ttl=PROFILE_CACHE_TTL)
             return uuid
 
 
 async def get_profile_data(uuid: str):
-    cached = cache_get(uuid)
+    cached = await cache_get(uuid)
     if cached:
         log_debug(f"Using cached data for {uuid}")
         return cached
@@ -66,7 +66,7 @@ async def get_profile_data(uuid: str):
                         log_error(f"Profile request failed ({r.status})")
                     return None
                 data = await r.json()
-                cache_set(uuid, data, ttl=PROFILE_CACHE_TTL)
+                await cache_set(uuid, data, ttl=PROFILE_CACHE_TTL)
                 return data
         except asyncio.TimeoutError:
             log_error("Profile request timed out (15s)")
@@ -74,7 +74,7 @@ async def get_profile_data(uuid: str):
 
 
 async def get_bazaar_prices():
-    cached = cache_get("bazaar_prices")
+    cached = await cache_get("bazaar_prices")
     if cached is not None:
         return cached
     
@@ -90,7 +90,7 @@ async def get_bazaar_prices():
                         log_error(f"Bazaar request failed ({r.status}): {text[:200]}")
                     except:
                         log_error(f"Bazaar request failed ({r.status})")
-                    cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
+                    await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
                     return {}
                 data = await r.json()
                 products = data.get("products", {})
@@ -98,16 +98,16 @@ async def get_bazaar_prices():
                     pid: info["quick_status"]["sellPrice"] 
                     for pid, info in products.items()
                 }
-                cache_set("bazaar_prices", prices, ttl=PRICES_CACHE_TTL)
+                await cache_set("bazaar_prices", prices, ttl=PRICES_CACHE_TTL)
                 return prices
         except Exception as e:
             log_error(f"Failed to fetch Bazaar prices: {e}")
-            cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
+            await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
             return {}
 
 
 async def get_ah_prices():
-    cached = cache_get("ah_prices")
+    cached = await cache_get("ah_prices")
     if cached is not None:
         return cached
         
@@ -124,14 +124,14 @@ async def get_ah_prices():
                         log_error(f"AH request failed ({r.status}): {text[:200]}")
                     except:
                         log_error(f"AH request failed ({r.status})")
-                    cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
+                    await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
                     return {}
                 prices = await r.json()
-                cache_set("ah_prices", prices, ttl=PRICES_CACHE_TTL)
+                await cache_set("ah_prices", prices, ttl=PRICES_CACHE_TTL)
                 return prices
         except Exception as e:
             log_error(f"Failed to fetch AH prices: {e}")
-            cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
+            await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
             return {}
 
 async def get_special_prices():

@@ -2,7 +2,9 @@ from discord.ext import commands, tasks
 from core.config import TOKEN, INTENTS, validate_config
 from core.logger import log_info, log_error
 from services.daily_manager import daily_manager
+from services.rng_manager import rng_manager
 from services.api import get_dungeon_xp
+from core.cache import initialize as init_cache
 import asyncio
 import os
 
@@ -27,7 +29,9 @@ async def track_daily_stats():
 
 @bot.listen()
 async def on_ready():
+    await init_cache()
     await daily_manager.initialize()
+    await rng_manager.initialize()
     await daily_manager.sanitize_data()
     if not track_daily_stats.is_running():
         track_daily_stats.start()

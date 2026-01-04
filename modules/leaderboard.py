@@ -339,7 +339,7 @@ class Leaderboard(commands.Cog):
              await interaction.followup.send(f"❌ Could not find UUID for IGN: `{ign}`")
              return
              
-        daily_manager.register_user(str(user.id), ign, uuid)
+        await daily_manager.register_user(str(user.id), ign, uuid)
         await interaction.followup.send(f"✅ Manually registered {user.mention} as `{ign}` for daily tracking.")
 
 async def setup(bot: commands.Bot):

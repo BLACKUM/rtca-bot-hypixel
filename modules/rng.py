@@ -40,7 +40,7 @@ class RngAmountModal(Modal):
             if amount < 0:
                 raise ValueError("Amount must be non-negative")
                 
-            rng_manager.set_drop_count(
+            await rng_manager.set_drop_count(
                 self.parent_view.target_user_id, 
                 self.parent_view.current_subcategory, 
                 self.parent_view.current_item, 
@@ -158,14 +158,14 @@ class RngActionButton(discord.ui.Button):
             if self.parent_view.current_item in GLOBAL_DROPS:
                 key = "Global"
             
-            rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, 1)
+            await rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, 1)
             log_info(f"RNG View ({self.parent_view.target_user_name}): Added {self.parent_view.current_item}")
         elif self.action == "subtract":
             key = self.parent_view.current_subcategory
             if self.parent_view.current_item in GLOBAL_DROPS:
                 key = "Global"
 
-            rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, -1)
+            await rng_manager.update_drop(self.parent_view.target_user_id, key, self.parent_view.current_item, -1)
             log_info(f"RNG View ({self.parent_view.target_user_name}): Removed {self.parent_view.current_item}")
         elif self.action == "back":
             log_info(f"RNG View ({self.parent_view.target_user_name}): Go back")
@@ -501,7 +501,7 @@ class Rng(commands.Cog):
             await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
             return
             
-        rng_manager.set_default_target(str(interaction.user.id), str(user.id))
+        await rng_manager.set_default_target(str(interaction.user.id), str(user.id))
         
         await interaction.response.send_message(f"✅ Default target for /rng set to **{user.mention}**.", ephemeral=True)
 

@@ -34,3 +34,21 @@ def test_class_average():
     }
     # Avg: (0+50+25+50+0) / 5 = 25
     assert get_class_average(classes) == 25.0
+
+def test_calculate_dungeon_xp_per_run_basic():
+    # Base floor 28000 (F7)
+    # No bonuses
+    # 1000 * (0.95 + 0 + 75 * 0.022) = 1000 * (0.95 + 1.65) = 1000 * 2.6 = 2600
+    from services.xp_calculations import calculate_dungeon_xp_per_run
+    
+    xp = calculate_dungeon_xp_per_run(1000.0, 0.0, 0.0, 1.0, 1.0)
+    assert xp == 2600.0
+
+def test_calculate_dungeon_xp_per_run_full():
+    # Test F7 (28000) with  bonuses
+    # ring=0.1, heca=0.02, mayor=1.0
+    # 28000 * 1.68 = 47040
+    from services.xp_calculations import calculate_dungeon_xp_per_run
+    
+    xp = calculate_dungeon_xp_per_run(28000.0, 0.1, 0.02, 1.0, 1.0)
+    assert xp == 47041.0

@@ -11,7 +11,6 @@ import os
 
 bot = commands.Bot(command_prefix="!", intents=INTENTS)
 
-# Initialize Managers
 bot.daily_manager = DailyManager()
 bot.rng_manager = RngManager()
 bot.link_manager = LinkManager()

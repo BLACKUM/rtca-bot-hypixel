@@ -54,5 +54,54 @@ async def test_get_profile_data(mocker):
     cm.__aexit__.return_value = None
     mock_session.get.return_value = cm
     
-    data = await api.get_profile_data("a"*32)
+    data = await api.get_profile_data("a"*32) # 32 chars
     assert data == {"profiles": []}
+
+@pytest.mark.asyncio
+async def test_get_bazaar_prices(mocker):
+    mocker.patch("services.api.cache_get", return_value=None)
+    mock_set = mocker.patch("services.api.cache_set")
+    
+    mock_session = mocker.MagicMock()
+    mock_session.get = mocker.Mock()
+    mocker.patch("services.api._SESSION", mock_session)
+    
+    mock_resp = mocker.AsyncMock()
+    mock_resp.status = 200
+    mock_resp.json.return_value = {
+        "products": {
+            "ITEM_ID": {"quick_status": {"sellPrice": 100.0}}
+        }
+    }
+    
+    cm = mocker.AsyncMock()
+    cm.__aenter__.return_value = mock_resp
+    cm.__aexit__.return_value = None
+    mock_session.get.return_value = cm
+    
+    prices = await api.get_bazaar_prices()
+    assert prices == {"ITEM_ID": 100.0}
+    mock_set.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_get_ah_prices(mocker):
+    mocker.patch("services.api.cache_get", return_value=None)
+    mock_set = mocker.patch("services.api.cache_set")
+    
+    mock_session = mocker.MagicMock()
+    mock_session.get = mocker.Mock()
+    mocker.patch("services.api._SESSION", mock_session)
+    
+    mock_resp = mocker.AsyncMock()
+    mock_resp.status = 200
+    mock_resp.json.return_value = {"ITEM_ID": 200.0}
+    
+    cm = mocker.AsyncMock()
+    cm.__aenter__.return_value = mock_resp
+    cm.__aexit__.return_value = None
+    mock_session.get.return_value = cm
+    
+    prices = await api.get_ah_prices()
+    assert prices == {"ITEM_ID": 200.0}
+    mock_set.assert_called_once()
+

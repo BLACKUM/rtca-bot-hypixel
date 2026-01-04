@@ -1,7 +1,7 @@
 import time
 import asyncio
 from core.logger import log_info, log_debug
-from services.xp_calculations import get_dungeon_level, get_total_xp_for_level
+from services.xp_calculations import get_dungeon_level, get_total_xp_for_level, calculate_dungeon_xp_per_run
 from core.config import TARGET_LEVEL
 
 

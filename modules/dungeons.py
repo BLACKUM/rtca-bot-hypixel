@@ -9,6 +9,7 @@ from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_profile_data
 from services.api import get_uuid, get_profile_data
 from services.simulation_logic import simulate_async
+from services.xp_calculations import calculate_dungeon_xp_per_run
 
 default_bonuses = {
     "ring": 0.1,
@@ -18,25 +19,6 @@ default_bonuses = {
     "global": 1.0,
     "mayor": 1.0
 }
-
-def calculate_dungeon_xp_per_run(base_floor: float, ring: float, hecatomb: float, global_mult: float, mayor_mult: float) -> float:
-    if base_floor >= 15000:
-        maxcomps = 26
-    elif base_floor == 4880:
-        maxcomps = 51
-    else:
-        maxcomps = 76
-    
-    if ring > 0 and mayor_mult > 1:
-        cataperrun = base_floor * (0.95 + ((mayor_mult - 1) + (maxcomps - 1) / 100) + ring + hecatomb + (maxcomps - 1) * (0.024 + hecatomb / 50))
-    elif ring > 0:
-        cataperrun = base_floor * (0.95 + ring + hecatomb + (maxcomps - 1) * (0.024 + hecatomb / 50))
-    else:
-        cataperrun = base_floor * (0.95 + hecatomb + (maxcomps - 1) * (0.022 + hecatomb / 50))
-    
-    cataperrun *= global_mult
-    return math.ceil(cataperrun)
-
 
 class ValueSelect(Select):
     

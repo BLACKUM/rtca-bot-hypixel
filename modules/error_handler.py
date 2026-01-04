@@ -6,7 +6,6 @@ from core.logger import log_error
 class GlobalErrorHandler(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Register the app command error handler
         bot.tree.on_error = self.on_app_command_error
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):

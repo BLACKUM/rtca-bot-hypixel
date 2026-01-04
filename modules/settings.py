@@ -20,13 +20,13 @@ class Settings(commands.Cog):
             await interaction.response.send_message(f"❌ Could not find player with IGN: {ign}", ephemeral=True)
             return
 
-        link_manager.link_user(interaction.user.id, ign)
+        await link_manager.link_user(interaction.user.id, ign)
         await daily_manager.register_user(interaction.user.id, ign, uuid)
         await interaction.response.send_message(f"✅ Successfully linked your Discord account to **{ign}**!", ephemeral=True)
 
     @app_commands.command(name="unlink", description="Unlink your Discord account from any Hypixel IGN")
     async def unlink(self, interaction: discord.Interaction):
-        if link_manager.unlink_user(interaction.user.id):
+        if await link_manager.unlink_user(interaction.user.id):
             await interaction.response.send_message("✅ Successfully unlinked your account.", ephemeral=True)
         else:
             await interaction.response.send_message("❌ You do not have a linked account.", ephemeral=True)

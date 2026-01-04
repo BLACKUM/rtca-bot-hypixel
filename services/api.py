@@ -4,6 +4,22 @@ from urllib.parse import quote
 from core.config import PROFILE_CACHE_TTL, PRICES_CACHE_TTL, SKELETON_MASTER_CHESTPLATE_50
 from core.logger import log_debug, log_error, log_info
 from core.cache import cache_get, cache_set, get_cache_expiry
+from typing import Optional
+
+_SESSION: Optional[aiohttp.ClientSession] = None
+
+async def init_session():
+    global _SESSION
+    if _SESSION is None:
+        _SESSION = aiohttp.ClientSession(headers=HEADERS)
+        log_info("Global API Session initialized.")
+
+async def close_session():
+    global _SESSION
+    if _SESSION:
+        await _SESSION.close()
+        _SESSION = None
+        log_info("Global API Session closed.")
 
 
 # cloudflare bypass, i hate i even have to do this
@@ -27,13 +43,17 @@ async def get_uuid(name: str):
         return cached
 
     log_debug(f"Requesting UUID for {name}")
-    async with aiohttp.ClientSession() as session:
-        if not name.replace("_", "").isalnum():
-            log_error(f"Invalid name format: {name}")
-            return None
-            
-        msg = quote(name)
-        async with session.get(f"https://playerdb.co/api/player/minecraft/{msg}", headers=HEADERS) as r:
+    
+    if not _SESSION:
+        await init_session()
+        
+    if not name.replace("_", "").isalnum():
+        log_error(f"Invalid name format: {name}")
+        return None
+        
+    msg = quote(name)
+    try:
+        async with _SESSION.get(f"https://playerdb.co/api/player/minecraft/{msg}") as r:
             if r.status != 200:
                 log_error(f"UUID request failed ({r.status})")
                 return None
@@ -42,6 +62,9 @@ async def get_uuid(name: str):
             log_debug(f"UUID fetched: {uuid}")
             await cache_set(name.lower(), uuid, ttl=PROFILE_CACHE_TTL)
             return uuid
+    except Exception as e:
+         log_error(f"UUID fetch error: {e}")
+         return None
 
 
 async def get_profile_data(uuid: str):
@@ -55,22 +78,28 @@ async def get_profile_data(uuid: str):
         
     url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/skyblock/profiles?uuid={uuid}"
     log_debug(f"Requesting profile data: {url}")
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as r:
-                if r.status != 200:
-                    try:
-                        text = await r.text()
-                        log_error(f"Profile request failed ({r.status}): {text[:200]}")
-                    except:
-                        log_error(f"Profile request failed ({r.status})")
-                    return None
-                data = await r.json()
-                await cache_set(uuid, data, ttl=PROFILE_CACHE_TTL)
-                return data
-        except asyncio.TimeoutError:
-            log_error("Profile request timed out (15s)")
-            return None
+    
+    if not _SESSION:
+        await init_session()
+
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+            if r.status != 200:
+                try:
+                    text = await r.text()
+                    log_error(f"Profile request failed ({r.status}): {text[:200]}")
+                except:
+                    log_error(f"Profile request failed ({r.status})")
+                return None
+            data = await r.json()
+            await cache_set(uuid, data, ttl=PROFILE_CACHE_TTL)
+            return data
+    except asyncio.TimeoutError:
+        log_error("Profile request timed out (15s)")
+        return None
+    except Exception as e:
+        log_error(f"Profile request error: {e}")
+        return None
 
 
 async def get_bazaar_prices():
@@ -81,29 +110,31 @@ async def get_bazaar_prices():
     url = "https://api.hypixel.net/skyblock/bazaar"
     log_debug("Fetching Bazaar prices")
     
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10)) as r:
-                if r.status != 200:
-                    try:
-                        text = await r.text()
-                        log_error(f"Bazaar request failed ({r.status}): {text[:200]}")
-                    except:
-                        log_error(f"Bazaar request failed ({r.status})")
-                    await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
-                    return {}
-                data = await r.json()
-                products = data.get("products", {})
-                prices = {
-                    pid: info["quick_status"]["sellPrice"] 
-                    for pid, info in products.items()
-                }
-                await cache_set("bazaar_prices", prices, ttl=PRICES_CACHE_TTL)
-                return prices
-        except Exception as e:
-            log_error(f"Failed to fetch Bazaar prices: {e}")
-            await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
-            return {}
+    if not _SESSION:
+        await init_session()
+
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            if r.status != 200:
+                try:
+                    text = await r.text()
+                    log_error(f"Bazaar request failed ({r.status}): {text[:200]}")
+                except:
+                    log_error(f"Bazaar request failed ({r.status})")
+                await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
+                return {}
+            data = await r.json()
+            products = data.get("products", {})
+            prices = {
+                pid: info["quick_status"]["sellPrice"] 
+                for pid, info in products.items()
+            }
+            await cache_set("bazaar_prices", prices, ttl=PRICES_CACHE_TTL)
+            return prices
+    except Exception as e:
+        log_error(f"Failed to fetch Bazaar prices: {e}")
+        await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
+        return {}
 
 
 async def get_ah_prices():
@@ -114,25 +145,27 @@ async def get_ah_prices():
     url = "https://moulberry.codes/auction_averages_lbin/3day.json"
     log_debug("Fetching AH prices (3-day avg)")
     
-    async with aiohttp.ClientSession() as session:
-        log_debug(f"Requesting AH prices: {url}")
-        try:
-            async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10)) as r:
-                if r.status != 200:
-                    try:
-                        text = await r.text()
-                        log_error(f"AH request failed ({r.status}): {text[:200]}")
-                    except:
-                        log_error(f"AH request failed ({r.status})")
-                    await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
-                    return {}
-                prices = await r.json()
-                await cache_set("ah_prices", prices, ttl=PRICES_CACHE_TTL)
-                return prices
-        except Exception as e:
-            log_error(f"Failed to fetch AH prices: {e}")
-            await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
-            return {}
+    if not _SESSION:
+        await init_session()
+
+    log_debug(f"Requesting AH prices: {url}")
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            if r.status != 200:
+                try:
+                    text = await r.text()
+                    log_error(f"AH request failed ({r.status}): {text[:200]}")
+                except:
+                    log_error(f"AH request failed ({r.status})")
+                await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
+                return {}
+            prices = await r.json()
+            await cache_set("ah_prices", prices, ttl=PRICES_CACHE_TTL)
+            return prices
+    except Exception as e:
+        log_error(f"Failed to fetch AH prices: {e}")
+        await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
+        return {}
 
 async def get_special_prices():
     urls = {
@@ -142,21 +175,23 @@ async def get_special_prices():
     
     special_prices = {}
     
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for key, url in urls.items():
-            tasks.append(fetch_special_price(session, key, url))
-        
-        results = await asyncio.gather(*tasks)
-        for key, price in results:
-            if price is not None:
-                special_prices[key] = price
+    if not _SESSION:
+        await init_session()
+
+    tasks = []
+    for key, url in urls.items():
+        tasks.append(fetch_special_price(_SESSION, key, url))
+    
+    results = await asyncio.gather(*tasks)
+    for key, price in results:
+        if price is not None:
+            special_prices[key] = price
                 
     return special_prices
 
 async def fetch_special_price(session, key, url):
     try:
-        async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=5)) as r:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
             if r.status == 200:
                 data = await r.json()
                 price = data.get("median", data.get("min", 0))

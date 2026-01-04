@@ -44,7 +44,6 @@ def get_class_average(classes_data: dict) -> float:
     total_level = 0.0
     count = 0
     
-    # Standard 5 classes
     for cls in ["archer", "berserk", "healer", "mage", "tank"]:
         xp = float(classes_data.get(cls, 0))
         level = get_dungeon_level(xp)

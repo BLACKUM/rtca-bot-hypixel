@@ -1,5 +1,6 @@
 import aiohttp
 import asyncio
+from services import json_utils
 from urllib.parse import quote
 from core.config import PROFILE_CACHE_TTL, PRICES_CACHE_TTL, SKELETON_MASTER_CHESTPLATE_50
 from core.logger import log_debug, log_error, log_info
@@ -57,7 +58,7 @@ async def get_uuid(name: str):
             if r.status != 200:
                 log_error(f"UUID request failed ({r.status})")
                 return None
-            data = await r.json()
+            data = await r.json(loads=json_utils.loads)
             uuid = data["data"]["player"]["raw_id"]
             log_debug(f"UUID fetched: {uuid}")
             await cache_set(name.lower(), uuid, ttl=PROFILE_CACHE_TTL)
@@ -91,7 +92,7 @@ async def get_profile_data(uuid: str):
                 except:
                     log_error(f"Profile request failed ({r.status})")
                 return None
-            data = await r.json()
+            data = await r.json(loads=json_utils.loads)
             await cache_set(uuid, data, ttl=PROFILE_CACHE_TTL)
             return data
     except asyncio.TimeoutError:
@@ -123,7 +124,7 @@ async def get_bazaar_prices():
                     log_error(f"Bazaar request failed ({r.status})")
                 await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
                 return {}
-            data = await r.json()
+            data = await r.json(loads=json_utils.loads)
             products = data.get("products", {})
             prices = {
                 pid: info["quick_status"]["sellPrice"] 
@@ -159,7 +160,7 @@ async def get_ah_prices():
                     log_error(f"AH request failed ({r.status})")
                 await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
                 return {}
-            prices = await r.json()
+            prices = await r.json(loads=json_utils.loads)
             await cache_set("ah_prices", prices, ttl=PRICES_CACHE_TTL)
             return prices
     except Exception as e:
@@ -193,7 +194,7 @@ async def fetch_special_price(session, key, url):
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
             if r.status == 200:
-                data = await r.json()
+                data = await r.json(loads=json_utils.loads)
                 price = data.get("median", data.get("min", 0))
                 return key, price
     except Exception as e:

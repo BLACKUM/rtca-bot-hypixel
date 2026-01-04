@@ -1,4 +1,4 @@
-import json
+from services import json_utils as json
 import os
 import time
 import aiofiles
@@ -112,7 +112,7 @@ class DailyManager:
             return
 
         try:
-            async with aiofiles.open(DAILY_DATA_FILE, 'r') as f:
+            async with aiofiles.open(DAILY_DATA_FILE, json.get_read_mode()) as f:
                 content = await f.read()
                 loaded = json.loads(content)
                 for key in self.data:
@@ -124,7 +124,7 @@ class DailyManager:
 
     async def _save_data(self):
         try:
-            async with aiofiles.open(DAILY_DATA_FILE, 'w') as f:
+            async with aiofiles.open(DAILY_DATA_FILE, json.get_write_mode()) as f:
                 await f.write(json.dumps(self.data, indent=4))
         except Exception as e:
             log_error(f"Failed to save daily data: {e}")

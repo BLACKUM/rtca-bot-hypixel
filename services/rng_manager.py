@@ -1,4 +1,4 @@
-import json
+from services import json_utils as json
 import os
 import aiofiles
 from typing import Dict, List, Optional
@@ -22,7 +22,7 @@ class RngManager:
              return
          
         try:
-             async with aiofiles.open(DATA_FILE, 'r') as f:
+             async with aiofiles.open(DATA_FILE, json.get_read_mode()) as f:
                  content = await f.read()
                  loaded_data = json.loads(content)
                 
@@ -70,7 +70,7 @@ class RngManager:
 
     async def save_data(self):
         try:
-            async with aiofiles.open(DATA_FILE, 'w') as f:
+            async with aiofiles.open(DATA_FILE, json.get_write_mode()) as f:
                 await f.write(json.dumps(self.data, indent=4))
         except Exception as e:
             log_error(f"Failed to save RNG data: {e}")

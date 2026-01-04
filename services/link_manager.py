@@ -1,4 +1,4 @@
-import json
+from services import json_utils as json
 import os
 import aiofiles
 from typing import Dict, Optional
@@ -19,7 +19,7 @@ class LinkManager:
              return
          
         try:
-             async with aiofiles.open(LINK_FILE, 'r') as f:
+             async with aiofiles.open(LINK_FILE, json.get_read_mode()) as f:
                  content = await f.read()
                  self.links = json.loads(content)
              log_info(f"Loaded {len(self.links)} user links.")
@@ -29,7 +29,7 @@ class LinkManager:
 
     async def save_links(self):
         try:
-            async with aiofiles.open(LINK_FILE, 'w') as f:
+            async with aiofiles.open(LINK_FILE, json.get_write_mode()) as f:
                 await f.write(json.dumps(self.links, indent=4))
         except Exception as e:
             log_error(f"Failed to save user links: {e}")

@@ -519,7 +519,7 @@ class Dungeons(commands.Cog):
         
         if current_average >= 50.0:
             import random
-            from services.daily_manager import CONGRATS_GIFS
+            from core.config import CONGRATS_GIFS
             
             gif = random.choice(CONGRATS_GIFS)
             msg = f"🎉 **Congratulations {ign}, you already hit Class Average 50!** 🎉\n> You don't need this simulation anymore. Go touch some grass! 🌱"

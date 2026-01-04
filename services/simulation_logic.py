@@ -1,4 +1,5 @@
 import time
+import asyncio
 from core.logger import log_info, log_debug
 from services.xp_calculations import get_dungeon_level, get_total_xp_for_level
 from core.config import TARGET_LEVEL
@@ -90,3 +91,13 @@ def simulate_to_level_all50(dungeon_classes: dict, floor_xp: float, bonuses: dic
         }
 
     return runs, results
+
+async def simulate_async(dungeon_classes: dict, floor_xp: float, bonuses: dict):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None, 
+        simulate_to_level_all50, 
+        dungeon_classes, 
+        floor_xp, 
+        bonuses
+    )

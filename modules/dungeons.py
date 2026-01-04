@@ -7,7 +7,7 @@ import math
 from core.config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS
 from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_profile_data
-from services.simulation_logic import simulate_to_level_all50
+from services.simulation_logic import simulate_async
 from services.daily_manager import daily_manager
 from services.link_manager import link_manager
 
@@ -78,7 +78,7 @@ class ValueSelect(Select):
         self.parent_view.xp_per_run = dungeon_xp
         log_debug(f"Dungeon XP per run: {dungeon_xp:,.0f}")
         
-        runs_total, results = simulate_to_level_all50(
+        runs_total, results = await simulate_async(
             self.parent_view.dungeon_classes, 
             self.parent_view.base_floor, 
             self.parent_view.bonuses
@@ -542,7 +542,7 @@ class Dungeons(commands.Cog):
         
         current_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
         
-        runs_total, results = simulate_to_level_all50(dungeon_classes, base_floor, bonuses)
+        runs_total, results = await simulate_async(dungeon_classes, base_floor, bonuses)
         
         view = BonusSelectView(self.bot, dungeon_classes, base_floor, bonuses, ign, floor, dungeon_xp, current_cata_xp)
         

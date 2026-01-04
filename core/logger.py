@@ -1,6 +1,8 @@
 import logging
 import os
-from logging.handlers import TimedRotatingFileHandler
+import atexit
+from queue import Queue
+from logging.handlers import TimedRotatingFileHandler, QueueHandler, QueueListener
 from core.config import DEBUG_MODE
 
 if not os.path.exists("logs"):
@@ -13,11 +15,18 @@ formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s", datef
 
 file_handler = TimedRotatingFileHandler("logs/bot.log", when="midnight", interval=1, backupCount=7)
 file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
 
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+
+log_queue = Queue(-1)
+queue_handler = QueueHandler(log_queue)
+logger.addHandler(queue_handler)
+
+listener = QueueListener(log_queue, file_handler, console_handler)
+listener.start()
+
+atexit.register(listener.stop)
 
 def log_info(msg):
     logger.info(msg)

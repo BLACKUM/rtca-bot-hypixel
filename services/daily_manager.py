@@ -50,7 +50,7 @@ CONGRATS_GIFS = [
     "https://media.tenor.com/UsDCL6bOIT4AAAAM/touch-grass-touch.gif",
     "https://i.imgflip.com/6f5788.gif",
     "https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyODIyMXFzamljbm9sc2d1NnVzdDJvYXllN2Jjcm14Y25kYm00cGF5ZSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/bum2UBz4nR9IxZmWde/giphy-downsized.gif",
-    "https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUyODVzb2JyeXpveng0Z2FocHdsczF6enZqbDN6NDBiZmhuaWlndXl1NiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/JyOtBwVBKFoeIQ14Po/200w_d.gif"
+    "https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUyODVzb2JyeXpveng0Z2FocHdsczF6enZqbDN6NDBiZmhuaWlndXl1NiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/JyOtBwVBKFoeIQ14Po/200w_d.gif",
     "https://media.discordapp.net/attachments/1122856048374595647/1152961363614908497/JIXMersMo8xcnmXQ.gif?ex=69591b72&is=6957c9f2&hm=40759ab651245f54ba2e5f10640403b43806c1cfe5cbf542ec4be9d2a4607437&=&width=585&height=75",
     "https://media.discordapp.net/attachments/1263938847910269000/1276128862849339393/minus-infinite-social-credit-china.gif?ex=6958f21e&is=6957a09e&hm=34acdfe4c04a23c4d4e4256f908b7523d41670e382018038544bfc3aeb2823ff&=&width=800&height=450",
     "https://media.discordapp.net/attachments/1263938847910269000/1276125652730380349/gypsycrusadervshoke.gif?ex=6958ef20&is=69579da0&hm=545b63f83cb383740758971ca6940b9f9b22d1bd9d832ed09089d9246c15ffc0&=&width=800&height=503",
@@ -103,7 +103,7 @@ class DailyManager:
         last_updated = self.data.get("last_updated", 0)
         
         if not force and now - last_updated < 86400:
-            log_info(f"Skipping daily update (last updated {now - last_updated}s ago)")
+            log_debug(f"Skipping daily update (last updated {now - last_updated}s ago)")
             if status_message:
                  try:
                      await status_message.edit(content=f"✅ Daily stats already up to date (Updated <t:{last_updated}:R>)")

@@ -98,57 +98,63 @@ class ForceLinkModal(Modal):
 
 
 class ConfigEditModal(Modal):
-    def __init__(self, key, current_value):
-        super().__init__(title=f"Edit Config: {key}")
+    def __init__(self, key, current_val):
+        super().__init__(title=f"Edit {key}")
         self.key = key
-        
-        self.value_input = TextInput(
-            label="New Value",
-            default=str(current_value),
-            required=True
-        )
+        default_val = str(current_val)
+        if isinstance(current_val, list):
+             default_val = ", ".join(map(str, current_val))
+             
+        self.value_input = TextInput(label="New Value", default=default_val, required=True, style=discord.TextStyle.paragraph)
         self.add_item(self.value_input)
 
     async def on_submit(self, interaction: discord.Interaction):
+        from core import config
+        new_val = self.value_input.value
+        
         try:
-            from core import config
-            
-            new_value = self.value_input.value
-            
-            if new_value.lower() == "true":
-                new_value = True
-            elif new_value.lower() == "false":
-                new_value = False
+            current_val = getattr(config, self.key)
+            if isinstance(current_val, bool):
+                 converted_val = new_val.lower() in ("true", "1", "yes")
+            elif isinstance(current_val, int):
+                converted_val = int(new_val)
+            elif isinstance(current_val, float):
+                converted_val = float(new_val)
+            elif isinstance(current_val, list):
+                items = [x.strip() for x in new_val.split(",") if x.strip()]
+                if items and isinstance(current_val[0], int):
+                     converted_val = [int(x) for x in items]
+                else:
+                     converted_val = items
             else:
-                try:
-                    if "." in new_value:
-                        new_value = float(new_value)
-                    else:
-                        new_value = int(new_value)
-                except ValueError:
-                    pass
-            
-            setattr(config, self.key.upper(), new_value)
+                converted_val = new_val
+                
+            setattr(config, self.key, converted_val)
             config.save_config()
             
-            await interaction.response.send_message(f"✅ Config `{self.key}` updated to `{new_value}`.", ephemeral=True)
+            await interaction.response.send_message(f"✅ Updated `{self.key}` to `{converted_val}`", ephemeral=True)
             
+        except ValueError:
+             await interaction.response.send_message(f"❌ Invalid format for {self.key}.", ephemeral=True)
         except Exception as e:
-            await interaction.response.send_message(f"❌ Failed to update config: {e}", ephemeral=True)
+             await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
 
 class ConfigSelect(Select):
     def __init__(self):
         from core import config
         options = []
         
-        keys = ["XP_PER_RUN_DEFAULT", "TARGET_LEVEL", "DEBUG_MODE"]
+        keys = ["TARGET_LEVEL", "DEBUG_MODE", "PROFILE_CACHE_TTL", "PRICES_CACHE_TTL", "OWNER_IDS", "CONGRATS_GIFS"]
         
         for key in keys:
             value = getattr(config, key, "Unknown")
-            
+            display_val = str(value)
+            if isinstance(value, list):
+                display_val = f"List [{len(value)} items]"
+
             options.append(discord.SelectOption(
                 label=key, 
-                description=f"Current: {value}",
+                description=f"Current: {display_val}",
                 value=key
             ))
 
@@ -157,9 +163,59 @@ class ConfigSelect(Select):
     async def callback(self, interaction: discord.Interaction):
         key = self.values[0]
         from core import config
+        
+        if key == "CONGRATS_GIFS":
+             await interaction.response.send_message("🎉 **Manage Congratulation GIFs**", view=GifManageView(self.bot), ephemeral=True)
+             return
+
         current_val = getattr(config, key.upper(), "Unknown")
         await interaction.response.send_modal(ConfigEditModal(key, current_val))
 
+class GifManageView(View):
+    def __init__(self, bot):
+        super().__init__(timeout=None)
+        self.bot = bot
+
+    @discord.ui.button(label="Add GIF", style=discord.ButtonStyle.success, emoji="➕")
+    async def add_gif(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(GifAddModal())
+
+    @discord.ui.button(label="Remove Last GIF", style=discord.ButtonStyle.danger, emoji="➖")
+    async def remove_gif(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from core import config
+        if config.CONGRATS_GIFS:
+            removed = config.CONGRATS_GIFS.pop()
+            config.save_config()
+            await interaction.response.send_message(f"🗑️ Removed last GIF: `{removed}`", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ No GIFs to remove.", ephemeral=True)
+
+    @discord.ui.button(label="List GIFs", style=discord.ButtonStyle.secondary, emoji="📜")
+    async def list_gifs(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from core import config
+        gifs = "\n".join([f"`{g}`" for g in config.CONGRATS_GIFS])
+        if len(gifs) > 1900:
+             gifs = gifs[:1900] + "... (truncated)"
+        if not gifs:
+            gifs = "No GIFs configured."
+            
+        await interaction.response.send_message(f"**Configured GIFs:**\n{gifs}", ephemeral=True)
+
+class GifAddModal(Modal):
+    def __init__(self):
+        super().__init__(title="Add Congratulation GIF")
+        self.gif_url = TextInput(label="GIF URL", placeholder="https://media.tenor.com/...", required=True)
+        self.add_item(self.gif_url)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        url = self.gif_url.value.strip()
+        from core import config
+        if url not in config.CONGRATS_GIFS:
+            config.CONGRATS_GIFS.append(url)
+            config.save_config()
+            await interaction.response.send_message(f"✅ Added GIF:\n`{url}`", ephemeral=True)
+        else:
+            await interaction.response.send_message("⚠️ GIF already exists.", ephemeral=True)
 
 class SystemSelect(Select):
     def __init__(self, bot):

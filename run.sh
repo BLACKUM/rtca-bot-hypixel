@@ -11,14 +11,19 @@ fi
 
 # Check if we are inside tmux
 if [ -z "$TMUX" ]; then
+    # Get absolute path to this script
+    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+    SCRIPT_NAME=$(basename "$0")
+    SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_NAME"
+
     # Check if session exists
     tmux has-session -t $SESSION 2>/dev/null
 
     if [ $? != 0 ]; then
         echo "Creating new tmux session: $SESSION"
         # Create session and run this script inside it
-        # We use $0 to recursively run this script
-        tmux new-session -s $SESSION -d "bash $0"
+        # We append '; read' to keep the window open if the script crashes
+        tmux new-session -s $SESSION -d "bash '$SCRIPT_PATH'; read -p 'Session ended. Press Enter to close...'"
     fi
 
     echo "Attaching to session: $SESSION"

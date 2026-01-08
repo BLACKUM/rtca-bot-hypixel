@@ -168,6 +168,7 @@ class SystemSelect(Select):
             discord.SelectOption(label="Reload Extensions", value="reload", description="Reload all bot modules", emoji="🔄"),
             discord.SelectOption(label="Get Logs", value="logs", description="Upload the latest log file", emoji="📜"),
             discord.SelectOption(label="Restart Bot", value="restart", description="Restart the bot process", emoji="👋"),
+            discord.SelectOption(label="Shutdown", value="shutdown", description="Turn off the bot", emoji="🛑"),
         ]
         super().__init__(placeholder="Select a system action...", options=options)
 
@@ -224,6 +225,11 @@ class SystemSelect(Select):
             await interaction.response.send_message("👋 Restarting bot...", ephemeral=True)
             await self.bot.close()
             os.execv(sys.executable, ['python'] + sys.argv)
+
+        elif val == "shutdown":
+            await interaction.response.send_message("🛑 Shutting down...", ephemeral=True)
+            await self.bot.close()
+            sys.exit(0)
 
 
 class LeaderboardAdminView(View):

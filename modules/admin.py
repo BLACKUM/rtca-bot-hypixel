@@ -140,7 +140,8 @@ class ConfigEditModal(Modal):
              await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
 
 class ConfigSelect(Select):
-    def __init__(self):
+    def __init__(self, bot):
+        self.bot = bot
         from core import config
         options = []
         
@@ -407,7 +408,7 @@ class AdminView(View):
     @discord.ui.button(label="Config", style=discord.ButtonStyle.secondary, emoji="⚙️", row=1)
     async def config(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = View()
-        view.add_item(ConfigSelect())
+        view.add_item(ConfigSelect(self.bot))
         await interaction.response.send_message("⚙️ **Configuration Editor**", view=view, ephemeral=True)
 
     @discord.ui.button(label="System", style=discord.ButtonStyle.danger, emoji="🖥️", row=1)

@@ -98,31 +98,31 @@ Install dependencies manually (if needed):
 pip3 install -r requirements.txt
 ```
 
-## Running in Background (Linux)
+## Running in Background (Linux / Tmux)
 
-I recommend using `tmux` for managing the bot in the background.
+The `run.sh` script now automatically handles `tmux` sessions for you.
 
-1. **Check for existing sessions:**
-   ```bash
-   tmux ls
-   ```
+1.  **Simply run the script:**
+    ```bash
+    ./run.sh
+    ```
+    
+    - If you are NOT in a tmux session, it will create one named `rtca` and attach you to it.
+    - If the session already exists, it will attach you to it.
+    - Inside the session, the bot runs in a loop. If it crashes or is restarted via the Admin Panel, it will auto-restart.
 
-2. **Start the bot:**
-   ```bash
-   tmux new -s rtca "cd /path/to/bot && source venv/bin/activate && chmod +x run.sh && ./run.sh"
-   ```
+2.  **Detach from session:** Press `Ctrl+B`, then `D`.
 
-3. **Detach from session:** `Ctrl+B`, then `D`.
+3.  **Reattach later:**
+    ```bash
+    ./run.sh
+    ```
+    *(Or manually: `tmux attach -t rtca`)*
 
-4. **Reattach to session:**
-   ```bash
-   tmux attach -t rtca
-   ```
-   
-5. **Stop the bot:**
-   ```bash
-   tmux kill-session -t rtca
-   ```
+4.  **Stop the bot:**
+    - Use `/admin` -> **System** -> **Shutdown** in Discord.
+    - Or press `Ctrl+C` inside the tmux session window.
+
 
 ## Updating the Bot
 

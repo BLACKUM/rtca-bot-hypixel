@@ -7,6 +7,7 @@ Discord bot for calculating class average 50 in Hypixel SkyBlock, tracking RNG d
 - **RNG Drop Tracker**: Track your rare dungeon drops, calculate total profit, and view profit-per-run.
 - **XP Leaderboards**: Daily and Monthly leaderboards for Catacombs XP gains among tracked users.
 - **Profile Linking**: Link your Discord account to your Hypixel IGN for seamless command usage.
+- **Admin Panel**: Comprehensive dashboard for bot management, system operations, and configuration editing.
 
 ## Commands
 
@@ -24,9 +25,12 @@ Discord bot for calculating class average 50 in Hypixel SkyBlock, tracking RNG d
 - `/unlink`: Unlink your current account.
 
 ### Owner Only
-- `/setdefault`: Change default simulation bonuses (e.g., Mayor, global boosts).
-- `/rngdefault <user>`: Set a default target user for the `/rng` command (for debugging/admin).
-- `/adddaily <user> <ign>`: Manually add a user to the daily leaderboard tracking.
+- `/admin`: Opens the Administration Panel.
+    - **Dungeons**: Manage default simulation settings.
+    - **Leaderboard**: Add users and force updates.
+    - **Data**: View linked and tracked users.
+    - **Config**: Edit bot configuration on the fly.
+    - **System**: Update, Restart, Shutdown, Get Logs, and view Host Info.
 
 ## Installation
 

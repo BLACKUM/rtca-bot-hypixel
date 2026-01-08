@@ -13,6 +13,31 @@ import asyncio
 import platform
 import psutil
 
+class EmbedPaginatorView(View):
+    def __init__(self, embeds):
+        super().__init__(timeout=180)
+        self.embeds = embeds
+        self.current_page = 0
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.prev_button.disabled = (self.current_page == 0)
+        self.next_button.disabled = (self.current_page == len(self.embeds) - 1)
+
+    @discord.ui.button(label="◀️ Previous", style=discord.ButtonStyle.secondary)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self._update_buttons()
+            await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
+
+    @discord.ui.button(label="Next ▶️", style=discord.ButtonStyle.secondary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page < len(self.embeds) - 1:
+            self.current_page += 1
+            self._update_buttons()
+            await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
+
 class AddUserModal(Modal):
     def __init__(self, bot):
         super().__init__(title="Add User to Daily Leaderboard")
@@ -194,13 +219,24 @@ class GifManageView(View):
     @discord.ui.button(label="List GIFs", style=discord.ButtonStyle.secondary, emoji="📜")
     async def list_gifs(self, interaction: discord.Interaction, button: discord.ui.Button):
         from core import config
-        gifs = "\n".join([f"`{g}`" for g in config.CONGRATS_GIFS])
-        if len(gifs) > 1900:
-             gifs = gifs[:1900] + "... (truncated)"
+        gifs = config.CONGRATS_GIFS
+        
         if not gifs:
-            gifs = "No GIFs configured."
+             await interaction.response.send_message("No GIFs configured.", ephemeral=True)
+             return
+
+        lines = [f"`{g}`" for g in gifs]
+        chunks = [lines[i:i+10] for i in range(0, len(lines), 10)]
+        
+        embeds = []
+        for i, chunk in enumerate(chunks):
+            embed = discord.Embed(title=f"Configured GIFs ({len(gifs)}) - Page {i+1}/{len(chunks)}", color=0x9b59b6)
+            embed.description = "\n".join(chunk)
+            embeds.append(embed)
             
-        await interaction.response.send_message(f"**Configured GIFs:**\n{gifs}", ephemeral=True)
+        view = EmbedPaginatorView(embeds)
+        await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
+
 
 class GifAddModal(Modal):
     def __init__(self):

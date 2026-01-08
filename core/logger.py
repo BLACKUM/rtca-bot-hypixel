@@ -39,3 +39,22 @@ def log_warn(msg):
 
 def log_error(msg):
     logger.error(msg)
+
+def get_latest_log_file():
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        return None
+    
+    files = [os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.endswith(".log")]
+    if not files:
+        if os.path.exists("logs/bot.log"):
+            return "logs/bot.log"
+        return None
+        
+    latest = max(files, key=os.path.getmtime)
+    
+    if os.path.exists("logs/bot.log"):
+        if os.path.getmtime("logs/bot.log") > os.path.getmtime(latest):
+            return "logs/bot.log"
+            
+    return latest

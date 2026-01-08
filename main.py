@@ -4,12 +4,26 @@ from core.logger import log_info, log_error
 from services.daily_manager import DailyManager
 from services.rng_manager import RngManager
 from services.link_manager import LinkManager
-from services.api import get_dungeon_xp, init_session
+from services.api import get_dungeon_xp, init_session, close_session
 from core.cache import initialize as init_cache
 import asyncio
 import os
 
-bot = commands.Bot(command_prefix="!", intents=INTENTS)
+class RTCABot(commands.Bot):
+    async def setup_hook(self):
+        await load_extensions()
+        await init_session()
+        await init_cache()
+        await self.link_manager.initialize()
+        await self.daily_manager.initialize()
+        await self.rng_manager.initialize()
+        await self.daily_manager.sanitize_data()
+        
+    async def close(self):
+        await close_session()
+        await super().close()
+
+bot = RTCABot(command_prefix="!", intents=INTENTS)
 
 bot.daily_manager = DailyManager()
 bot.rng_manager = RngManager()
@@ -34,12 +48,6 @@ async def track_daily_stats():
 
 @bot.listen()
 async def on_ready():
-    await init_cache()
-    await init_session()
-    await bot.link_manager.initialize()
-    await bot.daily_manager.initialize()
-    await bot.rng_manager.initialize()
-    await bot.daily_manager.sanitize_data()
     if not track_daily_stats.is_running():
         track_daily_stats.start()
     
@@ -70,7 +78,6 @@ async def main():
     validate_config()
     log_info("Starting RTCA Discord Bot...")
     
-    await load_extensions()
     
     try:
         await bot.start(TOKEN)
@@ -79,4 +86,7 @@ async def main():
         raise
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

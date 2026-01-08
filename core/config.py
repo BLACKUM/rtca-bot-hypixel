@@ -7,9 +7,41 @@ except ImportError:
         "secrets.py not found! Please copy secrets.example.py to secrets.py and add your Discord bot token."
     )
 
+import json
+import os
+
 XP_PER_RUN_DEFAULT = 300000.0
 TARGET_LEVEL = 50
 DEBUG_MODE = True
+
+CONFIG_FILE = "data/config.json"
+
+def load_config():
+    global XP_PER_RUN_DEFAULT, TARGET_LEVEL, DEBUG_MODE
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                data = json.load(f)
+                XP_PER_RUN_DEFAULT = data.get("xp_per_run_default", XP_PER_RUN_DEFAULT)
+                TARGET_LEVEL = data.get("target_level", TARGET_LEVEL)
+                DEBUG_MODE = data.get("debug_mode", DEBUG_MODE)
+        except Exception as e:
+            print(f"Failed to load config: {e}")
+
+def save_config():
+    data = {
+        "xp_per_run_default": XP_PER_RUN_DEFAULT,
+        "target_level": TARGET_LEVEL,
+        "debug_mode": DEBUG_MODE
+    }
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"Failed to save config: {e}")
+
+load_config()
+
 SKELETON_MASTER_CHESTPLATE_50 = "SKELETON_MASTER_CHESTPLATE_50"
 
 OWNER_IDS = [

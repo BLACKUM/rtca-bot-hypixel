@@ -141,12 +141,11 @@ class ConfigSelect(Select):
         from core import config
         options = []
         
-        full_config = {}
-        if os.path.exists(config.CONFIG_FILE):
-            with open(config.CONFIG_FILE, 'r') as f:
-                full_config = json.load(f)
+        keys = ["XP_PER_RUN_DEFAULT", "TARGET_LEVEL", "DEBUG_MODE"]
         
-        for key, value in full_config.items():
+        for key in keys:
+            value = getattr(config, key, "Unknown")
+            
             options.append(discord.SelectOption(
                 label=key, 
                 description=f"Current: {value}",

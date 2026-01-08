@@ -102,7 +102,12 @@ pip3 install -r requirements.txt
 
 The `run.sh` script now automatically handles `tmux` sessions for you.
 
-1.  **Simply run the script:**
+1.  **Make the script executable (first time only):**
+    ```bash
+    chmod +x run.sh
+    ```
+
+2.  **Simply run the script:**
     ```bash
     ./run.sh
     ```

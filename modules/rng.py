@@ -494,16 +494,7 @@ class Rng(commands.Cog):
         else:
             await interaction.response.send_message(embed=embed, view=view)
 
-    @app_commands.describe(user="Default user to manage")
-    @app_commands.command(name="rngdefault", description="Set default User Account to manage (Owner Only)")
-    async def rngdefault(self, interaction: discord.Interaction, user: discord.User):
-        if interaction.user.id not in OWNER_IDS:
-            await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
-            return
-            
-        await self.bot.rng_manager.set_default_target(str(interaction.user.id), str(user.id))
-        
-        await interaction.response.send_message(f"✅ Default target for /rng set to **{user.mention}**.", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Rng(bot))

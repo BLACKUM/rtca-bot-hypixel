@@ -534,17 +534,7 @@ class Dungeons(commands.Cog):
         
         log_info(f"✅ Simulation finished: {ign} → {runs_total:,} total runs")
 
-    @app_commands.command(name="setdefault", description="Change default bonus values (owner only)")
-    async def setdefault(self, interaction: discord.Interaction):
-        if interaction.user.id not in OWNER_IDS:
-             await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
-             return
 
-        view = DefaultSelectView(self.bot)
-        embed = view._create_embed()
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
-        view.message = await interaction.original_response()
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Dungeons(bot))

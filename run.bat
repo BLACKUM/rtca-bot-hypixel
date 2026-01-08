@@ -43,7 +43,11 @@ REM Run the bot
 echo.
 echo Starting RTCA Discord Bot...
 echo.
-python main.py
 
-pause
+:loop
+python main.py
+echo.
+echo Bot stopped. Restarting in 5 seconds...
+timeout /t 5
+goto loop
 

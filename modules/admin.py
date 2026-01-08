@@ -10,6 +10,8 @@ import os
 import sys
 import json
 import asyncio
+import platform
+import psutil
 
 class AddUserModal(Modal):
     def __init__(self, bot):
@@ -167,7 +169,9 @@ class SystemSelect(Select):
             discord.SelectOption(label="Update Bot (Git Pull)", value="update", description="Pull latest changes from GitHub", emoji="📥"),
             discord.SelectOption(label="Reload Extensions", value="reload", description="Reload all bot modules", emoji="🔄"),
             discord.SelectOption(label="Get Logs", value="logs", description="Upload the latest log file", emoji="📜"),
-            discord.SelectOption(label="Restart Bot", value="restart", description="Restart the bot process", emoji="👋"),
+            discord.SelectOption(label="Host Info", value="host_info", description="View location and system stats", emoji="ℹ️"),
+            discord.SelectOption(label="Restart (Internal)", value="restart", description="Restart via os.exec", emoji="🔄"),
+            discord.SelectOption(label="Restart (Loop/Tmux)", value="restart_loop", description="Exit process (requires loop script)", emoji="🔁"),
             discord.SelectOption(label="Shutdown", value="shutdown", description="Turn off the bot", emoji="🛑"),
         ]
         super().__init__(placeholder="Select a system action...", options=options)
@@ -222,14 +226,35 @@ class SystemSelect(Select):
                  await interaction.followup.send("❌ No log file found.")
 
         elif val == "restart":
-            await interaction.response.send_message("👋 Restarting bot...", ephemeral=True)
+            await interaction.response.send_message("👋 Restarting bot (Internal)...", ephemeral=True)
             await self.bot.close()
             os.execv(sys.executable, ['python'] + sys.argv)
 
-        elif val == "shutdown":
-            await interaction.response.send_message("🛑 Shutting down...", ephemeral=True)
+        elif val == "restart_loop":
+            await interaction.response.send_message("🔁 Exiting process for Loop/Tmux restart...", ephemeral=True)
             await self.bot.close()
             sys.exit(0)
+
+        elif val == "host_info":
+             await interaction.response.defer(ephemeral=True)
+             
+             path = os.getcwd()
+             system = f"{platform.system()} {platform.release()}"
+             py_ver = sys.version.split()[0]
+             
+             mem = psutil.virtual_memory()
+             mem_usage = f"{mem.used / (1024**3):.2f}/{mem.total / (1024**3):.2f} GB ({mem.percent}%)"
+             
+             cpu = psutil.cpu_percent(interval=None)
+             
+             embed = discord.Embed(title="ℹ️ Host System Info", color=0x3498db)
+             embed.add_field(name="📂 Bot Location", value=f"`{path}`", inline=False)
+             embed.add_field(name="💻 OS", value=f"`{system}`", inline=True)
+             embed.add_field(name="🐍 Python", value=f"`{py_ver}`", inline=True)
+             embed.add_field(name="🧠 Memory", value=f"`{mem_usage}`", inline=True)
+             embed.add_field(name="⚙️ CPU Load", value=f"`{cpu}%`", inline=True)
+             
+             await interaction.followup.send(embed=embed)
 
 
 class LeaderboardAdminView(View):

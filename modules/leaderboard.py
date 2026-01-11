@@ -555,7 +555,7 @@ class RecentView(View):
         self.filtered_data = data
         self.runs_count = runs_count
         self.page = 1
-        self.per_page = 15
+        self.per_page = 10
         self.update_total_pages()
         
         self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="recent_prev"))

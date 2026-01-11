@@ -250,7 +250,7 @@ class DailyManager:
             
         return stats
 
-    def get_leaderboard(self, type="daily"):
+    def get_leaderboard(self, type="daily", metric="xp"):
         snapshot_key = "daily_snapshots" if type == "daily" else "monthly_snapshots"
         leaderboard_map = {}
         
@@ -258,10 +258,26 @@ class DailyManager:
             stats = self._calculate_stats(user_id, snapshot_key)
             if stats:
                 ign = info["ign"]
-                if ign not in leaderboard_map or stats["cata_gained"] > leaderboard_map[ign]["gained"]:
+                val = 0
+                
+                if metric == "runs":
+                    if "runs" in stats:
+                        for cat in ["normal", "master"]:
+                            for count in stats["runs"].get(cat, {}).values():
+                                val += count
+                elif metric.startswith("runs_"):
+                    try:
+                        _, m_type, m_floor = metric.split("_", 2)
+                        val = stats.get("runs", {}).get(m_type, {}).get(m_floor, 0)
+                    except:
+                        val = 0
+                else:
+                    val = stats["cata_gained"]
+
+                if ign not in leaderboard_map or val > leaderboard_map[ign]["gained"]:
                     leaderboard_map[ign] = {
                         "ign": ign,
-                        "gained": stats["cata_gained"],
+                        "gained": val,
                         "user_id": user_id
                     }
         

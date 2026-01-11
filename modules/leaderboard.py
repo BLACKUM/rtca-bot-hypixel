@@ -51,7 +51,15 @@ class SearchModal(Modal):
 
         if ign_val:
             ign_val_lower = ign_val.lower()
-            data = self.view.bot.daily_manager.get_leaderboard("daily" if self.view.mode == "leaderboard" else "monthly")
+            
+            if "runs" in self.view.mode:
+                 metric = f"runs_{self.view.floor_id}"
+            else:
+                 metric = "xp"
+                 
+            period = "daily" if "daily" in self.view.mode or self.view.mode == "leaderboard" else "monthly"
+            
+            data = self.view.bot.daily_manager.get_leaderboard(period, metric)
             
             found_index = -1
             for i, entry in enumerate(data):
@@ -68,6 +76,30 @@ class SearchModal(Modal):
                 return
 
         await interaction.response.send_message("❌ Please enter an IGN or Page Number.", ephemeral=True)
+        
+class RunFloorSelect(discord.ui.Select):
+    def __init__(self, view):
+        self._view = view
+        options = []
+        
+        for i in range(7, 0, -1):
+             options.append(discord.SelectOption(label=f"Master Floor {i}", value=f"master_{i}", default=(f"master_{i}" == view.floor_id)))
+             
+        for i in range(7, 0, -1):
+             options.append(discord.SelectOption(label=f"Floor {i}", value=f"normal_{i}", default=(f"normal_{i}" == view.floor_id)))
+        
+        options.append(discord.SelectOption(label=f"Entrance", value=f"normal_0", default=("normal_0" == view.floor_id)))
+        
+        super().__init__(placeholder="Select Floor...", min_values=1, max_values=1, options=options, row=2, custom_id="floor_select")
+
+    async def callback(self, interaction: discord.Interaction):
+        self._view.floor_id = self.values[0]
+        self._view.page = 1
+        
+        for opt in self.options:
+            opt.default = (opt.value == self._view.floor_id)
+            
+        await self._view.update_message(interaction)
 
 class DailyView(View):
     def __init__(self, bot, user_id, ign):
@@ -76,6 +108,7 @@ class DailyView(View):
         self.user_id = str(user_id)
         self.ign = ign
         self.mode = "leaderboard"
+        self.floor_id = "master_7"
         self.msg = None
         self.page = 1
         self.total_pages = 1
@@ -89,6 +122,9 @@ class DailyView(View):
         self.add_item(discord.ui.Button(label="Personal", style=discord.ButtonStyle.success, row=0, custom_id="daily_personal"))
         self.children[2].callback = self.personal_btn
         
+        self.add_item(discord.ui.Button(label="Runs", style=discord.ButtonStyle.primary, row=0, custom_id="daily_runs"))
+        self.children[3].callback = self.runs_btn
+        
         self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, row=1, custom_id="daily_prev"))
         self.children[3].callback = self.prev_btn
         
@@ -101,10 +137,20 @@ class DailyView(View):
         self.add_item(discord.ui.Button(label="📍 Show Me", style=discord.ButtonStyle.primary, row=1, custom_id="daily_showme"))
         self.children[6].callback = self.show_me_btn
 
-
     def _get_leaderboard_embed(self, type="daily"):
-        data = self.bot.daily_manager.get_leaderboard(type)
-        title = "🏆 Daily Catacombs XP Leaderboard" if type == "daily" else "🏆 Monthly Catacombs XP Leaderboard"
+        metric = "runs" if "runs" in type else "xp"
+        period = "daily" if "daily" in type else "monthly"
+        
+        if metric == "runs":
+            metric = f"runs_{self.floor_id}"
+            floor_name = self.floor_id.replace("_", " ").title().replace("Master ", "M").replace("Normal ", "F").replace("Normal 0", "Entrance")
+            title_p = "Daily" if period == "daily" else "Monthly"
+            title = f"🏃 {title_p} {floor_name} Runs"
+        else:
+            title_p = "Daily" if period == "daily" else "Monthly"
+            title = f"🏆 {title_p} Catacombs XP Leaderboard"
+        
+        data = self.bot.daily_manager.get_leaderboard(period, metric)
         
         embed = discord.Embed(title=title, color=0xffd700)
         
@@ -135,7 +181,10 @@ class DailyView(View):
             elif i == 3: medal = "🥉"
             else: medal = f"**#{i}**"
             
-            line = f"{medal} **{entry['ign']}**: +{entry['gained']:,.0f} XP"
+
+            
+            val_str = f"+{entry['gained']:,.0f} Runs" if metric == "runs" else f"+{entry['gained']:,.0f} XP"
+            line = f"{medal} **{entry['ign']}**: {val_str}"
             if entry['ign'] == self.ign:
                 line = f"{line} < you"
             desc.append(line)
@@ -246,15 +295,24 @@ class DailyView(View):
 
     def _update_buttons(self):
         is_lb = self.mode in ["leaderboard", "monthly"]
+        is_runs = self.mode in ["runs_daily", "runs_monthly"]
         
-        self.children[0].disabled = self.mode == "leaderboard"
-        self.children[1].disabled = self.mode == "monthly"
+        self.children[0].disabled = self.mode == "leaderboard" or self.mode == "runs_daily"
+        self.children[1].disabled = self.mode == "monthly" or self.mode == "runs_monthly"
         self.children[2].disabled = self.mode == "personal"
+        self.children[3].disabled = is_runs
         
-        self.children[3].disabled = not is_lb or self.page <= 1
-        self.children[4].disabled = not is_lb
-        self.children[5].disabled = not is_lb or self.page >= self.total_pages
-        self.children[6].disabled = not is_lb
+        self.children[4].disabled = (not is_lb and not is_runs) or self.page <= 1
+        self.children[5].disabled = (not is_lb and not is_runs)
+        self.children[6].disabled = (not is_lb and not is_runs) or self.page >= self.total_pages
+        self.children[7].disabled = (not is_lb and not is_runs)
+        
+        for item in self.children:
+            if isinstance(item, RunFloorSelect):
+                self.remove_item(item)
+        
+        if is_runs:
+             self.add_item(RunFloorSelect(self))
 
     async def update_message(self, interaction):
         if not interaction.response.is_done():
@@ -264,6 +322,10 @@ class DailyView(View):
             embed = self._get_leaderboard_embed("daily")
         elif self.mode == "monthly":
              embed = self._get_leaderboard_embed("monthly")
+        elif self.mode == "runs_daily":
+             embed = self._get_leaderboard_embed("runs_daily")
+        elif self.mode == "runs_monthly":
+             embed = self._get_leaderboard_embed("runs_monthly")
         elif self.mode == "personal":
              embed = self._get_personal_embed()
         
@@ -271,12 +333,18 @@ class DailyView(View):
         await interaction.edit_original_response(embed=embed, view=self)
 
     async def today_btn(self, interaction: discord.Interaction):
-        self.mode = "leaderboard"
+        if "runs" in self.mode:
+             self.mode = "runs_daily"
+        else:
+             self.mode = "leaderboard"
         self.page = 1
         await self.update_message(interaction)
 
     async def monthly_btn(self, interaction: discord.Interaction):
-        self.mode = "monthly"
+        if "runs" in self.mode:
+             self.mode = "runs_monthly"
+        else:
+             self.mode = "monthly"
         self.page = 1
         await self.update_message(interaction)
 
@@ -284,7 +352,13 @@ class DailyView(View):
         self.mode = "personal"
         await self.update_message(interaction)
 
-
+    async def runs_btn(self, interaction: discord.Interaction):
+        if "monthly" in self.mode:
+             self.mode = "runs_monthly"
+        else:
+             self.mode = "runs_daily"
+        self.page = 1
+        await self.update_message(interaction)
 
     async def prev_btn(self, interaction: discord.Interaction):
         self.page -= 1
@@ -298,7 +372,12 @@ class DailyView(View):
         await self.update_message(interaction)
         
     async def show_me_btn(self, interaction: discord.Interaction):
-        data = interaction.client.daily_manager.get_leaderboard("daily" if self.mode == "leaderboard" else "monthly")
+        metric = "runs" if "runs" in self.mode else "xp"
+        if metric == "runs": metric = f"runs_{self.floor_id}"
+        
+        period = "daily" if "daily" in self.mode or self.mode == "leaderboard" else "monthly"
+        
+        data = interaction.client.daily_manager.get_leaderboard(period, metric)
         
         found_index = -1
         for i, entry in enumerate(data):
@@ -336,8 +415,6 @@ class Leaderboard(commands.Cog):
         embed = view._get_leaderboard_embed("daily")
         
         await interaction.response.send_message(embed=embed, view=view)
-
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Leaderboard(bot))

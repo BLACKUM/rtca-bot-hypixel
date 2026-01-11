@@ -126,16 +126,16 @@ class DailyView(View):
         self.children[3].callback = self.runs_btn
         
         self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, row=1, custom_id="daily_prev"))
-        self.children[3].callback = self.prev_btn
+        self.children[4].callback = self.prev_btn
         
         self.add_item(discord.ui.Button(emoji="🔍", style=discord.ButtonStyle.secondary, row=1, custom_id="daily_search"))
-        self.children[4].callback = self.search_btn
+        self.children[5].callback = self.search_btn
         
         self.add_item(discord.ui.Button(emoji="➡️", style=discord.ButtonStyle.secondary, row=1, custom_id="daily_next"))
-        self.children[5].callback = self.next_btn
+        self.children[6].callback = self.next_btn
         
         self.add_item(discord.ui.Button(label="📍 Show Me", style=discord.ButtonStyle.primary, row=1, custom_id="daily_showme"))
-        self.children[6].callback = self.show_me_btn
+        self.children[7].callback = self.show_me_btn
 
     def _get_leaderboard_embed(self, type="daily"):
         metric = "runs" if "runs" in type else "xp"

@@ -89,20 +89,17 @@ class DailyView(View):
         self.add_item(discord.ui.Button(label="Personal", style=discord.ButtonStyle.success, row=0, custom_id="daily_personal"))
         self.children[2].callback = self.personal_btn
         
-        self.add_item(discord.ui.Button(label="Force Update", style=discord.ButtonStyle.danger, row=0, custom_id="daily_force"))
-        self.children[3].callback = self.force_update_btn
-        
         self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, row=1, custom_id="daily_prev"))
-        self.children[4].callback = self.prev_btn
+        self.children[3].callback = self.prev_btn
         
         self.add_item(discord.ui.Button(emoji="🔍", style=discord.ButtonStyle.secondary, row=1, custom_id="daily_search"))
-        self.children[5].callback = self.search_btn
+        self.children[4].callback = self.search_btn
         
         self.add_item(discord.ui.Button(emoji="➡️", style=discord.ButtonStyle.secondary, row=1, custom_id="daily_next"))
-        self.children[6].callback = self.next_btn
+        self.children[5].callback = self.next_btn
         
         self.add_item(discord.ui.Button(label="📍 Show Me", style=discord.ButtonStyle.primary, row=1, custom_id="daily_showme"))
-        self.children[7].callback = self.show_me_btn
+        self.children[6].callback = self.show_me_btn
 
 
     def _get_leaderboard_embed(self, type="daily"):
@@ -213,21 +210,27 @@ class DailyView(View):
             
             n_runs = stats["runs"].get("normal", {})
             if n_runs:
-                items = sorted(n_runs.items(), key=lambda x: int(x[0]) if x[0].isdigit() else -1)
+                valid_tiers = {k: v for k, v in n_runs.items() if k.isdigit()}
+                items = sorted(valid_tiers.items(), key=lambda x: int(x[0]))
+                
                 parts = []
                 for tier, count in items:
                     name = f"F{tier}" if tier != "0" else "Entrance"
                     parts.append(f"{name} (+{count})")
+                
                 if parts:
                     lines.append(f"**{period_label} Normal**: {', '.join(parts)}")
             
             m_runs = stats["runs"].get("master", {})
             if m_runs:
-                items = sorted(m_runs.items(), key=lambda x: int(x[0]) if x[0].isdigit() else -1)
+                valid_tiers = {k: v for k, v in m_runs.items() if k.isdigit()}
+                items = sorted(valid_tiers.items(), key=lambda x: int(x[0]))
+                
                 parts = []
                 for tier, count in items:
                     name = f"M{tier}"
                     parts.append(f"{name} (+{count})")
+                
                 if parts:
                     lines.append(f"**{period_label} Master**: {', '.join(parts)}")
                     
@@ -248,10 +251,10 @@ class DailyView(View):
         self.children[1].disabled = self.mode == "monthly"
         self.children[2].disabled = self.mode == "personal"
         
-        self.children[4].disabled = not is_lb or self.page <= 1
-        self.children[5].disabled = not is_lb
-        self.children[6].disabled = not is_lb or self.page >= self.total_pages
-        self.children[7].disabled = not is_lb
+        self.children[3].disabled = not is_lb or self.page <= 1
+        self.children[4].disabled = not is_lb
+        self.children[5].disabled = not is_lb or self.page >= self.total_pages
+        self.children[6].disabled = not is_lb
 
     async def update_message(self, interaction):
         if not interaction.response.is_done():
@@ -281,30 +284,7 @@ class DailyView(View):
         self.mode = "personal"
         await self.update_message(interaction)
 
-    async def force_update_btn(self, interaction: discord.Interaction):
-        if interaction.user.id not in OWNER_IDS:
-             await interaction.response.send_message("❌ This command is restricted to bot owners.", ephemeral=True)
-             return
 
-        await interaction.response.defer(ephemeral=False)
-        
-        try:
-            tracked_users = interaction.client.daily_manager.get_tracked_users()
-            if not tracked_users:
-                await interaction.followup.send("❌ No users to update.", ephemeral=True)
-                return
-
-            status_msg = await interaction.followup.send(f"🔄 **Force Update Started**\nQueue: {len(tracked_users)} users...")
-            
-            updated_count, errors, total_users = await interaction.client.daily_manager.force_update_all(status_msg)
-            
-            await status_msg.edit(content=f"✅ **Force Update Complete**\nTotal: {total_users}\nUpdated: {updated_count}\nErrors: {errors}")
-            
-            await self.update_message(interaction)
-             
-        except Exception as e:
-            log_error(f"Force update failed: {e}")
-            await interaction.followup.send("❌ An error occurred during global update.", ephemeral=True)
 
     async def prev_btn(self, interaction: discord.Interaction):
         self.page -= 1
@@ -331,7 +311,6 @@ class DailyView(View):
             await self.update_message(interaction)
         else:
             await interaction.response.send_message("❌ You are not on the leaderboard yet.", ephemeral=True)
-
 
 class Leaderboard(commands.Cog):
     def __init__(self, bot: commands.Bot):

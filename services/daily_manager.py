@@ -162,9 +162,13 @@ class DailyManager:
         
         if user_id not in self.data["daily_snapshots"]:
              self.data["daily_snapshots"][user_id] = self.data["current_xp"][user_id]
+        elif "runs" not in self.data["daily_snapshots"][user_id]:
+             self.data["daily_snapshots"][user_id]["runs"] = self.data["current_xp"][user_id]["runs"]
         
         if user_id not in self.data["monthly_snapshots"]:
              self.data["monthly_snapshots"][user_id] = self.data["current_xp"][user_id]
+        elif "runs" not in self.data["monthly_snapshots"][user_id]:
+             self.data["monthly_snapshots"][user_id]["runs"] = self.data["current_xp"][user_id]["runs"]
              
         self.data["last_updated"] = now
         if save:

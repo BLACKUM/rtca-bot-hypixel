@@ -18,10 +18,6 @@ class RTCABot(commands.Bot):
         await self.daily_manager.initialize()
         await self.rng_manager.initialize()
         await self.daily_manager.sanitize_data()
-        
-    async def close(self):
-        await super().close()
-        await close_session()
 
 bot = RTCABot(command_prefix="!", intents=INTENTS)
 
@@ -84,6 +80,8 @@ async def main():
     except Exception as e:
         log_error(f"Failed to start bot: {e}")
         raise
+    finally:
+        await close_session()
 
 if __name__ == "__main__":
     try:

@@ -393,6 +393,235 @@ class DailyView(View):
         else:
             await interaction.response.send_message("❌ You are not on the leaderboard yet.", ephemeral=True)
 
+class RecentSearchModal(Modal):
+    def __init__(self, view):
+        super().__init__(title="Search Teammates")
+        self.view = view
+        self.ign_input = TextInput(label="IGN", placeholder="Enter IGN...", required=False, max_length=16)
+        self.page_input = TextInput(label="Page Number", placeholder="Enter page...", required=False, max_length=5)
+        self.add_item(self.ign_input)
+        self.add_item(self.page_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        ign_val = self.ign_input.value
+        page_val = self.page_input.value
+
+        if page_val:
+            try:
+                page_num = int(page_val)
+                if 1 <= page_num <= self.view.total_pages:
+                    self.view.page = page_num
+                    await self.view.update_message(interaction)
+                    return
+                else:
+                    await interaction.response.send_message(f"❌ Page must be between 1 and {self.view.total_pages}.", ephemeral=True)
+                    return
+            except ValueError:
+                await interaction.response.send_message("❌ Invalid page number.", ephemeral=True)
+                return
+
+        if ign_val:
+            ign_val_lower = ign_val.lower()
+            found_index = -1
+            for i, (name, _) in enumerate(self.view.data):
+                if name.lower() == ign_val_lower:
+                    found_index = i
+                    break
+            
+            if found_index != -1:
+                self.view.page = (found_index // self.view.per_page) + 1
+                await self.view.update_message(interaction)
+                return
+            else:
+                 await interaction.response.send_message(f"❌ Teammate '{ign_val}' not found.", ephemeral=True)
+                 return
+        
+        await interaction.response.send_message("❌ Please enter an IGN or Page Number.", ephemeral=True)
+
+class RecentView(View):
+    def __init__(self, bot, ign, data, runs_count):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.ign = ign
+        self.data = data
+        self.runs_count = runs_count
+        self.page = 1
+        self.per_page = 15
+        self.total_pages = math.ceil(len(data) / self.per_page) or 1
+        
+        self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="recent_prev"))
+        self.children[0].callback = self.prev_btn
+        
+        self.add_item(discord.ui.Button(emoji="🔍", style=discord.ButtonStyle.secondary, custom_id="recent_search"))
+        self.children[1].callback = self.search_btn
+        
+        self.add_item(discord.ui.Button(emoji="➡️", style=discord.ButtonStyle.secondary, custom_id="recent_next"))
+        self.children[2].callback = self.next_btn
+        
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.children[0].disabled = self.page <= 1
+        self.children[2].disabled = self.page >= self.total_pages
+
+    async def update_message(self, interaction):
+        self._update_buttons()
+        embed = self.get_embed()
+        if not interaction.response.is_done():
+             await interaction.response.defer()
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    def get_embed(self):
+        embed = discord.Embed(title=f"🤝 Recent Teammates: {self.ign}", color=0x3498db)
+        embed.description = f"Analyzed **{self.runs_count}** recent runs."
+        
+        start_idx = (self.page - 1) * self.per_page
+        end_idx = start_idx + self.per_page
+        current_data = self.data[start_idx:end_idx]
+        
+        lines = []
+        for i, (name, d) in enumerate(current_data, start_idx + 1):
+             medal = ""
+             if i == 1: medal = "🥇 "
+             elif i == 2: medal = "🥈 "
+             elif i == 3: medal = "🥉 "
+             else: medal = f"**{i}.** "
+             lines.append(f"{medal}**{name}**: {d['count']} runs (Last: {d['last_floor']})")
+             
+        if not lines:
+            embed.description += "\nNo teammates found."
+        else:
+            embed.add_field(name="Most Played With", value="\n".join(lines), inline=False)
+            
+        embed.set_footer(text=f"Page {self.page}/{self.total_pages} • Updates based on latest API data")
+        return embed
+
+    async def prev_btn(self, interaction: discord.Interaction):
+        self.page -= 1
+        await self.update_message(interaction)
+
+    async def next_btn(self, interaction: discord.Interaction):
+        self.page += 1
+        await self.update_message(interaction)
+
+    async def search_btn(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(RecentSearchModal(self))
+
+
+class RecentSearchModal(Modal):
+    def __init__(self, view):
+        super().__init__(title="Search Teammates")
+        self.view = view
+        self.ign_input = TextInput(label="IGN", placeholder="Enter IGN...", required=False, max_length=16)
+        self.page_input = TextInput(label="Page Number", placeholder="Enter page...", required=False, max_length=5)
+        self.add_item(self.ign_input)
+        self.add_item(self.page_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        ign_val = self.ign_input.value
+        page_val = self.page_input.value
+
+        if page_val:
+            try:
+                page_num = int(page_val)
+                if 1 <= page_num <= self.view.total_pages:
+                    self.view.page = page_num
+                    await self.view.update_message(interaction)
+                    return
+                else:
+                    await interaction.response.send_message(f"❌ Page must be between 1 and {self.view.total_pages}.", ephemeral=True)
+                    return
+            except ValueError:
+                await interaction.response.send_message("❌ Invalid page number.", ephemeral=True)
+                return
+
+        if ign_val:
+            ign_val_lower = ign_val.lower()
+            found_index = -1
+            for i, (name, _) in enumerate(self.view.data):
+                if name.lower() == ign_val_lower:
+                    found_index = i
+                    break
+            
+            if found_index != -1:
+                self.view.page = (found_index // self.view.per_page) + 1
+                await self.view.update_message(interaction)
+                return
+            else:
+                 await interaction.response.send_message(f"❌ Teammate '{ign_val}' not found.", ephemeral=True)
+                 return
+        
+        await interaction.response.send_message("❌ Please enter an IGN or Page Number.", ephemeral=True)
+
+class RecentView(View):
+    def __init__(self, bot, ign, data, runs_count):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.ign = ign
+        self.data = data
+        self.runs_count = runs_count
+        self.page = 1
+        self.per_page = 15
+        self.total_pages = math.ceil(len(data) / self.per_page) or 1
+        
+        self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="recent_prev"))
+        self.children[0].callback = self.prev_btn
+        
+        self.add_item(discord.ui.Button(emoji="🔍", style=discord.ButtonStyle.secondary, custom_id="recent_search"))
+        self.children[1].callback = self.search_btn
+        
+        self.add_item(discord.ui.Button(emoji="➡️", style=discord.ButtonStyle.secondary, custom_id="recent_next"))
+        self.children[2].callback = self.next_btn
+        
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.children[0].disabled = self.page <= 1
+        self.children[2].disabled = self.page >= self.total_pages
+
+    async def update_message(self, interaction):
+        self._update_buttons()
+        embed = self.get_embed()
+        if not interaction.response.is_done():
+             await interaction.response.defer()
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    def get_embed(self):
+        embed = discord.Embed(title=f"🤝 Recent Teammates: {self.ign}", color=0x3498db)
+        embed.description = f"Analyzed **{self.runs_count}** recent runs."
+        
+        start_idx = (self.page - 1) * self.per_page
+        end_idx = start_idx + self.per_page
+        current_data = self.data[start_idx:end_idx]
+        
+        lines = []
+        for i, (name, d) in enumerate(current_data, start_idx + 1):
+             medal = ""
+             if i == 1: medal = "🥇 "
+             elif i == 2: medal = "🥈 "
+             elif i == 3: medal = "🥉 "
+             else: medal = f"**{i}.** "
+             lines.append(f"{medal}**{name}**: {d['count']} runs (Last: {d['last_floor']})")
+             
+        if not lines:
+            embed.description += "\nNo teammates found."
+        else:
+            embed.add_field(name="Most Played With", value="\n".join(lines), inline=False)
+            
+        embed.set_footer(text=f"Page {self.page}/{self.total_pages} • Updates based on latest API data")
+        return embed
+
+    async def prev_btn(self, interaction: discord.Interaction):
+        self.page -= 1
+        await self.update_message(interaction)
+
+    async def next_btn(self, interaction: discord.Interaction):
+        self.page += 1
+        await self.update_message(interaction)
+
+    async def search_btn(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(RecentSearchModal(self))
+
 class Leaderboard(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -478,26 +707,10 @@ class Leaderboard(commands.Cog):
 
         sorted_mates = sorted(teammates.items(), key=lambda x: x[1]["count"], reverse=True)
         
-        embed = discord.Embed(title=f"🤝 Recent Teammates: {ign}", color=0x3498db)
-        embed.description = f"Analyzed **{len(runs)}** recent runs."
+        view = RecentView(self.bot, ign, sorted_mates, len(runs))
+        embed = view.get_embed()
         
-        lines = []
-        for i, (name, data) in enumerate(sorted_mates[:15], 1):
-             medal = ""
-             if i == 1: medal = "🥇 "
-             elif i == 2: medal = "🥈 "
-             elif i == 3: medal = "🥉 "
-             else: medal = f"**{i}.** "
-             
-             lines.append(f"{medal}**{name}**: {data['count']} runs (Last: {data['last_floor']})")
-             
-        if not lines:
-            embed.description += "\nNo teammates found (Solo runs?)."
-        else:
-            embed.add_field(name="Most Played With", value="\n".join(lines), inline=False)
-            
-        embed.set_footer(text=f"Updates based on latest API data")
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, view=view)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Leaderboard(bot))

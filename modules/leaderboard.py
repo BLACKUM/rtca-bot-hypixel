@@ -508,21 +508,79 @@ class RecentView(View):
         await interaction.response.send_modal(RecentSearchModal(self))
 
 
+import re
+
+def clean_mc_formatting(text):
+    if not text: return ""
+    return re.sub(r'§.', '', text).strip()
+
+class RecentClassSelect(discord.ui.Select):
+    def __init__(self, view):
+        self._view = view
+        options = [
+            discord.SelectOption(label="All Classes", value="all", emoji="♾️", default=True),
+            discord.SelectOption(label="Archer", value="Archer", emoji="🏹"),
+            discord.SelectOption(label="Berserk", value="Berserk", emoji="⚔️"),
+            discord.SelectOption(label="Healer", value="Healer", emoji="💖"),
+            discord.SelectOption(label="Mage", value="Mage", emoji="🧙‍♂️"),
+            discord.SelectOption(label="Tank", value="Tank", emoji="🛡️")
+        ]
+        super().__init__(placeholder="Filter by Class...", min_values=1, max_values=1, options=options, row=0, custom_id="recent_class_select")
+
+    async def callback(self, interaction: discord.Interaction):
+        val = self.values[0]
+        self._view.filter_class = val if val != "all" else None
+        
+        for opt in self.options:
+            opt.default = (opt.value == val)
+            
+        self._view.apply_filters()
+        await self._view.update_message(interaction)
+
+class RecentTimeSelect(discord.ui.Select):
+    def __init__(self, view):
+        self._view = view
+        options = [
+            discord.SelectOption(label="Any Time", value="all", emoji="🕒", default=True),
+            discord.SelectOption(label="Last 24 Hours", value="24h", emoji="☀️"),
+            discord.SelectOption(label="Last 7 Days", value="7d", emoji="📅"),
+            discord.SelectOption(label="Last 30 Days", value="30d", emoji="🗓️")
+        ]
+        super().__init__(placeholder="Filter by Last Seen...", min_values=1, max_values=1, options=options, row=1, custom_id="recent_time_select")
+
+    async def callback(self, interaction: discord.Interaction):
+        val = self.values[0]
+        now = time.time()
+        
+        if val == "24h":
+            self._view.filter_time = now - 86400
+        elif val == "7d":
+            self._view.filter_time = now - 604800
+        elif val == "30d":
+            self._view.filter_time = now - 2592000
+        else:
+            self._view.filter_time = None
+            
+        for opt in self.options:
+            opt.default = (opt.value == val)
+            
+        self._view.apply_filters()
+        await self._view.update_message(interaction)
+
 class RecentSearchModal(Modal):
     def __init__(self, view):
         super().__init__(title="Search Teammates")
         self.view = view
-        self.ign_input = TextInput(label="IGN", placeholder="Enter IGN...", required=False, max_length=16)
-        self.class_input = TextInput(label="Class", placeholder="Archer, Mage, Tank...", required=False, max_length=10)
+        self.ign_input = TextInput(label="IGN", placeholder="Enter IGN (e.g. Steve)...", required=False, max_length=16)
+        self.level_input = TextInput(label="Level Filter", placeholder="e.g. 50, <50, >45", required=False, max_length=10)
         self.page_input = TextInput(label="Page Number", placeholder="Enter page...", required=False, max_length=5)
-        
         self.add_item(self.ign_input)
-        self.add_item(self.class_input)
+        self.add_item(self.level_input)
         self.add_item(self.page_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         ign_val = self.ign_input.value
-        class_val = self.class_input.value
+        level_val = self.level_input.value
         page_val = self.page_input.value
 
         if page_val:
@@ -539,12 +597,11 @@ class RecentSearchModal(Modal):
                 await interaction.response.send_message("❌ Invalid page number.", ephemeral=True)
                 return
 
-        if ign_val or class_val:
-            self.view.filter_data(ign=ign_val, class_name=class_val)
-            await self.view.update_message(interaction)
-            return
+        self.view.filter_ign = ign_val if ign_val else None
+        self.view.filter_level = level_val if level_val else None
         
-        await interaction.response.send_message("❌ Please enter filters or Page Number.", ephemeral=True)
+        self.view.apply_filters()
+        await self.view.update_message(interaction)
 
 class RecentView(View):
     def __init__(self, bot, ign, data, runs_count):
@@ -556,16 +613,25 @@ class RecentView(View):
         self.runs_count = runs_count
         self.page = 1
         self.per_page = 10
+        
+        self.filter_ign = None
+        self.filter_class = None
+        self.filter_time = None 
+        self.filter_level = None
+        
         self.update_total_pages()
         
-        self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="recent_prev"))
-        self.children[0].callback = self.prev_btn
+        self.add_item(RecentClassSelect(self))
+        self.add_item(RecentTimeSelect(self))
         
-        self.add_item(discord.ui.Button(emoji="🔍", style=discord.ButtonStyle.secondary, custom_id="recent_search"))
-        self.children[1].callback = self.search_btn
+        self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="recent_prev", row=2))
+        self.children[2].callback = self.prev_btn
         
-        self.add_item(discord.ui.Button(emoji="➡️", style=discord.ButtonStyle.secondary, custom_id="recent_next"))
-        self.children[2].callback = self.next_btn
+        self.add_item(discord.ui.Button(emoji="🔍", style=discord.ButtonStyle.secondary, custom_id="recent_search", row=2))
+        self.children[3].callback = self.search_btn
+        
+        self.add_item(discord.ui.Button(emoji="➡️", style=discord.ButtonStyle.secondary, custom_id="recent_next", row=2))
+        self.children[4].callback = self.next_btn
         
         self._update_buttons()
 
@@ -574,24 +640,55 @@ class RecentView(View):
         if self.page > self.total_pages:
             self.page = 1
 
-    def filter_data(self, ign=None, class_name=None):
+    def apply_filters(self):
         filtered = self.all_data
         
-        if ign:
-            ign = ign.lower()
-            filtered = [x for x in filtered if ign in x[0].lower()]
+        if self.filter_ign:
+            f_ign = self.filter_ign.lower()
+            filtered = [x for x in filtered if f_ign in x[0].lower()]
             
-        if class_name:
-            c_name = class_name.lower()
-            filtered = [x for x in filtered if c_name in x[1].get("last_class", "").lower()]
+        if self.filter_class:
+            f_cls = self.filter_class.lower()
+            filtered = [x for x in filtered if f_cls == x[1].get("last_class", "").lower()]
+            
+        if self.filter_time:
+            filtered = [x for x in filtered if x[1].get("last_ts", 0) >= self.filter_time]
+            
+        if self.filter_level:
+            try:
+                fl = self.filter_level.strip()
+                op = "="
+                val = 0
+                
+                if fl.startswith(">"):
+                    op = ">"
+                    val = int(fl.replace(">", "").strip())
+                elif fl.startswith("<"):
+                    op = "<"
+                    val = int(fl.replace("<", "").strip())
+                else:
+                    val = int(fl)
+                    
+                filtered_lvls = []
+                for x in filtered:
+                    lvl = x[1].get("last_class_level", 0)
+                    match = False
+                    if op == "=": match = (lvl == val)
+                    elif op == ">": match = (lvl > val)
+                    elif op == "<": match = (lvl < val)
+                    
+                    if match: filtered_lvls.append(x)
+                filtered = filtered_lvls
+            except ValueError:
+                pass
             
         self.filtered_data = filtered
         self.page = 1
         self.update_total_pages()
         
     def _update_buttons(self):
-        self.children[0].disabled = self.page <= 1
-        self.children[2].disabled = self.page >= self.total_pages
+        self.children[2].disabled = self.page <= 1
+        self.children[4].disabled = self.page >= self.total_pages
 
     async def update_message(self, interaction):
         self._update_buttons()
@@ -724,11 +821,7 @@ class Leaderboard(commands.Cog):
                 if p_uuid == uuid: continue
                 
                 raw_name = p.get("display_name", "Unknown")
-                p_ign = discord.utils.remove_markdown(raw_name.split(":")[0]).strip()
-                if "§" in p_ign:
-                    p_ign = "".join([c for i, c in enumerate(p_ign) if c != "§" and (i==0 or p_ign[i-1] != "§")])
-                    import re
-                    p_ign = re.sub(r'§.', '', raw_name.split(":")[0]).strip()
+                p_ign = clean_mc_formatting(raw_name.split(":")[0])
                 
                 if p_ign not in teammates:
                     teammates[p_ign] = {
@@ -739,14 +832,17 @@ class Leaderboard(commands.Cog):
                         "last_class_level": "?"
                     }
                 
-                clean_display = discord.utils.remove_markdown(p.get("display_name", ""))
+                clean_display = clean_mc_formatting(p.get("display_name", ""))
                 if ":" in clean_display:
                     parts = clean_display.split(":")
                     if len(parts) > 1:
                         class_part = parts[1].strip()
                         if "(" in class_part:
                             c_name = class_part.split("(")[0].strip()
-                            c_lvl = class_part.split("(")[1].replace(")", "").strip()
+                            try:
+                                c_lvl = int(class_part.split("(")[1].replace(")", "").strip())
+                            except ValueError:
+                                c_lvl = 0
                             teammates[p_ign]["last_class"] = c_name
                             teammates[p_ign]["last_class_level"] = c_lvl
 
@@ -761,7 +857,10 @@ class Leaderboard(commands.Cog):
                             class_part = parts[1].strip()
                             if "(" in class_part:
                                 c_name = class_part.split("(")[0].strip()
-                                c_lvl = class_part.split("(")[1].replace(")", "").strip()
+                                try:
+                                    c_lvl = int(class_part.split("(")[1].replace(")", "").strip())
+                                except ValueError:
+                                    c_lvl = 0
                                 teammates[p_ign]["last_class"] = c_name
                                 teammates[p_ign]["last_class_level"] = c_lvl
 

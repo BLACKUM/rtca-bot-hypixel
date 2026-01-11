@@ -22,10 +22,14 @@ async def close_session():
     global _SESSION, _CONNECTOR
     if _SESSION:
         await _SESSION.close()
-        await asyncio.sleep(0.25)
-        _SESSION = None
-        _CONNECTOR = None
-        log_info("Global API Session closed.")
+    
+    if _CONNECTOR and not _CONNECTOR.closed:
+        await _CONNECTOR.close()
+
+    await asyncio.sleep(0.5)
+    _SESSION = None
+    _CONNECTOR = None
+    log_info("Global API Session closed.")
 
 
 # cloudflare bypass, i hate i even have to do this

@@ -20,8 +20,8 @@ class RTCABot(commands.Bot):
         await self.daily_manager.sanitize_data()
         
     async def close(self):
-        await close_session()
         await super().close()
+        await close_session()
 
 bot = RTCABot(command_prefix="!", intents=INTENTS)
 

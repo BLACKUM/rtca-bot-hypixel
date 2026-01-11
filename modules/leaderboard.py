@@ -181,9 +181,12 @@ class DailyView(View):
             elif i == 3: medal = "🥉"
             else: medal = f"**#{i}**"
             
-
-            
-            val_str = f"+{entry['gained']:,.0f} Runs" if metric == "runs" else f"+{entry['gained']:,.0f} XP"
+            if metric.startswith("runs"):
+                suffix = "Run" if entry['gained'] == 1 else "Runs"
+                val_str = f"+{entry['gained']:,.0f} {suffix}"
+            else:
+                val_str = f"+{entry['gained']:,.0f} XP"
+                
             line = f"{medal} **{entry['ign']}**: {val_str}"
             if entry['ign'] == self.ign:
                 line = f"{line} < you"

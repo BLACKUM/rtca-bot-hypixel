@@ -325,7 +325,6 @@ class SystemSelect(Select):
         elif val == "restart_loop":
             await interaction.response.send_message("🔁 Exiting process for Loop/Tmux restart...", ephemeral=True)
             await self.bot.close()
-            sys.exit(0)
 
         elif val == "host_info":
              await interaction.response.defer(ephemeral=True)

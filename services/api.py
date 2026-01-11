@@ -16,6 +16,7 @@ async def init_session():
         log_info("Global API Session initialized.")
 
 async def close_session():
+    global _SESSION
     if _SESSION:
         await _SESSION.close()
         await asyncio.sleep(0.25)

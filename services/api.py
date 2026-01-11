@@ -280,7 +280,12 @@ async def get_dungeon_xp(uuid: str):
     dungeons = member.get("dungeons", {})
     
     catacombs = dungeons.get("dungeon_types", {}).get("catacombs", {})
+    master_catacombs = dungeons.get("dungeon_types", {}).get("master_catacombs", {})
+    
     cata_xp = float(catacombs.get("experience", 0))
+    
+    normal_runs = catacombs.get("tier_completions", {})
+    master_runs = master_catacombs.get("tier_completions", {})
     
     classes = dungeons.get("player_classes", {})
     class_xp = {}
@@ -291,5 +296,9 @@ async def get_dungeon_xp(uuid: str):
         
     return {
         "catacombs": cata_xp,
-        "classes": class_xp
+        "classes": class_xp,
+        "runs": {
+            "normal": normal_runs,
+            "master": master_runs
+        }
     }

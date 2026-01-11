@@ -205,6 +205,40 @@ class DailyView(View):
         else:
             embed.add_field(name="Class Progress", value="No class XP gained recently.", inline=False)
 
+        run_lines = []
+        
+        def format_runs(stats, period_label):
+            if not stats or "runs" not in stats: return []
+            lines = []
+            
+            n_runs = stats["runs"].get("normal", {})
+            if n_runs:
+                items = sorted(n_runs.items(), key=lambda x: int(x[0]) if x[0].isdigit() else -1)
+                parts = []
+                for tier, count in items:
+                    name = f"F{tier}" if tier != "0" else "Entrance"
+                    parts.append(f"{name} (+{count})")
+                if parts:
+                    lines.append(f"**{period_label} Normal**: {', '.join(parts)}")
+            
+            m_runs = stats["runs"].get("master", {})
+            if m_runs:
+                items = sorted(m_runs.items(), key=lambda x: int(x[0]) if x[0].isdigit() else -1)
+                parts = []
+                for tier, count in items:
+                    name = f"M{tier}"
+                    parts.append(f"{name} (+{count})")
+                if parts:
+                    lines.append(f"**{period_label} Master**: {', '.join(parts)}")
+                    
+            return lines
+
+        run_lines.extend(format_runs(daily_stats, "Daily"))
+        run_lines.extend(format_runs(monthly_stats, "Monthly"))
+        
+        if run_lines:
+             embed.add_field(name="Runs Gained", value="\n".join(run_lines), inline=False)
+
         return embed
 
     def _update_buttons(self):

@@ -156,7 +156,8 @@ class DailyManager:
         self.data["current_xp"][user_id] = {
             "timestamp": now,
             "cata_xp": xp_data["catacombs"],
-            "classes": xp_data["classes"]
+            "classes": xp_data["classes"],
+            "runs": xp_data.get("runs", {"normal": {}, "master": {}})
         }
         
         if user_id not in self.data["daily_snapshots"]:
@@ -213,8 +214,25 @@ class DailyManager:
             "cata_current_xp": current["cata_xp"],
             "cata_start_lvl": get_dungeon_level(start["cata_xp"]),
             "cata_current_lvl": get_dungeon_level(current["cata_xp"]),
-            "classes": {}
+            "cata_current_lvl": get_dungeon_level(current["cata_xp"]),
+            "classes": {},
+            "runs": {"normal": {}, "master": {}}
         }
+        
+        current_runs = current.get("runs", {"normal": {}, "master": {}})
+        start_runs = start.get("runs", {"normal": {}, "master": {}})
+        
+        for type_key in ["normal", "master"]:
+            c_runs = current_runs.get(type_key, {})
+            s_runs = start_runs.get(type_key, {})
+            all_floors = set(c_runs.keys()) | set(s_runs.keys())
+            
+            for floor in all_floors:
+                c_val = int(c_runs.get(floor, 0))
+                s_val = int(s_runs.get(floor, 0))
+                diff = c_val - s_val
+                if diff > 0:
+                    stats["runs"][type_key][floor] = diff
         
         for cls, xp in current["classes"].items():
             start_xp = start["classes"].get(cls, 0)

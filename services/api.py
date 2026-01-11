@@ -8,6 +8,7 @@ from core.cache import cache_get, cache_set, get_cache_expiry
 from typing import Optional
 
 
+_SESSION: Optional[aiohttp.ClientSession] = None
 _CONNECTOR: Optional[aiohttp.TCPConnector] = None
 
 async def init_session():

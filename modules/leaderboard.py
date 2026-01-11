@@ -513,12 +513,16 @@ class RecentSearchModal(Modal):
         super().__init__(title="Search Teammates")
         self.view = view
         self.ign_input = TextInput(label="IGN", placeholder="Enter IGN...", required=False, max_length=16)
+        self.class_input = TextInput(label="Class", placeholder="Archer, Mage, Tank...", required=False, max_length=10)
         self.page_input = TextInput(label="Page Number", placeholder="Enter page...", required=False, max_length=5)
+        
         self.add_item(self.ign_input)
+        self.add_item(self.class_input)
         self.add_item(self.page_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         ign_val = self.ign_input.value
+        class_val = self.class_input.value
         page_val = self.page_input.value
 
         if page_val:
@@ -535,34 +539,24 @@ class RecentSearchModal(Modal):
                 await interaction.response.send_message("❌ Invalid page number.", ephemeral=True)
                 return
 
-        if ign_val:
-            ign_val_lower = ign_val.lower()
-            found_index = -1
-            for i, (name, _) in enumerate(self.view.data):
-                if name.lower() == ign_val_lower:
-                    found_index = i
-                    break
-            
-            if found_index != -1:
-                self.view.page = (found_index // self.view.per_page) + 1
-                await self.view.update_message(interaction)
-                return
-            else:
-                 await interaction.response.send_message(f"❌ Teammate '{ign_val}' not found.", ephemeral=True)
-                 return
+        if ign_val or class_val:
+            self.view.filter_data(ign=ign_val, class_name=class_val)
+            await self.view.update_message(interaction)
+            return
         
-        await interaction.response.send_message("❌ Please enter an IGN or Page Number.", ephemeral=True)
+        await interaction.response.send_message("❌ Please enter filters or Page Number.", ephemeral=True)
 
 class RecentView(View):
     def __init__(self, bot, ign, data, runs_count):
         super().__init__(timeout=300)
         self.bot = bot
         self.ign = ign
-        self.data = data
+        self.all_data = data
+        self.filtered_data = data
         self.runs_count = runs_count
         self.page = 1
         self.per_page = 15
-        self.total_pages = math.ceil(len(data) / self.per_page) or 1
+        self.update_total_pages()
         
         self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="recent_prev"))
         self.children[0].callback = self.prev_btn
@@ -575,6 +569,26 @@ class RecentView(View):
         
         self._update_buttons()
 
+    def update_total_pages(self):
+        self.total_pages = math.ceil(len(self.filtered_data) / self.per_page) or 1
+        if self.page > self.total_pages:
+            self.page = 1
+
+    def filter_data(self, ign=None, class_name=None):
+        filtered = self.all_data
+        
+        if ign:
+            ign = ign.lower()
+            filtered = [x for x in filtered if ign in x[0].lower()]
+            
+        if class_name:
+            c_name = class_name.lower()
+            filtered = [x for x in filtered if c_name in x[1].get("last_class", "").lower()]
+            
+        self.filtered_data = filtered
+        self.page = 1
+        self.update_total_pages()
+        
     def _update_buttons(self):
         self.children[0].disabled = self.page <= 1
         self.children[2].disabled = self.page >= self.total_pages
@@ -588,23 +602,46 @@ class RecentView(View):
 
     def get_embed(self):
         embed = discord.Embed(title=f"🤝 Recent Teammates: {self.ign}", color=0x3498db)
-        embed.description = f"Analyzed **{self.runs_count}** recent runs."
+        
+        analyzed_text = f"Analyzed **{self.runs_count}** recent runs."
+        if len(self.filtered_data) != len(self.all_data):
+              analyzed_text += f" (Filtered: {len(self.filtered_data)}/{len(self.all_data)})"
+              
+        embed.description = analyzed_text
         
         start_idx = (self.page - 1) * self.per_page
         end_idx = start_idx + self.per_page
-        current_data = self.data[start_idx:end_idx]
+        current_data = self.filtered_data[start_idx:end_idx]
         
         lines = []
+        
+        class_emojis = {
+            "Archer": "🏹",
+            "Berserk": "⚔️", 
+            "Healer": "💖",
+            "Mage": "🧙‍♂️",
+            "Tank": "🛡️"
+        }
+        
         for i, (name, d) in enumerate(current_data, start_idx + 1):
              medal = ""
              if i == 1: medal = "🥇 "
              elif i == 2: medal = "🥈 "
              elif i == 3: medal = "🥉 "
              else: medal = f"**{i}.** "
-             lines.append(f"{medal}**{name}**: {d['count']} runs (Last: {d['last_floor']})")
+             
+             cls = d.get('last_class', 'Unknown')
+             lvl = d.get('last_class_level', '?')
+             emoji = class_emojis.get(cls, "❓")
+             
+             ts = int(d['last_ts'])
+             
+             lines.append(f"{medal}**{name}**: {d['count']} runs • {emoji} {cls} {lvl} • <t:{ts}:R>")
              
         if not lines:
-            embed.description += "\nNo teammates found."
+            embed.description += "\nNo teammates found matching criteria."
+        elif len(lines) == 0:
+             embed.description += "\nNo data on this page."
         else:
             embed.add_field(name="Most Played With", value="\n".join(lines), inline=False)
             
@@ -697,13 +734,36 @@ class Leaderboard(commands.Cog):
                     teammates[p_ign] = {
                         "count": 0,
                         "last_floor": floor_name,
-                        "last_ts": ts
+                        "last_ts": ts,
+                        "last_class": "Unknown",
+                        "last_class_level": "?"
                     }
                 
+                clean_display = discord.utils.remove_markdown(p.get("display_name", ""))
+                if ":" in clean_display:
+                    parts = clean_display.split(":")
+                    if len(parts) > 1:
+                        class_part = parts[1].strip()
+                        if "(" in class_part:
+                            c_name = class_part.split("(")[0].strip()
+                            c_lvl = class_part.split("(")[1].replace(")", "").strip()
+                            teammates[p_ign]["last_class"] = c_name
+                            teammates[p_ign]["last_class_level"] = c_lvl
+
                 teammates[p_ign]["count"] += 1
                 if ts > teammates[p_ign]["last_ts"]:
                     teammates[p_ign]["last_floor"] = floor_name
                     teammates[p_ign]["last_ts"] = ts
+                    
+                    if ":" in clean_display:
+                        parts = clean_display.split(":")
+                        if len(parts) > 1:
+                            class_part = parts[1].strip()
+                            if "(" in class_part:
+                                c_name = class_part.split("(")[0].strip()
+                                c_lvl = class_part.split("(")[1].replace(")", "").strip()
+                                teammates[p_ign]["last_class"] = c_name
+                                teammates[p_ign]["last_class_level"] = c_lvl
 
         sorted_mates = sorted(teammates.items(), key=lambda x: x[1]["count"], reverse=True)
         

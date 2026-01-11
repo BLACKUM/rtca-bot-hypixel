@@ -7,8 +7,7 @@ import math
 from datetime import datetime, timedelta, timezone
 from core.config import OWNER_IDS
 from core.logger import log_info, log_error
-from services.api import get_uuid, get_dungeon_xp
-from services.api import get_uuid, get_dungeon_xp
+from services.api import get_uuid, get_dungeon_xp, get_recent_runs
 
 class SearchModal(Modal):
     def __init__(self, view):
@@ -418,6 +417,87 @@ class Leaderboard(commands.Cog):
         embed = view._get_leaderboard_embed("daily")
         
         await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.command(name="recent", description="View recent teammates and run stats")
+    async def recent(self, interaction: discord.Interaction, ign: str = None):
+        if not ign:
+            ign = self.bot.link_manager.get_link(interaction.user.id)
+        
+        if not ign:
+            await interaction.response.send_message("❌ Please provide an IGN or link your account.", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        
+        uuid = await get_uuid(ign)
+        if not uuid:
+             await interaction.followup.send("❌ User not found.")
+             return
+             
+        runs = await get_recent_runs(uuid)
+        if not runs:
+             await interaction.followup.send(f"❌ No recent runs found for **{ign}** (or API disabled).")
+             return
+             
+        teammates = {}
+        
+        for run in runs:
+            d_type = run.get("dungeon_type", "catacombs")
+            tier = run.get("dungeon_tier", 0)
+            is_master = "master" in d_type
+            floor_prefix = "M" if is_master else "F"
+            floor_name = f"{floor_prefix}{tier}"
+            if tier == 0 and not is_master: floor_name = "Entrance"
+            
+            ts = run.get("completion_ts", 0) / 1000
+            
+            for p in run.get("participants", []):
+                p_uuid = p.get("player_uuid")
+                if p_uuid == uuid: continue
+                
+                raw_name = p.get("display_name", "Unknown")
+                p_ign = discord.utils.remove_markdown(raw_name.split(":")[0]).strip()
+                if "§" in p_ign:
+                    p_ign = "".join([c for i, c in enumerate(p_ign) if c != "§" and (i==0 or p_ign[i-1] != "§")])
+                    import re
+                    p_ign = re.sub(r'§.', '', raw_name.split(":")[0]).strip()
+                
+                if p_ign not in teammates:
+                    teammates[p_ign] = {
+                        "count": 0,
+                        "last_floor": floor_name,
+                        "last_ts": ts
+                    }
+                
+                teammates[p_ign]["count"] += 1
+                if ts > teammates[p_ign]["last_ts"]:
+                    teammates[p_ign]["last_floor"] = floor_name
+                    teammates[p_ign]["last_ts"] = ts
+
+        sorted_mates = sorted(teammates.items(), key=lambda x: x[1]["count"], reverse=True)
+        
+        embed = discord.Embed(title=f"🤝 Recent Teammates: {ign}", color=0x3498db)
+        embed.description = f"Analyzed **{len(runs)}** recent runs."
+        
+        lines = []
+        for i, (name, data) in enumerate(sorted_mates[:15], 1):
+             medal = ""
+             if i == 1: medal = "🥇 "
+             elif i == 2: medal = "🥈 "
+             elif i == 3: medal = "🥉 "
+             else: medal = f"**{i}.** "
+             
+             lines.append(f"{medal}**{name}**: {data['count']} runs (Last: {data['last_floor']})")
+             
+        if not lines:
+            embed.description += "\nNo teammates found (Solo runs?)."
+        else:
+            embed.add_field(name="Most Played With", value="\n".join(lines), inline=False)
+            
+        embed.set_footer(text=f"Updates based on latest API data")
+        await interaction.followup.send(embed=embed)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Leaderboard(bot))

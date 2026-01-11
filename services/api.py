@@ -302,3 +302,21 @@ async def get_dungeon_xp(uuid: str):
             "master": master_runs
         }
     }
+
+async def get_recent_runs(uuid: str):
+    profile_data = await get_profile_data(uuid)
+    if not profile_data:
+        return []
+    
+    profiles = profile_data.get("profiles")
+    if not profiles:
+        return []
+    
+    best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
+    member = best_profile.get("members", {}).get(uuid, {})
+    dungeons = member.get("dungeons", {})
+    
+    treasures = dungeons.get("treasures", {})
+    runs = treasures.get("runs", [])
+    
+    return runs

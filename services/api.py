@@ -7,20 +7,23 @@ from core.logger import log_debug, log_error, log_info
 from core.cache import cache_get, cache_set, get_cache_expiry
 from typing import Optional
 
-_SESSION: Optional[aiohttp.ClientSession] = None
+
+_CONNECTOR: Optional[aiohttp.TCPConnector] = None
 
 async def init_session():
-    global _SESSION
+    global _SESSION, _CONNECTOR
     if _SESSION is None:
-        _SESSION = aiohttp.ClientSession(headers=HEADERS)
+        _CONNECTOR = aiohttp.TCPConnector(force_close=True)
+        _SESSION = aiohttp.ClientSession(headers=HEADERS, connector=_CONNECTOR)
         log_info("Global API Session initialized.")
 
 async def close_session():
-    global _SESSION
+    global _SESSION, _CONNECTOR
     if _SESSION:
         await _SESSION.close()
         await asyncio.sleep(0.25)
         _SESSION = None
+        _CONNECTOR = None
         log_info("Global API Session closed.")
 
 

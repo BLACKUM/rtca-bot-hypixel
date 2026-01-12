@@ -37,7 +37,7 @@ class RecentManager:
              await self._save_data()
              return
         try:
-            async with aiofiles.open(RECENT_DATA_FILE, 'r') as f:
+            async with aiofiles.open(RECENT_DATA_FILE, 'rb') as f:
                 content = await f.read()
                 self.data = json.loads(content)
                 log_info(f"Loaded recent data for {len(self.data)} users.")
@@ -47,7 +47,7 @@ class RecentManager:
     async def _save_data(self):
         try:
             os.makedirs(os.path.dirname(RECENT_DATA_FILE), exist_ok=True)
-            async with aiofiles.open(RECENT_DATA_FILE, 'w') as f:
+            async with aiofiles.open(RECENT_DATA_FILE, 'wb') as f:
                 await f.write(json.dumps(self.data, indent=4))
         except Exception as e:
             log_error(f"Failed to save recent data: {e}")

@@ -567,22 +567,25 @@ class RecentView(View):
              if i == 1: medal = "🥇 "
              elif i == 2: medal = "🥈 "
              elif i == 3: medal = "🥉 "
-             else: medal = f"**{i + (self.page-1)*self.per_page}.** "
+             else: medal = f"**{i}.** "
              
              cls = d.get('last_class', 'Unknown')
              lvl = d.get('last_class_level', '?')
              emoji = class_emojis.get(cls, "❓")
              
              ts = int(d['last_ts'])
+             runs_cnt = d['count']
+             runs_str = "run" if runs_cnt == 1 else "runs"
              
-             lines.append(f"{medal}**{name}**: {d['count']} runs • {emoji} {cls} {lvl} • <t:{ts}:R>")
+             lines.append(f"{medal}**{name}**: {runs_cnt} {runs_str} • {emoji} {cls} {lvl} • <t:{ts}:R>")
              
         if not lines:
             embed.description += "\nNo teammates found matching criteria."
         elif len(lines) == 0:
              embed.description += "\nNo data on this page."
         else:
-            embed.add_field(name="Most Played With", value="\n".join(lines), inline=False)
+            field_name = "Recently Played With" if self.filter_sort == "recent" else "Most Played With"
+            embed.add_field(name=field_name, value="\n".join(lines), inline=False)
             
         embed.set_footer(text=f"Page {self.page}/{self.total_pages} • Updates based on latest API data")
         return embed

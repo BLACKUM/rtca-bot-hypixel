@@ -39,10 +39,15 @@ class RecentManager:
         try:
             async with aiofiles.open(RECENT_DATA_FILE, 'rb') as f:
                 content = await f.read()
+                if not content:
+                    self.data = {}
+                    log_info("Created new recent data (file was empty).")
+                    return
                 self.data = json.loads(content)
                 log_info(f"Loaded recent data for {len(self.data)} users.")
         except Exception as e:
             log_error(f"Failed to load recent data: {e}")
+            self.data = {}
 
     async def _save_data(self):
         try:

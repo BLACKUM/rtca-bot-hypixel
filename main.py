@@ -4,6 +4,7 @@ from core.logger import log_info, log_error
 from services.daily_manager import DailyManager
 from services.rng_manager import RngManager
 from services.link_manager import LinkManager
+from services.recent_manager import RecentManager
 from services.api import get_dungeon_xp, init_session, close_session
 from core.cache import initialize as init_cache
 import asyncio
@@ -17,6 +18,7 @@ class RTCABot(commands.Bot):
         await self.link_manager.initialize()
         await self.daily_manager.initialize()
         await self.rng_manager.initialize()
+        await self.recent_manager.initialize()
         await self.daily_manager.sanitize_data()
 
 bot = RTCABot(command_prefix="!", intents=INTENTS)
@@ -24,6 +26,7 @@ bot = RTCABot(command_prefix="!", intents=INTENTS)
 bot.daily_manager = DailyManager()
 bot.rng_manager = RngManager()
 bot.link_manager = LinkManager()
+bot.recent_manager = RecentManager()
 
 @tasks.loop(hours=2)
 async def track_daily_stats():

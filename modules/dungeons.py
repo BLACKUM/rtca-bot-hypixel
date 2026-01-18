@@ -569,10 +569,10 @@ class Dungeons(commands.Cog):
             
         class_avg = total_class_level / len(stats["classes"]) if stats["classes"] else 0
 
-        graph_file = await generate_dungeon_graph(class_levels, cata_level)
+        graph_file = await generate_dungeon_graph(class_levels, stats["floors"], cata_level)
 
         embed = discord.Embed(title=f"Dungeon Stats: {ign}", color=0x2ecc71)
-        embed.set_thumbnail(url=f"https://crafatar.com/avatars/{uuid}?overlay")
+        embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{uuid}")
         
         embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**", inline=True)
         embed.add_field(name="Class Average", value=f"**{class_avg:.2f}**", inline=True)
@@ -584,24 +584,27 @@ class Dungeons(commands.Cog):
             m, s = divmod(seconds, 60)
             return f"{m}:{s:02d}"
 
-        priority_floors = ["M7", "M6", "M5", "M4", "F7", "F6", "F5"]
-        floor_text = ""
+        floor_order = ["M7", "M6", "M5", "M4", "M3", "M2", "M1", 
+                       "F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance"]
         
         floors_data = stats["floors"]
+        lines = []
         
-        for f in priority_floors:
+        for f in floor_order:
             if f in floors_data:
                 data = floors_data[f]
                 runs = data["runs"]
-                best_time = format_ms(data["fastest_s_plus"])
                 if runs > 0:
-                    floor_text += f"**{f}**: {runs:,} runs | Best S+: `{best_time}`\n"
+                    best_time = format_ms(data["fastest_s_plus"])
+                    lines.append(f"`{f:<3}`: **{runs:,}** runs | Best S+: `{best_time}`")
         
-        if floor_text:
-             embed.add_field(name="Floor Stats (S+)", value=floor_text, inline=False)
+        if lines:
+             embed.description = "\n".join(lines)
+        else:
+             embed.description = "No dungeon runs completed."
         
         embed.set_image(url="attachment://dungeon_stats.png")
-        embed.set_footer(text="RTCA Bot • /help")
+        embed.set_footer(text=f"RTCA Bot • Requested by {interaction.user.display_name}")
 
         await interaction.followup.send(embed=embed, file=graph_file)
 

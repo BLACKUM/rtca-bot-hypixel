@@ -548,88 +548,94 @@ class Dungeons(commands.Cog):
                 await interaction.followup.send("❌ You must provide an IGN or link your account first using `/link <ign>`.", ephemeral=True)
                 return
 
-        uuid = await get_uuid(ign)
-        if not uuid:
-            await interaction.followup.send(f"❌ Could not find UUID for `{ign}`.")
-            return
+        try:
+            uuid = await get_uuid(ign)
+            if not uuid:
+                await interaction.followup.send(f"❌ Could not find UUID for `{ign}`.")
+                return
 
-        stats = await get_dungeon_stats(uuid)
-        if not stats:
-            await interaction.followup.send(f"❌ Could not fetch dungeon stats for `{ign}` (Profile might be private or API error).")
-            return
+            stats = await get_dungeon_stats(uuid)
+            if not stats:
+                await interaction.followup.send(f"❌ Could not fetch dungeon stats for `{ign}` (Profile might be private or API error).")
+                return
 
-        cata_xp = stats["catacombs"]
-        cata_level = get_dungeon_level(cata_xp)
-        secrets = stats["secrets"]
-        
-        class_levels = {}
-        total_class_level = 0
-        for cls_name, xp in stats["classes"].items():
-            lvl = get_dungeon_level(xp)
-            class_levels[cls_name] = lvl
-            total_class_level += lvl
+            cata_xp = stats["catacombs"]
+            cata_level = get_dungeon_level(cata_xp)
+            secrets = stats["secrets"]
             
-        class_avg = total_class_level / len(stats["classes"]) if stats["classes"] else 0
-
-        graph_file = await generate_dungeon_graph(class_levels, stats["floors"], cata_level)
-
-        embed = discord.Embed(title=f"Dungeon Stats: {ign}", color=0x2ecc71)
-        embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{uuid}")
-        blood_kills = int(stats.get("blood_mob_kills", 0))
-        
-        floors_data = stats["floors"]
-        total_runs = sum(f["runs"] for f in floors_data.values())
-        spr = secrets / total_runs if total_runs > 0 else 0
-
-        def format_xp(xp):
-            if xp >= 1_000_000_000: return f"{xp/1_000_000_000:.2f}B"
-            if xp >= 1_000_000: return f"{xp/1_000_000:.2f}M"
-            return f"{xp:,.0f}"
+            class_levels = {}
+            total_class_level = 0
+            for cls_name, xp in stats["classes"].items():
+                lvl = get_dungeon_level(xp)
+                class_levels[cls_name] = lvl
+                total_class_level += lvl
             
-        def format_ms(ms):
-            if not ms or ms == 0: return "-"
-            seconds = int(ms / 1000)
-            m, s = divmod(seconds, 60)
-            return f"{m}:{s:02d}"
+            class_avg = total_class_level / len(stats["classes"]) if stats["classes"] else 0
 
-        embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\nAvg: **{class_avg:.2f}**", inline=True)
-        embed.add_field(name="Secrets", value=f"**{secrets:,}**\nRatio: **{spr:.2f}**", inline=True)
-        embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**\nTotal XP: **{format_xp(cata_xp)}**", inline=True)
+            graph_file = await generate_dungeon_graph(class_levels, stats["floors"], cata_level)
 
-        sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)
-        class_text = " • ".join([f"**{name.capitalize()}**: {format_xp(xp)}" for name, xp in sorted_classes])
-        embed.add_field(name="Class XP", value=class_text, inline=False)
+            embed = discord.Embed(title=f"Dungeon Stats: {ign}", color=0x2ecc71)
+            embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{uuid}")
+            blood_kills = int(stats.get("blood_mob_kills", 0))
+            
+            floors_data = stats["floors"]
+            total_runs = sum(f["runs"] for f in floors_data.values())
+            spr = secrets / total_runs if total_runs > 0 else 0
 
-        master_floors = ["M7", "M6", "M5", "M4", "M3", "M2", "M1"]
-        normal_floors = ["F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance"]
-        
-        def build_floor_lines(floors_list):
-            lines = []
-            for f in floors_list:
-                if f in floors_data:
-                    data = floors_data[f]
-                    runs = int(data["runs"])
-                    if runs > 0:
-                        s_plus = format_ms(data['fastest_s_plus'])
-                        s = format_ms(data['fastest_s'])
-                        lines.append(f"**{f}** • **{runs:,}** runs\n└ S+ **{s_plus}** • S **{s}**")
-            return lines
+            def format_xp(xp):
+                if xp >= 1_000_000_000: return f"{xp/1_000_000_000:.2f}B"
+                if xp >= 1_000_000: return f"{xp/1_000_000:.2f}M"
+                return f"{xp:,.0f}"
+                
+            def format_ms(ms):
+                if not ms or ms == 0: return "-"
+                seconds = int(ms / 1000)
+                m, s = divmod(seconds, 60)
+                return f"{m}:{s:02d}"
 
-        m_lines = build_floor_lines(master_floors)
-        f_lines = build_floor_lines(normal_floors)
-        
-        if m_lines:
-            embed.add_field(name="Master Mode", value="\n".join(m_lines), inline=True)
-        
-        if f_lines:
-            embed.add_field(name="Catacombs", value="\n".join(f_lines), inline=True)
-        
-        if not m_lines and not f_lines:
-             embed.description = "No dungeon runs completed."
-        
-        embed.set_image(url="attachment://dungeon_stats.png")
-        embed.set_footer(text=f"Requested by {interaction.user.display_name}")
+            embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\nAvg: **{class_avg:.2f}**", inline=True)
+            embed.add_field(name="Secrets", value=f"**{secrets:,}**\nRatio: **{spr:.2f}**", inline=True)
+            embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**\nTotal XP: **{format_xp(cata_xp)}**", inline=True)
 
+            sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)
+            class_text = " • ".join([f"**{name.capitalize()}**: {format_xp(xp)}" for name, xp in sorted_classes])
+            embed.add_field(name="Class XP", value=class_text, inline=False)
+
+            master_floors = ["M7", "M6", "M5", "M4", "M3", "M2", "M1"]
+            normal_floors = ["F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance"]
+            
+            def build_floor_lines(floors_list):
+                lines = []
+                for f in floors_list:
+                    if f in floors_data:
+                        data = floors_data[f]
+                        runs = int(data["runs"])
+                        if runs > 0:
+                            s_plus = format_ms(data['fastest_s_plus'])
+                            s = format_ms(data['fastest_s'])
+                            lines.append(f"**{f}** • **{runs:,}** runs\n└ S+ **{s_plus}** • S **{s}**")
+                return lines
+
+            m_lines = build_floor_lines(master_floors)
+            f_lines = build_floor_lines(normal_floors)
+            
+            if m_lines:
+                embed.add_field(name="Master Mode", value="\n".join(m_lines), inline=True)
+            
+            if f_lines:
+                embed.add_field(name="Catacombs", value="\n".join(f_lines), inline=True)
+            
+            if not m_lines and not f_lines:
+                embed.description = "No dungeon runs completed."
+            
+            embed.set_image(url="attachment://dungeon_stats.png")
+            embed.set_footer(text=f"Requested by {interaction.user.display_name}")
+
+            await interaction.followup.send(embed=embed, file=graph_file)
+            
+        except Exception as e:
+            log_error(f"Error in dungeons command: {e}")
+            await interaction.followup.send(f"❌ An error occurred while generating stats: {str(e)}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Dungeons(bot))

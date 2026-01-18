@@ -305,6 +305,7 @@ async def get_dungeon_xp(uuid: str):
         cls_data = classes.get(cls, {})
         class_xp[cls] = float(cls_data.get("experience", 0))
         
+
     return {
         "catacombs": cata_xp,
         "classes": class_xp,
@@ -312,6 +313,66 @@ async def get_dungeon_xp(uuid: str):
             "normal": normal_runs,
             "master": master_runs
         }
+    }
+
+
+async def get_dungeon_stats(uuid: str):
+    profile_data = await get_profile_data(uuid)
+    if not profile_data:
+        return None
+    
+    profiles = profile_data.get("profiles")
+    if not profiles:
+        return None
+    
+    best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
+    member = best_profile.get("members", {}).get(uuid, {})
+    dungeons = member.get("dungeons", {})
+    
+    catacombs = dungeons.get("dungeon_types", {}).get("catacombs", {})
+    master_catacombs = dungeons.get("dungeon_types", {}).get("master_catacombs", {})
+    
+    cata_xp = float(catacombs.get("experience", 0))
+    
+    secrets = int(dungeons.get("secrets", 0))
+    if secrets == 0:
+         secrets = int(member.get("achievements", {}).get("skyblock_treasure_hunter", 0))
+         
+    player_classes = dungeons.get("player_classes", {})
+    class_xp = {}
+    for cls in ["archer", "berserk", "healer", "mage", "tank"]:
+        cls_data = player_classes.get(cls, {})
+        class_xp[cls.capitalize()] = float(cls_data.get("experience", 0))
+
+    floors = {}
+    
+    def process_tier(tier_data, prefix="F"):
+        times = tier_data.get("fastest_time_s_plus", {})
+        runs = tier_data.get("tier_completions", {})
+        best_score = tier_data.get("best_score", {})
+        
+        for tier in runs.keys():
+            if tier == "0": floor_name = "Entrance" if prefix == "F" else "M0"
+            else: floor_name = f"{prefix}{tier}"
+            
+            ms = times.get(tier, 0)
+            score = best_score.get(tier, 0)
+            count = runs.get(tier, 0)
+            
+            floors[floor_name] = {
+                "runs": count,
+                "best_score": score,
+                "fastest_s_plus": ms
+            }
+
+    process_tier(catacombs, "F")
+    process_tier(master_catacombs, "M")
+
+    return {
+        "cata_xp": cata_xp,
+        "secrets": secrets,
+        "classes": class_xp,
+        "floors": floors
     }
 
 async def get_recent_runs(uuid: str):

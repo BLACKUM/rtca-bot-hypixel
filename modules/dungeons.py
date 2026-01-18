@@ -7,10 +7,11 @@ import math
 from core.config import config
 from core.game_data import FLOOR_XP_MAP
 from core.logger import log_info, log_debug, log_error
-from services.api import get_uuid, get_profile_data
-from services.api import get_uuid, get_profile_data
+from services.api import get_uuid, get_profile_data, get_dungeon_stats
 from services.simulation_logic import simulate_async
-from services.xp_calculations import calculate_dungeon_xp_per_run
+from services.xp_calculations import calculate_dungeon_xp_per_run, get_dungeon_level
+from services.visualization import generate_dungeon_graph
+import datetime
 
 default_bonuses = {
     "ring": 0.1,
@@ -533,6 +534,76 @@ class Dungeons(commands.Cog):
         view.message = message
         
         log_info(f"✅ Simulation finished: {ign} → {runs_total:,} total runs")
+
+    @app_commands.describe(ign="Minecraft IGN (optional if linked)")
+    @app_commands.command(name="dungeons", description="View comprehensive dungeon stats and class levels")
+    async def dungeons(self, interaction: discord.Interaction, ign: str = None):
+        await interaction.response.defer()
+        
+        if ign is None:
+            ign = self.bot.link_manager.get_link(interaction.user.id)
+            if not ign:
+                await interaction.followup.send("❌ You must provide an IGN or link your account first using `/link <ign>`.", ephemeral=True)
+                return
+
+        uuid = await get_uuid(ign)
+        if not uuid:
+            await interaction.followup.send(f"❌ Could not find UUID for `{ign}`.")
+            return
+
+        stats = await get_dungeon_stats(uuid)
+        if not stats:
+            await interaction.followup.send(f"❌ Could not fetch dungeon stats for `{ign}` (Profile might be private or API error).")
+            return
+
+        cata_xp = stats["catacombs"]
+        cata_level = get_dungeon_level(cata_xp)
+        secrets = stats["secrets"]
+        
+        class_levels = {}
+        total_class_level = 0
+        for cls_name, xp in stats["classes"].items():
+            lvl = get_dungeon_level(xp)
+            class_levels[cls_name] = lvl
+            total_class_level += lvl
+            
+        class_avg = total_class_level / len(stats["classes"]) if stats["classes"] else 0
+
+        graph_file = await generate_dungeon_graph(class_levels, cata_level)
+
+        embed = discord.Embed(title=f"Dungeon Stats: {ign}", color=0x2ecc71)
+        embed.set_thumbnail(url=f"https://crafatar.com/avatars/{uuid}?overlay")
+        
+        embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**", inline=True)
+        embed.add_field(name="Class Average", value=f"**{class_avg:.2f}**", inline=True)
+        embed.add_field(name="Secrets", value=f"**{secrets:,}**", inline=True)
+
+        def format_ms(ms):
+            if not ms or ms == 0: return "-"
+            seconds = int(ms / 1000)
+            m, s = divmod(seconds, 60)
+            return f"{m}:{s:02d}"
+
+        priority_floors = ["M7", "M6", "M5", "M4", "F7", "F6", "F5"]
+        floor_text = ""
+        
+        floors_data = stats["floors"]
+        
+        for f in priority_floors:
+            if f in floors_data:
+                data = floors_data[f]
+                runs = data["runs"]
+                best_time = format_ms(data["fastest_s_plus"])
+                if runs > 0:
+                    floor_text += f"**{f}**: {runs:,} runs | Best S+: `{best_time}`\n"
+        
+        if floor_text:
+             embed.add_field(name="Floor Stats (S+)", value=floor_text, inline=False)
+        
+        embed.set_image(url="attachment://dungeon_stats.png")
+        embed.set_footer(text="RTCA Bot • /help")
+
+        await interaction.followup.send(embed=embed, file=graph_file)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Dungeons(bot))

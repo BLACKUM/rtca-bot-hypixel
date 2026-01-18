@@ -575,16 +575,33 @@ class Dungeons(commands.Cog):
 
         embed = discord.Embed(title=f"Dungeon Stats: {ign}", color=0x2ecc71)
         embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{uuid}")
-        blood_kills = stats.get("blood_mob_kills", 0)
+        blood_kills = int(stats.get("blood_mob_kills", 0))
         
         floors_data = stats["floors"]
         total_runs = sum(f["runs"] for f in floors_data.values())
         spr = secrets / total_runs if total_runs > 0 else 0
 
-        embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**", inline=True)
+        def format_xp(xp):
+            if xp >= 1_000_000_000: return f"{xp/1_000_000_000:.2f}B"
+            if xp >= 1_000_000: return f"{xp/1_000_000:.2f}M"
+            return f"{xp:,.0f}"
+
+        embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\n({format_xp(cata_xp)} XP)", inline=True)
         embed.add_field(name="Class Average", value=f"**{class_avg:.2f}**", inline=True)
         embed.add_field(name="Secrets", value=f"**{secrets:,}**\n(Per Run: {spr:.2f})", inline=True)
+        
         embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**", inline=True)
+
+        class_xp_lines = []
+        sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)
+        
+        class_text = ""
+        for name, xp in sorted_classes:
+            class_text += f"**{name.capitalize()}:** {format_xp(xp)}\n"
+            
+        embed.add_field(name="Class XP", value=class_text.strip(), inline=True)
+        
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
 
         def format_ms(ms):
             if not ms or ms == 0: return "-"

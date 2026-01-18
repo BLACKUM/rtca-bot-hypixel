@@ -369,7 +369,7 @@ async def get_dungeon_stats(uuid: str):
     process_tier(master_catacombs, "M")
 
     return {
-        "cata_xp": cata_xp,
+        "catacombs": cata_xp,
         "secrets": secrets,
         "classes": class_xp,
         "floors": floors

@@ -29,20 +29,31 @@ def _create_combined_graph(class_data: dict, floors_data: dict, cata_level: floa
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
     fig.patch.set_facecolor('#2b2d31')
+    CLASS_COLORS = {
+        'Archer': '#2ecc71', 
+        'Berserk': '#e74c3c',
+        'Healer': '#f1c40f', 
+        'Mage': '#3498db',   
+        'Tank': '#95a5a6'    
+    }
     
-    colors_classes = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db'][:len(classes)]
+    bar_colors = [CLASS_COLORS.get(c, '#ffffff') for c in classes]
+    
     ax1.set_facecolor('#2b2d31')
-    bars1 = ax1.barh(classes, levels, color=colors_classes, height=0.6)
+    bars1 = ax1.barh(classes, levels, color=bar_colors, height=0.6)
     
-    ax1.set_title(f"Class Levels (Cata {cata_level:.2f})", color='white', fontweight='bold', pad=10)
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
     ax1.spines['bottom'].set_color('#ffffff')
     ax1.spines['left'].set_color('#ffffff')
     ax1.tick_params(axis='x', colors='white')
     ax1.tick_params(axis='y', colors='white')
-    ax1.axvline(x=50, color='gray', linestyle='--', alpha=0.3)
     
+    ax1.grid(axis='x', color='white', alpha=0.1)
+    
+    ax1.set_xlabel('Level', color='white', fontweight='bold')
+    ax1.set_title(f'Class Levels (Cata {cata_level:.2f})', color='white', pad=20, fontsize=12, fontweight='bold', y=1.02)
+
     for bar in bars1:
         width = bar.get_width()
         ax1.text(width + 0.5, bar.get_y() + bar.get_height()/2, f'{width:.1f}', ha='left', va='center', color='white', fontsize=9)
@@ -59,8 +70,10 @@ def _create_combined_graph(class_data: dict, floors_data: dict, cata_level: floa
         ax2.tick_params(axis='x', colors='white')
         ax2.tick_params(axis='y', colors='white')
         
+        ax2.grid(axis='x', color='white', alpha=0.1)
+        
         ax2.set_xlabel('Runs', color='white', fontweight='bold')
-        ax2.set_title('Floor Completions', color='white', pad=20, fontsize=12, fontweight='bold')
+        ax2.set_title('Floor Completions', color='white', pad=20, fontsize=12, fontweight='bold', y=1.02)
         
         for bar in bars2:
             width = bar.get_width()

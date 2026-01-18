@@ -585,53 +585,51 @@ class Dungeons(commands.Cog):
             if xp >= 1_000_000_000: return f"{xp/1_000_000_000:.2f}B"
             if xp >= 1_000_000: return f"{xp/1_000_000:.2f}M"
             return f"{xp:,.0f}"
-
-        embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\n({format_xp(cata_xp)} XP)", inline=True)
-        embed.add_field(name="Class Average", value=f"**{class_avg:.2f}**", inline=True)
-        embed.add_field(name="Secrets", value=f"**{secrets:,}**\n(Per Run: {spr:.2f})", inline=True)
-        
-        embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**", inline=True)
-
-        class_xp_lines = []
-        sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)
-        
-        class_text = ""
-        for name, xp in sorted_classes:
-            class_text += f"**{name.capitalize()}:** {format_xp(xp)}\n"
             
-        embed.add_field(name="Class XP", value=class_text.strip(), inline=True)
-        
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
-
         def format_ms(ms):
             if not ms or ms == 0: return "-"
             seconds = int(ms / 1000)
             m, s = divmod(seconds, 60)
             return f"{m}:{s:02d}"
 
-        floor_order = ["M7", "M6", "M5", "M4", "M3", "M2", "M1", 
-                       "F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance"]
+        embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\nAvg: **{class_avg:.2f}**", inline=True)
+        embed.add_field(name="Secrets", value=f"**{secrets:,}**\nRatio: **{spr:.2f}**", inline=True)
+        embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**\nTotal XP: **{format_xp(cata_xp)}**", inline=True)
+
+        sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)
+        class_text = " • ".join([f"**{name.capitalize()}**: {format_xp(xp)}" for name, xp in sorted_classes])
+        embed.add_field(name="Class XP", value=class_text, inline=False)
+
+        master_floors = ["M7", "M6", "M5", "M4", "M3", "M2", "M1"]
+        normal_floors = ["F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance"]
         
-        lines = []
+        def build_floor_lines(floors_list):
+            lines = []
+            for f in floors_list:
+                if f in floors_data:
+                    data = floors_data[f]
+                    runs = int(data["runs"])
+                    if runs > 0:
+                        s_plus = format_ms(data['fastest_s_plus'])
+                        s = format_ms(data['fastest_s'])
+                        lines.append(f"**{f}** • **{runs:,}** runs\n└ S+ **{s_plus}** • S **{s}**")
+            return lines
+
+        m_lines = build_floor_lines(master_floors)
+        f_lines = build_floor_lines(normal_floors)
         
-        for f in floor_order:
-            if f in floors_data:
-                data = floors_data[f]
-                runs = int(data["runs"])
-                if runs > 0:
-                    best_s_plus = format_ms(data["fastest_s_plus"])
-                    best_s = format_ms(data["fastest_s"])
-                    lines.append(f"`{f}`: **{runs:,}** runs | S+: `{best_s_plus}` | S: `{best_s}`")
+        if m_lines:
+            embed.add_field(name="Master Mode", value="\n".join(m_lines), inline=True)
         
-        if lines:
-             embed.description = "\n".join(lines)
-        else:
+        if f_lines:
+            embed.add_field(name="Catacombs", value="\n".join(f_lines), inline=True)
+        
+        if not m_lines and not f_lines:
              embed.description = "No dungeon runs completed."
         
         embed.set_image(url="attachment://dungeon_stats.png")
         embed.set_footer(text=f"Requested by {interaction.user.display_name}")
 
-        await interaction.followup.send(embed=embed, file=graph_file)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Dungeons(bot))

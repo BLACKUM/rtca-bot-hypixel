@@ -347,7 +347,8 @@ async def get_dungeon_stats(uuid: str):
     floors = {}
     
     def process_tier(tier_data, prefix="F"):
-        times = tier_data.get("fastest_time_s_plus", {})
+        times_s_plus = tier_data.get("fastest_time_s_plus", {})
+        times_s = tier_data.get("fastest_time_s", {})
         runs = tier_data.get("tier_completions", {})
         best_score = tier_data.get("best_score", {})
         
@@ -355,14 +356,16 @@ async def get_dungeon_stats(uuid: str):
             if tier == "0": floor_name = "Entrance" if prefix == "F" else "M0"
             else: floor_name = f"{prefix}{tier}"
             
-            ms = times.get(tier, 0)
+            ms_s_plus = times_s_plus.get(tier, 0)
+            ms_s = times_s.get(tier, 0)
             score = best_score.get(tier, 0)
             count = runs.get(tier, 0)
             
             floors[floor_name] = {
                 "runs": count,
                 "best_score": score,
-                "fastest_s_plus": ms
+                "fastest_s_plus": ms_s_plus,
+                "fastest_s": ms_s
             }
 
     process_tier(catacombs, "F")

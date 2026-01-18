@@ -186,7 +186,7 @@ def _create_option_list(option: str, current_val: float) -> list[discord.SelectO
 class BonusSelectView(View):
     
     def __init__(self, bot: commands.Bot, dungeon_classes: dict, base_floor: float, 
-                 initial_bonuses: dict, ign: str, floor: str, xp_per_run: float, current_cata_xp: float):
+                 initial_bonuses: dict, ign: str, floor: str, xp_per_run: float, current_cata_xp: float, requester_name: str):
         super().__init__(timeout=300)
         self.bot = bot
         self.dungeon_classes = dungeon_classes
@@ -197,6 +197,7 @@ class BonusSelectView(View):
         self.message = None
         self.xp_per_run = xp_per_run
         self.current_cata_xp = current_cata_xp
+        self.requester_name = requester_name
         
         self.main_select = MainSelect(self)
         self.add_item(self.main_select)
@@ -245,7 +246,7 @@ class BonusSelectView(View):
                 inline=True
             )
         
-        embed.set_footer(text=f"Total simulated runs: {runs_total:,} \nDM @BLACKUM if you want to report an issue.")
+        embed.set_footer(text=f"Total simulated runs: {runs_total:,} • Requested by {self.requester_name}")
         return embed
 
 
@@ -508,6 +509,7 @@ class Dungeons(commands.Cog):
             
             embed = discord.Embed(description=msg, color=0xFFD700)
             embed.set_image(url=gif)
+            embed.set_footer(text=f"Requested by {interaction.user.display_name}")
             
             await interaction.followup.send(embed=embed)
             log_info(f"✅ {ign} already has CA50. Sent congrats message. GIF: {gif}")
@@ -526,7 +528,7 @@ class Dungeons(commands.Cog):
         
         runs_total, results = await simulate_async(dungeon_classes, base_floor, bonuses)
         
-        view = BonusSelectView(self.bot, dungeon_classes, base_floor, bonuses, ign, floor, dungeon_xp, current_cata_xp)
+        view = BonusSelectView(self.bot, dungeon_classes, base_floor, bonuses, ign, floor, dungeon_xp, current_cata_xp, interaction.user.display_name)
         
         embed = view._create_embed(results, runs_total)
         
@@ -574,9 +576,13 @@ class Dungeons(commands.Cog):
         embed = discord.Embed(title=f"Dungeon Stats: {ign}", color=0x2ecc71)
         embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{uuid}")
         
+        floors_data = stats["floors"]
+        total_runs = sum(f["runs"] for f in floors_data.values())
+        spr = secrets / total_runs if total_runs > 0 else 0
+
         embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**", inline=True)
         embed.add_field(name="Class Average", value=f"**{class_avg:.2f}**", inline=True)
-        embed.add_field(name="Secrets", value=f"**{secrets:,}**", inline=True)
+        embed.add_field(name="Secrets", value=f"**{secrets:,}**\n({spr:.2f}/run)", inline=True)
 
         def format_ms(ms):
             if not ms or ms == 0: return "-"
@@ -587,7 +593,6 @@ class Dungeons(commands.Cog):
         floor_order = ["M7", "M6", "M5", "M4", "M3", "M2", "M1", 
                        "F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance"]
         
-        floors_data = stats["floors"]
         lines = []
         
         for f in floor_order:
@@ -595,8 +600,9 @@ class Dungeons(commands.Cog):
                 data = floors_data[f]
                 runs = data["runs"]
                 if runs > 0:
-                    best_time = format_ms(data["fastest_s_plus"])
-                    lines.append(f"`{f:<3}`: **{runs:,}** runs | Best S+: `{best_time}`")
+                    best_s_plus = format_ms(data["fastest_s_plus"])
+                    best_s = format_ms(data["fastest_s"])
+                    lines.append(f"`{f:<3}`: **{runs:,}** runs | S+: `{best_s_plus}` | S: `{best_s}`")
         
         if lines:
              embed.description = "\n".join(lines)
@@ -604,7 +610,7 @@ class Dungeons(commands.Cog):
              embed.description = "No dungeon runs completed."
         
         embed.set_image(url="attachment://dungeon_stats.png")
-        embed.set_footer(text=f"RTCA Bot • Requested by {interaction.user.display_name}")
+        embed.set_footer(text=f"Requested by {interaction.user.display_name}")
 
         await interaction.followup.send(embed=embed, file=graph_file)
 

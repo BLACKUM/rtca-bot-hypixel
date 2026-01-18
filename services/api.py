@@ -344,6 +344,10 @@ async def get_dungeon_stats(uuid: str):
         cls_data = player_classes.get(cls, {})
         class_xp[cls.capitalize()] = float(cls_data.get("experience", 0))
 
+    player_stats = member.get("player_stats", {})
+    kills = player_stats.get("kills", {})
+    blood_mob_kills = kills.get("watcher_summon_undead", 0)
+
     floors = {}
     
     def process_tier(tier_data, prefix="F"):
@@ -353,6 +357,8 @@ async def get_dungeon_stats(uuid: str):
         best_score = tier_data.get("best_score", {})
         
         for tier in runs.keys():
+            if tier == "total": continue
+            
             if tier == "0": floor_name = "Entrance" if prefix == "F" else "M0"
             else: floor_name = f"{prefix}{tier}"
             
@@ -374,6 +380,7 @@ async def get_dungeon_stats(uuid: str):
     return {
         "catacombs": cata_xp,
         "secrets": secrets,
+        "blood_mob_kills": blood_mob_kills,
         "classes": class_xp,
         "floors": floors
     }

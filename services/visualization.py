@@ -49,9 +49,9 @@ def _create_combined_graph(class_data: dict, floors_data: dict, cata_level: floa
 
     ax2.set_facecolor('#2b2d31')
     if floor_names:
-        bars2 = ax2.barh(floor_names, run_counts, color='#9b59b6', height=0.6)
+        colors_runs = ['#d35400' if f.startswith('M') else '#9b59b6' for f in floor_names]
+        bars2 = ax2.barh(floor_names, run_counts, color=colors_runs, height=0.6)
         
-        ax2.set_title("Floor Completions", color='white', fontweight='bold', pad=10)
         ax2.spines['top'].set_visible(False)
         ax2.spines['right'].set_visible(False)
         ax2.spines['bottom'].set_color('#ffffff')
@@ -59,9 +59,13 @@ def _create_combined_graph(class_data: dict, floors_data: dict, cata_level: floa
         ax2.tick_params(axis='x', colors='white')
         ax2.tick_params(axis='y', colors='white')
         
+        ax2.set_xlabel('Runs', color='white', fontweight='bold')
+        ax2.set_title('Floor Completions', color='white', pad=20, fontsize=12, fontweight='bold')
+        
         for bar in bars2:
             width = bar.get_width()
-            ax2.text(width + 5, bar.get_y() + bar.get_height()/2, f'{width:,}', ha='left', va='center', color='white', fontsize=9)
+            if width > 0:
+                ax2.text(width + 0.5, bar.get_y() + bar.get_height()/2, f'{width:.0f}', ha='left', va='center', color='white', fontsize=9)
     else:
         ax2.text(0.5, 0.5, "No Runs Data", color='white', ha='center', va='center')
         ax2.axis('off')

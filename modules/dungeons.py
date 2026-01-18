@@ -575,6 +575,7 @@ class Dungeons(commands.Cog):
 
         embed = discord.Embed(title=f"Dungeon Stats: {ign}", color=0x2ecc71)
         embed.set_thumbnail(url=f"https://mc-heads.net/avatar/{uuid}")
+        blood_kills = stats.get("blood_mob_kills", 0)
         
         floors_data = stats["floors"]
         total_runs = sum(f["runs"] for f in floors_data.values())
@@ -582,7 +583,8 @@ class Dungeons(commands.Cog):
 
         embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**", inline=True)
         embed.add_field(name="Class Average", value=f"**{class_avg:.2f}**", inline=True)
-        embed.add_field(name="Secrets", value=f"**{secrets:,}**\n({spr:.2f}/run)", inline=True)
+        embed.add_field(name="Secrets", value=f"**{secrets:,}**\n(Per Run: {spr:.2f})", inline=True)
+        embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**", inline=True)
 
         def format_ms(ms):
             if not ms or ms == 0: return "-"
@@ -598,11 +600,11 @@ class Dungeons(commands.Cog):
         for f in floor_order:
             if f in floors_data:
                 data = floors_data[f]
-                runs = data["runs"]
+                runs = int(data["runs"])
                 if runs > 0:
                     best_s_plus = format_ms(data["fastest_s_plus"])
                     best_s = format_ms(data["fastest_s"])
-                    lines.append(f"`{f:<3}`: **{runs:,}** runs | S+: `{best_s_plus}` | S: `{best_s}`")
+                    lines.append(f"`{f}`: **{runs:,}** runs | S+: `{best_s_plus}` | S: `{best_s}`")
         
         if lines:
              embed.description = "\n".join(lines)

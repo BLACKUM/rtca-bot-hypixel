@@ -6,7 +6,7 @@ from core.logger import log_info, log_error, log_debug
 
 DATA_FILE = "data/rng_data.json"
 
-from core.config import RNG_DROPS
+from core.game_data import RNG_DROPS
 
 class RngManager:
     def __init__(self):

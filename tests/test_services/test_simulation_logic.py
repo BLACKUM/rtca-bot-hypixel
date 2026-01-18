@@ -1,9 +1,13 @@
 import pytest
 from services.simulation_logic import simulate_to_level_all50
 from services.xp_calculations import get_total_xp_for_level
-from core.config import DUNGEON_XP
+from core.game_data import DUNGEON_XP
+from unittest.mock import patch, MagicMock
+from core.config import config
 
-def test_simulate_already_maxed():
+@patch("services.simulation_logic.config")
+def test_simulate_already_maxed(mock_config):
+    mock_config.target_level = 50
     target_xp_50 = get_total_xp_for_level(50)
     max_xp = target_xp_50 + 1000
     classes = {

@@ -3,7 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Select, View, Modal, TextInput, Button
 import time
-from core.config import RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS, GLOBAL_DROPS, OWNER_IDS, RNG_CATEGORIES
+from core.config import config
+from core.game_data import RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS, GLOBAL_DROPS, RNG_CATEGORIES
 from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_all_prices, get_dungeon_runs, get_prices_expiry
 from services.api import get_uuid, get_all_prices, get_dungeon_runs, get_prices_expiry
@@ -493,8 +494,6 @@ class Rng(commands.Cog):
             await interaction.followup.send(embed=embed, view=view)
         else:
             await interaction.response.send_message(embed=embed, view=view)
-
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Rng(bot))

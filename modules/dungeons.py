@@ -4,7 +4,8 @@ from discord.ext import commands
 from discord.ui import Select, View
 import time
 import math
-from core.config import TARGET_LEVEL, FLOOR_XP_MAP, XP_PER_RUN_DEFAULT, OWNER_IDS
+from core.config import config
+from core.game_data import FLOOR_XP_MAP
 from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_profile_data
 from services.api import get_uuid, get_profile_data
@@ -216,7 +217,7 @@ class BonusSelectView(View):
         xp_description = f"Dungeon XP per run: {self.xp_per_run:,.0f}"
         
         embed = discord.Embed(
-            title=f"Simulation — reach Level {TARGET_LEVEL} for all classes ({self.ign})",
+            title=f"Simulation — reach Level {config.target_level} for all classes ({self.ign})",
             description=f"Floor: {self.floor} ({self.base_floor:,} base XP)\n{xp_description}",
             color=0x00ff99
         )
@@ -236,7 +237,7 @@ class BonusSelectView(View):
             lvl = info["current_level"]
             rem = info["remaining_xp"]
             runs_for_class = info["runs_done"]
-            rem_text = "\n(✅ reached)" if runs_for_class == 0 and lvl >= TARGET_LEVEL else "\n(❌ not yet)"
+            rem_text = "\n(✅ reached)" if runs_for_class == 0 and lvl >= config.target_level else "\n(❌ not yet)"
             embed.add_field(
                 name=cls.title(),
                 value=f"Expected Level {lvl:.2f} {rem_text}\n({runs_for_class} runs)",
@@ -255,7 +256,7 @@ class DefaultValueSelect(Select):
         super().__init__(placeholder=f"{option.replace('_', ' ').title()}...", options=options)
     
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id not in OWNER_IDS:
+        if interaction.user.id not in config.owner_ids:
             await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
             return
         
@@ -312,7 +313,7 @@ class DefaultMainSelect(Select):
         )
     
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id not in OWNER_IDS:
+        if interaction.user.id not in config.owner_ids:
             await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
             return
         
@@ -432,7 +433,7 @@ class Dungeons(commands.Cog):
             except:
                 pass
         
-        base_floor = FLOOR_XP_MAP.get(floor.upper(), XP_PER_RUN_DEFAULT)
+        base_floor = FLOOR_XP_MAP.get(floor.upper(), config.xp_per_run_default)
         
         uuid = await get_uuid(ign)
         if not uuid:
@@ -500,9 +501,8 @@ class Dungeons(commands.Cog):
         
         if current_average >= 50.0:
             import random
-            from core.config import CONGRATS_GIFS
             
-            gif = random.choice(CONGRATS_GIFS)
+            gif = random.choice(config.congrats_gifs)
             msg = f"🎉 **Congratulations {ign}, you already hit Class Average 50!** 🎉\n> You don't need this simulation anymore. Go touch some grass! 🌱"
             
             embed = discord.Embed(description=msg, color=0xFFD700)
@@ -533,8 +533,6 @@ class Dungeons(commands.Cog):
         view.message = message
         
         log_info(f"✅ Simulation finished: {ign} → {runs_total:,} total runs")
-
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Dungeons(bot))

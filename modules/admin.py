@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import View, Select, Modal, TextInput, Button
-from core.config import OWNER_IDS, save_config, CONFIG_FILE
+from core.config import config
 from core.logger import log_info, log_error, get_latest_log_file
 from services.api import get_uuid
 from modules.dungeons import DefaultSelectView
@@ -155,7 +155,7 @@ class ConfigEditModal(Modal):
                 converted_val = new_val
                 
             setattr(config, self.key, converted_val)
-            config.save_config()
+            config.save()
             
             await interaction.response.send_message(f"✅ Updated `{self.key}` to `{converted_val}`", ephemeral=True)
             
@@ -170,7 +170,7 @@ class ConfigSelect(Select):
         from core import config
         options = []
         
-        keys = ["TARGET_LEVEL", "DEBUG_MODE", "PROFILE_CACHE_TTL", "PRICES_CACHE_TTL", "OWNER_IDS", "CONGRATS_GIFS"]
+        keys = ["target_level", "debug_mode", "profile_cache_ttl", "prices_cache_ttl", "owner_ids", "congrats_gifs"]
         
         for key in keys:
             value = getattr(config, key, "Unknown")
@@ -190,11 +190,11 @@ class ConfigSelect(Select):
         key = self.values[0]
         from core import config
         
-        if key == "CONGRATS_GIFS":
+        if key == "congrats_gifs":
              await interaction.response.send_message("🎉 **Manage Congratulation GIFs**", view=GifManageView(self.bot), ephemeral=True)
              return
 
-        current_val = getattr(config, key.upper(), "Unknown")
+        current_val = getattr(config, key, "Unknown")
         await interaction.response.send_modal(ConfigEditModal(key, current_val))
 
 class GifManageView(View):
@@ -209,9 +209,9 @@ class GifManageView(View):
     @discord.ui.button(label="Remove Last GIF", style=discord.ButtonStyle.danger, emoji="➖")
     async def remove_gif(self, interaction: discord.Interaction, button: discord.ui.Button):
         from core import config
-        if config.CONGRATS_GIFS:
-            removed = config.CONGRATS_GIFS.pop()
-            config.save_config()
+        if config.congrats_gifs:
+            removed = config.congrats_gifs.pop()
+            config.save()
             await interaction.response.send_message(f"🗑️ Removed last GIF: `{removed}`", ephemeral=True)
         else:
             await interaction.response.send_message("❌ No GIFs to remove.", ephemeral=True)
@@ -219,7 +219,7 @@ class GifManageView(View):
     @discord.ui.button(label="List GIFs", style=discord.ButtonStyle.secondary, emoji="📜")
     async def list_gifs(self, interaction: discord.Interaction, button: discord.ui.Button):
         from core import config
-        gifs = config.CONGRATS_GIFS
+        gifs = config.congrats_gifs
         
         if not gifs:
              await interaction.response.send_message("No GIFs configured.", ephemeral=True)
@@ -247,9 +247,9 @@ class GifAddModal(Modal):
     async def on_submit(self, interaction: discord.Interaction):
         url = self.gif_url.value.strip()
         from core import config
-        if url not in config.CONGRATS_GIFS:
-            config.CONGRATS_GIFS.append(url)
-            config.save_config()
+        if url not in config.congrats_gifs:
+            config.congrats_gifs.append(url)
+            config.save()
             await interaction.response.send_message(f"✅ Added GIF:\n`{url}`", ephemeral=True)
         else:
             await interaction.response.send_message("⚠️ GIF already exists.", ephemeral=True)
@@ -459,7 +459,7 @@ class Admin(commands.Cog):
 
     @app_commands.command(name="admin", description="Owner-only administration panel")
     async def admin(self, interaction: discord.Interaction):
-        if interaction.user.id not in OWNER_IDS:
+        if interaction.user.id not in config.owner_ids:
             await interaction.response.send_message("❌ You do not have permission to access the admin panel.", ephemeral=True)
             return
             

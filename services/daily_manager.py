@@ -5,7 +5,7 @@ import aiofiles
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 from core.logger import log_info, log_error, log_debug
-from core.config import CONGRATS_GIFS
+from core.config import config
 from services.xp_calculations import get_dungeon_level
 from services.api import get_uuid, get_dungeon_xp
 from datetime import timedelta

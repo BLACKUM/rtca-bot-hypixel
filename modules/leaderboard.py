@@ -5,7 +5,7 @@ from discord.ui import View, Modal, TextInput
 import time
 import math
 from datetime import datetime, timedelta, timezone
-from core.config import OWNER_IDS
+from core.config import config
 from core.logger import log_info, log_error
 from services.api import get_uuid, get_dungeon_xp, get_recent_runs
 

@@ -2,7 +2,9 @@ import aiohttp
 import asyncio
 from services import json_utils
 from urllib.parse import quote
-from core.config import PROFILE_CACHE_TTL, PRICES_CACHE_TTL, SKELETON_MASTER_CHESTPLATE_50
+from core.config import config
+from core.game_data import SKELETON_MASTER_CHESTPLATE_50
+
 from core.logger import log_debug, log_error, log_info
 from core.cache import cache_get, cache_set, get_cache_expiry
 from typing import Optional
@@ -70,7 +72,7 @@ async def get_uuid(name: str):
             data = await r.json(loads=json_utils.loads)
             uuid = data["data"]["player"]["raw_id"]
             log_debug(f"UUID fetched: {uuid}")
-            await cache_set(name.lower(), uuid, ttl=PROFILE_CACHE_TTL)
+            await cache_set(name.lower(), uuid, ttl=config.profile_cache_ttl)
             return uuid
     except Exception as e:
          log_error(f"UUID fetch error: {e}")
@@ -102,7 +104,7 @@ async def get_profile_data(uuid: str):
                     log_error(f"Profile request failed ({r.status})")
                 return None
             data = await r.json(loads=json_utils.loads)
-            await cache_set(uuid, data, ttl=PROFILE_CACHE_TTL)
+            await cache_set(uuid, data, ttl=config.profile_cache_ttl)
             return data
     except asyncio.TimeoutError:
         log_error("Profile request timed out (15s)")
@@ -131,7 +133,7 @@ async def get_bazaar_prices():
                     log_error(f"Bazaar request failed ({r.status}): {text[:200]}")
                 except:
                     log_error(f"Bazaar request failed ({r.status})")
-                await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
+                await cache_set("bazaar_prices", {}, ttl=config.prices_cache_ttl)
                 return {}
             data = await r.json(loads=json_utils.loads)
             products = data.get("products", {})
@@ -139,11 +141,11 @@ async def get_bazaar_prices():
                 pid: info["quick_status"]["sellPrice"] 
                 for pid, info in products.items()
             }
-            await cache_set("bazaar_prices", prices, ttl=PRICES_CACHE_TTL)
+            await cache_set("bazaar_prices", prices, ttl=config.prices_cache_ttl)
             return prices
     except Exception as e:
         log_error(f"Failed to fetch Bazaar prices: {e}")
-        await cache_set("bazaar_prices", {}, ttl=PRICES_CACHE_TTL)
+        await cache_set("bazaar_prices", {}, ttl=config.prices_cache_ttl)
         return {}
 
 
@@ -167,14 +169,14 @@ async def get_ah_prices():
                     log_error(f"AH request failed ({r.status}): {text[:200]}")
                 except:
                     log_error(f"AH request failed ({r.status})")
-                await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
+                await cache_set("ah_prices", {}, ttl=config.prices_cache_ttl)
                 return {}
             prices = await r.json(loads=json_utils.loads)
-            await cache_set("ah_prices", prices, ttl=PRICES_CACHE_TTL)
+            await cache_set("ah_prices", prices, ttl=config.prices_cache_ttl)
             return prices
     except Exception as e:
         log_error(f"Failed to fetch AH prices: {e}")
-        await cache_set("ah_prices", {}, ttl=PRICES_CACHE_TTL)
+        await cache_set("ah_prices", {}, ttl=config.prices_cache_ttl)
         return {}
 
 async def get_special_prices():

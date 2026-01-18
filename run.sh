@@ -22,7 +22,6 @@ if [ -z "$TMUX" ]; then
     if [ $? != 0 ]; then
         echo "Creating new tmux session: $SESSION"
         # Create session and run this script inside it
-        # We append '; read' to keep the window open if the script crashes
         tmux new-session -s $SESSION -d "bash '$SCRIPT_PATH'; read -p 'Session ended. Press Enter to close...'"
     fi
 
@@ -30,8 +29,6 @@ if [ -z "$TMUX" ]; then
     tmux attach -t $SESSION
     exit 0
 fi
-
-# --- Main Bot Logic (Inside Tmux) ---
 
 # Check if Python 3 is installed
 if ! command -v python3 &> /dev/null; then

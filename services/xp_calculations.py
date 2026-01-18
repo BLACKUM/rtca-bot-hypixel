@@ -1,5 +1,5 @@
 import math
-from core.config import DUNGEON_XP
+from core.game_data import DUNGEON_XP
 
 
 def get_total_xp_for_level(level: float) -> float:

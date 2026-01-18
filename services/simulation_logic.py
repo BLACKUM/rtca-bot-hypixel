@@ -2,11 +2,13 @@ import time
 import asyncio
 from core.logger import log_info, log_debug
 from services.xp_calculations import get_dungeon_level, get_total_xp_for_level, calculate_dungeon_xp_per_run
-from core.config import TARGET_LEVEL
+from core.config import config
 
 
 def simulate_to_level_all50(dungeon_classes: dict, floor_xp: float, bonuses: dict,
-                            target_level: int = TARGET_LEVEL, max_runs: int = 200000):
+                            target_level: int = None, max_runs: int = 200000):
+    if target_level is None:
+        target_level = config.target_level
     start_time = time.perf_counter()
     log_info("▶ Starting simulation...")
     log_debug(f"Initial XP: {dungeon_classes}")

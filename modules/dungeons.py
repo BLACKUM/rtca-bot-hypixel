@@ -238,7 +238,7 @@ class BonusSelectView(View):
             info = results.get(cls, {"current_level": 0.0, "remaining_xp": 0, "runs_done": 0})
             lvl = info["current_level"]
             runs_for_class = info["runs_done"]
-            rem_text = "✅" if runs_for_class == 0 and lvl >= config.target_level else "❌"
+            rem_text = "\n(✅ reached)" if runs_for_class == 0 and lvl >= config.target_level else "\n(❌ not yet)"
             
             icon = CLASS_ICONS.get(cls, "")
             

@@ -5,7 +5,7 @@ from discord.ui import Select, View
 import time
 import math
 from core.config import config
-from core.game_data import FLOOR_XP_MAP
+from core.game_data import FLOOR_XP_MAP, CLASS_ICONS
 from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_profile_data, get_dungeon_stats
 from services.simulation_logic import simulate_async
@@ -237,12 +237,14 @@ class BonusSelectView(View):
         for cls in ["archer", "berserk", "healer", "mage", "tank"]:
             info = results.get(cls, {"current_level": 0.0, "remaining_xp": 0, "runs_done": 0})
             lvl = info["current_level"]
-            rem = info["remaining_xp"]
             runs_for_class = info["runs_done"]
-            rem_text = "\n(✅ reached)" if runs_for_class == 0 and lvl >= config.target_level else "\n(❌ not yet)"
+            rem_text = "✅" if runs_for_class == 0 and lvl >= config.target_level else "❌"
+            
+            icon = CLASS_ICONS.get(cls, "")
+            
             embed.add_field(
-                name=cls.title(),
-                value=f"Expected Level {lvl:.2f} {rem_text}\n({runs_for_class} runs)",
+                name=f"{icon} {cls.title()}",
+                value=f"Level **{lvl:.2f}** {rem_text}\nRuns: **{runs_for_class}**",
                 inline=True
             )
         
@@ -593,12 +595,18 @@ class Dungeons(commands.Cog):
                 m, s = divmod(seconds, 60)
                 return f"{m}:{s:02d}"
 
-            embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\nClass Avg: **{class_avg:.2f}\nTotal XP: **{format_xp(cata_xp)}**", inline=True)
-            embed.add_field(name="Secrets", value=f"**{secrets:,}**\nSecrets Per Run: **{spr:.2f}**", inline=True)
-            embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**", inline=True)
+            embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\nAvg: **{class_avg:.2f}**", inline=True)
+            embed.add_field(name="Secrets", value=f"**{secrets:,}**\nRatio: **{spr:.2f}**", inline=True)
+            embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**\nTotal XP: **{format_xp(cata_xp)}**", inline=True)
 
             sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)
-            class_text = "".join([f"**{name.capitalize()}**: {format_xp(xp)}\n" for name, xp in sorted_classes])
+            class_lines = []
+            for name, xp in sorted_classes:
+                lower_name = name.lower()
+                icon = CLASS_ICONS.get(lower_name, "")
+                class_lines.append(f"{icon} **{name.capitalize()}**: {format_xp(xp)}")
+            
+            class_text = " • ".join(class_lines)
             embed.add_field(name="Class XP", value=class_text, inline=False)
 
             master_floors = ["M7", "M6", "M5", "M4", "M3", "M2", "M1"]

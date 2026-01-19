@@ -339,3 +339,11 @@ CHEST_COSTS = {
 }
 
 SKELETON_MASTER_CHESTPLATE_50 = "SKELETON_MASTER_CHESTPLATE"
+
+CLASS_ICONS = {
+    "archer": "<:Minecraft_items_bow:1448311754164539462>",
+    "berserk": "<:Minecraft_items_iron_sword:1448310365124563118>",
+    "healer": "<a:SkyBlock_items_potion_of_regener:1462888361294561527>",
+    "mage": "<:Minecraft_items_blaze_rod:1448310353166340248>",
+    "tank": "<:Minecraft_items_leather_chestpla:1462886969355800699>"
+}

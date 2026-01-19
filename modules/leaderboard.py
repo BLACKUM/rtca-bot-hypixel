@@ -6,6 +6,7 @@ import time
 import math
 from datetime import datetime, timedelta, timezone
 from core.config import config
+from core.game_data import CLASS_ICONS
 from core.logger import log_info, log_error
 from services.api import get_uuid, get_dungeon_xp, get_recent_runs
 
@@ -832,14 +833,6 @@ class RecentView(View):
         
         lines = []
         
-        class_emojis = {
-            "Archer": "🏹",
-            "Berserk": "⚔️", 
-            "Healer": "💖",
-            "Mage": "🧙‍♂️",
-            "Tank": "🛡️"
-        }
-        
         for i, (name, d) in enumerate(current_data, start_idx + 1):
              medal = ""
              if i == 1: medal = "🥇 "
@@ -849,7 +842,7 @@ class RecentView(View):
              
              cls = d.get('last_class', 'Unknown')
              lvl = d.get('last_class_level', '?')
-             emoji = class_emojis.get(cls, "❓")
+             emoji = CLASS_ICONS.get(cls.lower(), "❓")
              
              ts = int(d['last_ts'])
              

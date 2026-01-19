@@ -594,7 +594,7 @@ class Dungeons(commands.Cog):
                 return f"{m}:{s:02d}"
 
             embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\nAvg: **{class_avg:.2f}**", inline=True)
-            embed.add_field(name="Secrets", value=f"**{secrets:,}**\nSecrets\Run: **{spr:.2f}**", inline=True)
+            embed.add_field(name="Secrets", value=f"**{secrets:,}**\nSecrets Per Run: **{spr:.2f}**", inline=True)
             embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**\nTotal XP: **{format_xp(cata_xp)}**", inline=True)
 
             sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)

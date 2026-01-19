@@ -594,11 +594,11 @@ class Dungeons(commands.Cog):
                 return f"{m}:{s:02d}"
 
             embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\nAvg: **{class_avg:.2f}**", inline=True)
-            embed.add_field(name="Secrets", value=f"**{secrets:,}**\nRatio: **{spr:.2f}**", inline=True)
+            embed.add_field(name="Secrets", value=f"**{secrets:,}**\nSecrets\Run: **{spr:.2f}**", inline=True)
             embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**\nTotal XP: **{format_xp(cata_xp)}**", inline=True)
 
             sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)
-            class_text = " • ".join([f"**{name.capitalize()}**: {format_xp(xp)}" for name, xp in sorted_classes])
+            class_text = "".join([f"**{name.capitalize()}**: {format_xp(xp)}\n" for name, xp in sorted_classes])
             embed.add_field(name="Class XP", value=class_text, inline=False)
 
             master_floors = ["M7", "M6", "M5", "M4", "M3", "M2", "M1"]

@@ -10,7 +10,7 @@ from core.logger import log_info, log_debug, log_error
 from services.api import get_uuid, get_profile_data, get_dungeon_stats
 from services.simulation_logic import simulate_async
 from services.xp_calculations import calculate_dungeon_xp_per_run, get_dungeon_level
-from services.visualization import generate_dungeon_graph
+from services.visualization import generate_dungeon_graph, generate_rtca_graph
 import datetime
 
 default_bonuses = {
@@ -69,14 +69,16 @@ class ValueSelect(Select):
         
         embed = self.parent_view._create_embed(results, runs_total)
         
+        graph_file = await generate_rtca_graph(self.parent_view.dungeon_classes, results, self.parent_view.ign)
+        
         self.parent_view._reset_view()
         
         try:
-            await interaction.edit_original_response(embed=embed, view=self.parent_view)
+            await interaction.edit_original_response(embed=embed, view=self.parent_view, attachments=[graph_file])
         except Exception as e:
             log_error(f"Failed to edit message: {e}")
             try:
-                await interaction.edit_original_response(embed=embed, view=self.parent_view)
+                await interaction.edit_original_response(embed=embed, view=self.parent_view, attachments=[graph_file])
             except Exception as e2:
                 log_error(f"Failed to edit message with interaction.message: {e2}")
         
@@ -240,14 +242,18 @@ class BonusSelectView(View):
             runs_for_class = info["runs_done"]
             rem_text = "\n(✅ reached)" if runs_for_class == 0 and lvl >= config.target_level else "\n(❌ not yet)"
             
+            current_xp = self.dungeon_classes.get(cls, 0)
+            current_lvl = get_dungeon_level(current_xp)
+            
             icon = CLASS_ICONS.get(cls, "")
             
             embed.add_field(
                 name=f"{icon} {cls.title()}",
-                value=f"Level **{lvl:.2f}** {rem_text}\nRuns: **{runs_for_class}**",
+                value=f"Current: **{current_lvl:.2f}**\nTarget: **{lvl:.2f}** {rem_text}\nRuns: **{runs_for_class:,}**",
                 inline=True
             )
         
+        embed.set_image(url="attachment://rtca_stats.png")
         embed.set_footer(text=f"Total simulated runs: {runs_total:,} • Requested by {self.requester_name}")
         return embed
 
@@ -534,7 +540,9 @@ class Dungeons(commands.Cog):
         
         embed = view._create_embed(results, runs_total)
         
-        message = await interaction.followup.send(embed=embed, view=view)
+        graph_file = await generate_rtca_graph(dungeon_classes, results, ign)
+        
+        message = await interaction.followup.send(embed=embed, view=view, file=graph_file)
         view.message = message
         
         log_info(f"✅ Simulation finished: {ign} → {runs_total:,} total runs")

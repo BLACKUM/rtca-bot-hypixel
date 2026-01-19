@@ -595,9 +595,10 @@ class Dungeons(commands.Cog):
                 m, s = divmod(seconds, 60)
                 return f"{m}:{s:02d}"
 
-            embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}**\nAvg: **{class_avg:.2f}**", inline=True)
-            embed.add_field(name="Secrets", value=f"**{secrets:,}**\nRatio: **{spr:.2f}**", inline=True)
-            embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**\nTotal XP: **{format_xp(cata_xp)}**", inline=True)
+            embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}** • **Class Avg {class_avg:.2f}** • **Total XP {format_xp(cata_xp)}**", inline=False)
+            
+            embed.add_field(name="Secrets", value=f"**{secrets:,}** • **Per Run: {spr:.2f}**", inline=True)
+            embed.add_field(name="Blood Kills", value=f"**{blood_kills:,}**", inline=True)
 
             sorted_classes = sorted(stats["classes"].items(), key=lambda x: x[1], reverse=True)
             class_lines = []
@@ -606,7 +607,7 @@ class Dungeons(commands.Cog):
                 icon = CLASS_ICONS.get(lower_name, "")
                 class_lines.append(f"{icon} **{name.capitalize()}**: {format_xp(xp)}")
             
-            class_text = " • ".join(class_lines)
+            class_text = "\n".join(class_lines)
             embed.add_field(name="Class XP", value=class_text, inline=False)
 
             master_floors = ["M7", "M6", "M5", "M4", "M3", "M2", "M1"]

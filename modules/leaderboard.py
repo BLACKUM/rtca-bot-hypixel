@@ -726,7 +726,7 @@ class RecentView(View):
         self.filtered_data = data
         self.runs_count = runs_count
         self.page = 1
-        self.per_page = 10
+        self.per_page = 8
         
         self.filter_ign = None
         self.filter_class = None

@@ -303,7 +303,15 @@ class DailyView(View):
         self.children[0].disabled = self.mode == "leaderboard" or self.mode == "runs_daily"
         self.children[1].disabled = self.mode == "monthly" or self.mode == "runs_monthly"
         self.children[2].disabled = self.mode == "personal"
-        self.children[3].disabled = is_runs
+        
+        runs_btn = self.children[3]
+        runs_btn.disabled = False
+        if is_runs:
+            runs_btn.label = "Show XP"
+            runs_btn.style = discord.ButtonStyle.secondary
+        else:
+            runs_btn.label = "Runs"
+            runs_btn.style = discord.ButtonStyle.primary
         
         self.children[4].disabled = (not is_lb and not is_runs) or self.page <= 1
         self.children[5].disabled = (not is_lb and not is_runs)
@@ -356,10 +364,15 @@ class DailyView(View):
         await self.update_message(interaction)
 
     async def runs_btn(self, interaction: discord.Interaction):
-        if "monthly" in self.mode:
+        if self.mode == "runs_daily":
+             self.mode = "leaderboard"
+        elif self.mode == "runs_monthly":
+             self.mode = "monthly"
+        elif "monthly" in self.mode:
              self.mode = "runs_monthly"
         else:
              self.mode = "runs_daily"
+             
         self.page = 1
         await self.update_message(interaction)
 

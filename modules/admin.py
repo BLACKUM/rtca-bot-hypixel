@@ -457,6 +457,8 @@ class Admin(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    @app_commands.allowed_installs(guilds=True, users=False)
+    @app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
     @app_commands.command(name="admin", description="Owner-only administration panel")
     async def admin(self, interaction: discord.Interaction):
         if interaction.user.id not in config.owner_ids:

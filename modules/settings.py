@@ -22,6 +22,8 @@ class Settings(commands.Cog):
         await self.bot.daily_manager.register_user(interaction.user.id, ign, uuid)
         await interaction.response.send_message(f"✅ Successfully linked your Discord account to **{ign}**!", ephemeral=True)
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.command(name="unlink", description="Unlink your Discord account from any Hypixel IGN")
     async def unlink(self, interaction: discord.Interaction):
         if await self.bot.link_manager.unlink_user(interaction.user.id):

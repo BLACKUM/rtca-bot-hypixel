@@ -109,6 +109,7 @@ class DailyView(View):
         self.ign = ign
         self.mode = "leaderboard"
         self.floor_id = "master_7"
+        self.current_metric = "xp"
         self.msg = None
         self.page = 1
         self.total_pages = 1
@@ -308,7 +309,7 @@ class DailyView(View):
         runs_btn.disabled = False
         if is_runs:
             runs_btn.label = "Show XP"
-            runs_btn.style = discord.ButtonStyle.secondary
+            runs_btn.style = discord.ButtonStyle.success
         else:
             runs_btn.label = "Runs"
             runs_btn.style = discord.ButtonStyle.primary
@@ -344,7 +345,7 @@ class DailyView(View):
         await interaction.edit_original_response(embed=embed, view=self)
 
     async def today_btn(self, interaction: discord.Interaction):
-        if "runs" in self.mode:
+        if self.current_metric == "runs":
              self.mode = "runs_daily"
         else:
              self.mode = "leaderboard"
@@ -352,7 +353,7 @@ class DailyView(View):
         await self.update_message(interaction)
 
     async def monthly_btn(self, interaction: discord.Interaction):
-        if "runs" in self.mode:
+        if self.current_metric == "runs":
              self.mode = "runs_monthly"
         else:
              self.mode = "monthly"
@@ -364,14 +365,20 @@ class DailyView(View):
         await self.update_message(interaction)
 
     async def runs_btn(self, interaction: discord.Interaction):
-        if self.mode == "runs_daily":
-             self.mode = "leaderboard"
-        elif self.mode == "runs_monthly":
-             self.mode = "monthly"
-        elif "monthly" in self.mode:
-             self.mode = "runs_monthly"
+        is_runs = self.mode in ["runs_daily", "runs_monthly"]
+        
+        if is_runs:
+             self.current_metric = "xp"
+             if "monthly" in self.mode:
+                 self.mode = "monthly"
+             else:
+                 self.mode = "leaderboard"
         else:
-             self.mode = "runs_daily"
+             self.current_metric = "runs"
+             if "monthly" in self.mode:
+                 self.mode = "runs_monthly"
+             else:
+                 self.mode = "runs_daily"
              
         self.page = 1
         await self.update_message(interaction)

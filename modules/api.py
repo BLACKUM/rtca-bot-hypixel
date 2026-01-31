@@ -18,6 +18,27 @@ class API(commands.Cog):
         self.host = os.getenv('API_HOST', '0.0.0.0')
         self.port = int(os.getenv('API_PORT', '8080'))
 
+    async def cog_load(self):
+        self.runner = web.AppRunner(self.app)
+        await self.runner.setup()
+        self.site = web.TCPSite(self.runner, self.host, self.port)
+        await self.site.start()
+        log_info(f"API server started on http://{self.host}:{self.port}")
+
+    async def cog_unload(self):
+        if self.site:
+            await self.site.stop()
+        if self.runner:
+            await self.runner.cleanup()
+        log_info("API server stopped.")
+
+    async def index(self, request):
+        return web.json_response({
+            'status': 'online', 
+            'bot': str(self.bot.user),
+            'version': '1.0.0'
+        })
+
     async def handle_profile(self, request):
         try:
             player = request.query.get('player')

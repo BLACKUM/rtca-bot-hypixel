@@ -600,8 +600,9 @@ class Dungeons(commands.Cog):
             def format_ms(ms):
                 if not ms or ms == 0: return "-"
                 seconds = int(ms / 1000)
+                millis = int(ms % 1000)
                 m, s = divmod(seconds, 60)
-                return f"{m}:{s:02d}"
+                return f"{m}:{s:02d}.{millis:03d}"
 
             embed.add_field(name="Catacombs", value=f"**Level {cata_level:.2f}** \n**Class Avg {class_avg:.2f}** \n**Total XP {format_xp(cata_xp)}**", inline=False)
             

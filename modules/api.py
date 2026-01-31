@@ -48,16 +48,19 @@ class API(commands.Cog):
 
             log_info(f"[API] Received profile request for: {player}")
             
-            from services.api import get_uuid, get_dungeon_stats
+            from services.api import get_uuid, get_dungeon_stats, get_recent_runs
             
             uuid = await get_uuid(player)
             if not uuid:
                 return web.json_response({'error': 'Player not found'}, status=404)
                 
             stats = await get_dungeon_stats(uuid)
+            recent_runs = await get_recent_runs(uuid)
             
             if stats:
-                return web.json_response({'status': 'success', 'player': player, 'data': stats})
+                data = stats
+                data['recent_runs'] = recent_runs if recent_runs else []
+                return web.json_response({'status': 'success', 'player': player, 'data': data})
             else:
                  return web.json_response({'error': 'Could not fetch stats'}, status=502)
 

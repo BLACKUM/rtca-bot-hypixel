@@ -8,6 +8,7 @@ class API(commands.Cog):
         self.bot = bot
         self.app = web.Application()
         self.app.router.add_get('/', self.index)
+        self.app.router.add_get('/v1/profile', self.handle_profile)
         self.app.router.add_post('/v1/rng', self.handle_rng)
         self.app.router.add_post('/v1/daily', self.handle_daily)
         
@@ -17,26 +18,31 @@ class API(commands.Cog):
         self.host = os.getenv('API_HOST', '0.0.0.0')
         self.port = int(os.getenv('API_PORT', '8080'))
 
-    async def cog_load(self):
-        self.runner = web.AppRunner(self.app)
-        await self.runner.setup()
-        self.site = web.TCPSite(self.runner, self.host, self.port)
-        await self.site.start()
-        log_info(f"API server started on http://{self.host}:{self.port}")
+    async def handle_profile(self, request):
+        try:
+            player = request.query.get('player')
+            
+            if not player:
+                 return web.json_response({'error': 'Missing player parameter'}, status=400)
 
-    async def cog_unload(self):
-        if self.site:
-            await self.site.stop()
-        if self.runner:
-            await self.runner.cleanup()
-        log_info("API server stopped.")
+            log_info(f"[API] Received profile request for: {player}")
+            
+            from services.api import get_uuid, get_dungeon_stats
+            
+            uuid = await get_uuid(player)
+            if not uuid:
+                return web.json_response({'error': 'Player not found'}, status=404)
+                
+            stats = await get_dungeon_stats(uuid)
+            
+            if stats:
+                return web.json_response({'status': 'success', 'player': player, 'data': stats})
+            else:
+                 return web.json_response({'error': 'Could not fetch stats'}, status=502)
 
-    async def index(self, request):
-        return web.json_response({
-            'status': 'online', 
-            'bot': str(self.bot.user),
-            'version': '1.0.0'
-        })
+        except Exception as e:
+            log_error(f"[API] Error processing profile request: {e}")
+            return web.json_response({'error': str(e)}, status=500)
 
     async def handle_daily(self, request):
         try:

@@ -631,7 +631,7 @@ class Dungeons(commands.Cog):
                         if runs > 0:
                             s_plus = format_ms(data['fastest_s_plus'])
                             s = format_ms(data['fastest_s'])
-                            lines.append(f"**{f}** • **{runs:,}** runs\n└ S+ **{s_plus}** • S **{s}**")
+                            lines.append(f"**{f}** • **{runs:,}** runs\n└ S+ **{s_plus}**\n└ S **{s}**")
                 return lines
 
             m_lines = build_floor_lines(master_floors)

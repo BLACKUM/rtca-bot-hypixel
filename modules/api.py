@@ -57,9 +57,19 @@ class API(commands.Cog):
             stats = await get_dungeon_stats(uuid)
             recent_runs = await get_recent_runs(uuid)
             
+            teammates = self.bot.recent_manager.get_teammates(uuid)
+            
+            daily_stats = None
+            user_id = self.bot.daily_manager.get_user_id_by_ign(player)
+            if user_id:
+                daily_stats = self.bot.daily_manager.get_daily_stats(user_id)
+
             if stats:
                 data = stats
                 data['recent_runs'] = recent_runs if recent_runs else []
+                data['teammates'] = teammates if teammates else []
+                data['daily_stats'] = daily_stats if daily_stats else {}
+                
                 return web.json_response({'status': 'success', 'player': player, 'data': data})
             else:
                  return web.json_response({'error': 'Could not fetch stats'}, status=502)

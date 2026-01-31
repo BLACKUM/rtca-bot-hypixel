@@ -64,7 +64,8 @@ async def load_extensions():
         "modules.leaderboard",
         "modules.settings",
         "modules.error_handler",
-        "modules.admin"
+        "modules.admin",
+        "modules.api"
     ]
     for ext in extensions:
         try:

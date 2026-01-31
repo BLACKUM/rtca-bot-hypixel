@@ -149,6 +149,12 @@ class DailyManager:
     def get_tracked_users(self) -> List[Tuple[str, str]]:
         return [(uid, info["uuid"]) for uid, info in self.data["users"].items()]
 
+    def get_user_id_by_ign(self, ign: str) -> Optional[str]:
+        for user_id, info in self.data["users"].items():
+            if info["ign"].lower() == ign.lower():
+                return user_id
+        return None
+
     async def update_user_data(self, user_id: str, xp_data: dict, save: bool = True):
         user_id = str(user_id)
         now = int(time.time())

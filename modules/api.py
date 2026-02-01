@@ -199,6 +199,10 @@ class API(commands.Cog):
                 "class_boosts": class_boosts
             }
 
+            log_info(f"Simulating for {player} on {floor_name}")
+            log_info(f"Dungeon Classes: {dungeon_classes}")
+            log_info(f"Bonuses: {bonuses}")
+            
             runs_total, results = await simulate_async(dungeon_classes, base_floor, bonuses)
             
             return web.json_response({

@@ -83,12 +83,11 @@ def simulate_to_level_all50(dungeon_classes: dict, floor_xp: float, bonuses: dic
     results = {}
     for c, xp in classes.items():
         lvl = get_dungeon_level(xp)
-        xp_for_target = get_total_xp_for_level(target_level)
-        actual_remaining = classxpsleft.get(c, 0)
-        remaining = max(0, actual_remaining)
+        initial_remaining = max(0, get_total_xp_for_level(target_level) - dungeon_classes.get(c, 0))
+        
         results[c] = {
             "current_level": lvl,
-            "remaining_xp": int(remaining),
+            "remaining_xp": int(initial_remaining),
             "runs_done": runs_done.get(c, 0)
         }
 

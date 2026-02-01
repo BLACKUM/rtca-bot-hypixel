@@ -10,7 +10,6 @@ class API(commands.Cog):
         self.app.router.add_get('/', self.index)
         self.app.router.add_get('/v1/profile', self.handle_profile)
         self.app.router.add_post('/v1/rng', self.handle_rng)
-        self.app.router.add_post('/v1/rng', self.handle_rng)
         self.app.router.add_post('/v1/daily', self.handle_daily)
         self.app.router.add_post('/v1/rtca', self.handle_rtca)
         

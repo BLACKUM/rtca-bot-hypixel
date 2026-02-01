@@ -178,13 +178,24 @@ class API(commands.Cog):
 
             base_floor = FLOOR_XP_MAP.get(floor_name.upper(), config.xp_per_run_default)
             
+            request_bonuses = data.get('bonuses', {})
+            
+            def get_bonus(key, default):
+                val = request_bonuses.get(key)
+                if val is not None:
+                    try:
+                        return float(val)
+                    except:
+                        pass
+                return default
+
             bonuses = {
-                "ring": default_bonuses["ring"],
-                "hecatomb": default_bonuses["hecatomb"],
-                "scarf_accessory": default_bonuses["scarf_accessory"],
-                "scarf_attribute": default_bonuses["scarf_attribute"],
-                "global": default_bonuses["global"],
-                "mayor": default_bonuses["mayor"],
+                "ring": get_bonus("ring", default_bonuses["ring"]),
+                "hecatomb": get_bonus("hecatomb", default_bonuses["hecatomb"]),
+                "scarf_accessory": get_bonus("scarf_accessory", default_bonuses["scarf_accessory"]),
+                "scarf_attribute": get_bonus("scarf_attribute", default_bonuses["scarf_attribute"]),
+                "global": get_bonus("global", default_bonuses["global"]),
+                "mayor": get_bonus("mayor", default_bonuses["mayor"]),
                 "class_boosts": class_boosts
             }
 

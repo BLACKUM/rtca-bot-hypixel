@@ -10,7 +10,9 @@ class API(commands.Cog):
         self.app.router.add_get('/', self.index)
         self.app.router.add_get('/v1/profile', self.handle_profile)
         self.app.router.add_post('/v1/rng', self.handle_rng)
+        self.app.router.add_post('/v1/rng', self.handle_rng)
         self.app.router.add_post('/v1/daily', self.handle_daily)
+        self.app.router.add_post('/v1/rtca', self.handle_rtca)
         
         self.runner = None
         self.site = None
@@ -119,6 +121,88 @@ class API(commands.Cog):
             return web.json_response({'status': 'received', 'processed': True})
         except Exception as e:
             log_error(f"[API] Error processing RNG drop: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_rtca(self, request):
+        try:
+            data = await request.json()
+            player = data.get('player')
+            floor_name = data.get('floor', 'M7')
+            
+            if not player:
+                 return web.json_response({'error': 'Missing player field'}, status=400)
+
+            log_info(f"[API] Received RTCA simulation request for: {player} ({floor_name})")
+            
+            from services.api import get_uuid, get_profile_data
+            from core.game_data import FLOOR_XP_MAP
+            from core.config import config
+            from modules.dungeons import default_bonuses
+            from services.xp_calculations import calculate_dungeon_xp_per_run
+            from services.simulation_logic import simulate_async
+            
+            uuid = await get_uuid(player)
+            if not uuid:
+                return web.json_response({'error': 'Player not found'}, status=404)
+
+            profile_data = await get_profile_data(uuid)
+            if not profile_data:
+                return web.json_response({'error': 'Profile data not found'}, status=404)
+            
+            profiles = profile_data.get("profiles")
+            if not profiles:
+                return web.json_response({'error': 'No profiles found'}, status=404)
+
+            best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
+            member = best_profile.get("members", {}).get(uuid, {})
+            dungeons = member.get("dungeons", {})
+            player_classes = dungeons.get("player_classes", {})
+
+            dungeon_classes = {
+                cls: data["experience"]
+                for cls, data in player_classes.items()
+                if cls in ["archer", "berserk", "healer", "mage", "tank"]
+            }
+
+            if not dungeon_classes:
+                 return web.json_response({'error': 'No dungeon classes found'}, status=404)
+
+            player_data = member.get("player_data", {})
+            perks = player_data.get("perks", {})
+            class_boosts = {
+                "archer": perks.get("toxophilite", 0) * 0.02,
+                "berserk": perks.get("unbridled_rage", 0) * 0.02,
+                "healer": perks.get("heart_of_gold", 0) * 0.02,
+                "mage": perks.get("cold_efficiency", 0) * 0.02,
+                "tank": perks.get("diamond_in_the_rough", 0) * 0.02,
+            }
+
+            base_floor = FLOOR_XP_MAP.get(floor_name.upper(), config.xp_per_run_default)
+            
+            bonuses = {
+                "ring": default_bonuses["ring"],
+                "hecatomb": default_bonuses["hecatomb"],
+                "scarf_accessory": default_bonuses["scarf_accessory"],
+                "scarf_attribute": default_bonuses["scarf_attribute"],
+                "global": default_bonuses["global"],
+                "mayor": default_bonuses["mayor"],
+                "class_boosts": class_boosts
+            }
+
+            runs_total, results = await simulate_async(dungeon_classes, base_floor, bonuses)
+            
+            return web.json_response({
+                'status': 'success', 
+                'player': player, 
+                'total_runs': runs_total,
+                'results': results,
+                'bonuses': bonuses
+            })
+
+        except Exception as e:
+            log_error(f"[API] Error processing RTCA request: {e}")
+            import traceback
+            traceback.print_exc()
             return web.json_response({'error': str(e)}, status=500)
 
 async def setup(bot):

@@ -225,15 +225,25 @@ class API(commands.Cog):
             period = request.query.get('period', 'daily')
             metric = request.query.get('metric', 'xp')
             limit = int(request.query.get('limit', '10'))
+            page = int(request.query.get('page', '1'))
             
-            log_info(f"[API] Received leaderboard request: period={period}, metric={metric}, limit={limit}")
+            log_info(f"[API] Received leaderboard request: period={period}, metric={metric}, limit={limit}, page={page}")
             
             data = self.bot.daily_manager.get_leaderboard(period, metric)
             
             if data is None:
                  return web.json_response({'error': 'Failed to fetch leaderboard'}, status=500)
-                 
-            limited_data = data[:limit]
+            
+            total_entries = len(data)
+            total_pages = (total_entries + limit - 1)
+            
+            if page < 1: page = 1
+            if page > total_pages and total_pages > 0: page = total_pages
+            
+            start = (page - 1) * limit
+            end = start + limit
+            
+            limited_data = data[start:end]
             
             last_updated = self.bot.daily_manager.get_last_updated()
             
@@ -241,6 +251,8 @@ class API(commands.Cog):
                 'status': 'success',
                 'period': period,
                 'metric': metric,
+                'page': page,
+                'total_pages': total_pages,
                 'last_updated': last_updated,
                 'data': limited_data
             })

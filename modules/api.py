@@ -9,7 +9,8 @@ class API(commands.Cog):
         self.app = web.Application()
         self.app.router.add_get('/', self.index)
         self.app.router.add_get('/v1/profile', self.handle_profile)
-        self.app.router.add_post('/v1/rng', self.handle_rng)
+        self.app.router.add_get('/v1/rng', self.handle_rng_get)
+        self.app.router.add_post('/v1/rng', self.handle_rng_post)
         self.app.router.add_post('/v1/daily', self.handle_daily)
         self.app.router.add_post('/v1/rtca', self.handle_rtca)
         self.app.router.add_get('/v1/leaderboard', self.handle_leaderboard)
@@ -117,17 +118,85 @@ class API(commands.Cog):
             log_error(f"[API] Error processing daily update: {e}")
             return web.json_response({'error': str(e)}, status=500)
 
-    async def handle_rng(self, request):
+    async def handle_rng_get(self, request):
+        try:
+            player = request.query.get('player')
+            
+            if not player:
+                return web.json_response({'error': 'Missing player parameter'}, status=400)
+
+            log_info(f"[API] Received RNG data request for: {player}")
+            
+            from services.api import get_uuid, get_all_prices, get_dungeon_runs
+            from core.game_data import RNG_CATEGORIES, RNG_DROPS, DROP_IDS, CHEST_COSTS, GLOBAL_DROPS
+            
+            uuid = await get_uuid(player)
+            if not uuid:
+                return web.json_response({'error': 'Player not found'}, status=404)
+            
+            user_id = self.bot.link_manager.get_user_id(player)
+            if not user_id:
+                user_id = uuid
+            
+            user_stats = self.bot.rng_manager.get_user_stats(str(user_id))
+            prices = await get_all_prices()
+            run_counts = await get_dungeon_runs(uuid)
+            
+            return web.json_response({
+                'status': 'success',
+                'player': player,
+                'data': {
+                    'drops': user_stats,
+                    'prices': prices,
+                    'run_counts': run_counts,
+                    'categories': RNG_CATEGORIES,
+                    'items': RNG_DROPS,
+                    'item_ids': DROP_IDS,
+                    'chest_costs': CHEST_COSTS,
+                    'global_drops': GLOBAL_DROPS
+                }
+            })
+
+        except Exception as e:
+            log_error(f"[API] Error processing RNG GET request: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_rng_post(self, request):
         try:
             data = await request.json()
-            if not data.get('item') or not data.get('player'):
-                 return web.json_response({'error': 'Missing fields'}, status=400)
+            player = data.get('player')
+            action = data.get('action')
+            category = data.get('category')
+            item = data.get('item')
+            
+            if not player or not action or not category or not item:
+                return web.json_response({'error': 'Missing required fields'}, status=400)
 
-            log_info(f"[API] Received RNG drop: {data}")
+            log_info(f"[API] Received RNG update: {data}")
+            
+            from services.api import get_uuid
+            
+            uuid = await get_uuid(player)
+            if not uuid:
+                return web.json_response({'error': 'Player not found'}, status=404)
+            
+            user_id = self.bot.link_manager.get_user_id(player)
+            if not user_id:
+                user_id = uuid
+            
+            if action == 'increment':
+                new_count = await self.bot.rng_manager.update_drop(str(user_id), category, item, 1)
+            elif action == 'decrement':
+                new_count = await self.bot.rng_manager.update_drop(str(user_id), category, item, -1)
+            elif action == 'set':
+                count = data.get('count', 0)
+                new_count = await self.bot.rng_manager.set_drop_count(str(user_id), category, item, count)
+            else:
+                return web.json_response({'error': 'Invalid action'}, status=400)
 
-            return web.json_response({'status': 'received', 'processed': True})
+            return web.json_response({'status': 'success', 'item': item, 'count': new_count})
         except Exception as e:
-            log_error(f"[API] Error processing RNG drop: {e}")
+            log_error(f"[API] Error processing RNG POST: {e}")
             return web.json_response({'error': str(e)}, status=500)
 
     async def handle_rtca(self, request):

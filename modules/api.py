@@ -235,7 +235,21 @@ class API(commands.Cog):
                  return web.json_response({'error': 'Failed to fetch leaderboard'}, status=500)
             
             total_entries = len(data)
-            total_pages = (total_entries + limit - 1)
+            total_pages = (total_entries + limit - 1) // limit
+
+            find_player = request.query.get('find_player')
+            if find_player:
+                find_player = find_player.lower()
+                found_index = -1
+                for i, entry in enumerate(data):
+                    if entry['ign'].lower() == find_player:
+                        found_index = i
+                        break
+                
+                if found_index != -1:
+                    page = (found_index // limit) + 1
+                else:
+                    return web.json_response({'error': 'Player not found on leaderboard'}, status=404)
             
             if page < 1: page = 1
             if page > total_pages and total_pages > 0: page = total_pages

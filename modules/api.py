@@ -12,6 +12,7 @@ class API(commands.Cog):
         self.app.router.add_post('/v1/rng', self.handle_rng)
         self.app.router.add_post('/v1/daily', self.handle_daily)
         self.app.router.add_post('/v1/rtca', self.handle_rtca)
+        self.app.router.add_get('/v1/leaderboard', self.handle_leaderboard)
         
         self.runner = None
         self.site = None
@@ -217,6 +218,35 @@ class API(commands.Cog):
             log_error(f"[API] Error processing RTCA request: {e}")
             import traceback
             traceback.print_exc()
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_leaderboard(self, request):
+        try:
+            period = request.query.get('period', 'daily')
+            metric = request.query.get('metric', 'xp')
+            limit = int(request.query.get('limit', '10'))
+            
+            log_info(f"[API] Received leaderboard request: period={period}, metric={metric}, limit={limit}")
+            
+            data = self.bot.daily_manager.get_leaderboard(period, metric)
+            
+            if data is None:
+                 return web.json_response({'error': 'Failed to fetch leaderboard'}, status=500)
+                 
+            limited_data = data[:limit]
+            
+            last_updated = self.bot.daily_manager.get_last_updated()
+            
+            return web.json_response({
+                'status': 'success',
+                'period': period,
+                'metric': metric,
+                'last_updated': last_updated,
+                'data': limited_data
+            })
+
+        except Exception as e:
+            log_error(f"[API] Error processing leaderboard request: {e}")
             return web.json_response({'error': str(e)}, status=500)
 
 async def setup(bot):

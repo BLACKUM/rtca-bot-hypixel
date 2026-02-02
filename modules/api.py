@@ -70,7 +70,14 @@ class API(commands.Cog):
                 data = stats
                 data['recent_runs'] = recent_runs if recent_runs else []
                 data['teammates'] = teammates if teammates else []
-                data['daily_stats'] = daily_stats if daily_stats else {}
+                daily_stats = daily_stats if daily_stats else {}
+                
+                monthly_stats = None
+                if user_id:
+                    monthly_stats = self.bot.daily_manager.get_monthly_stats(user_id)
+                
+                data['daily_stats'] = daily_stats
+                data['monthly_stats'] = monthly_stats if monthly_stats else {}
                 
                 return web.json_response({'status': 'success', 'player': player, 'data': data})
             else:

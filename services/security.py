@@ -46,7 +46,8 @@ def verify_identity(encrypted_identity, claimed_uuid):
         if len(parts) < 3:
             return False
             
-        decrypted_uuid = parts[0]
+        decrypted_uuid = parts[0].replace('-', '')
+        claimed_uuid = claimed_uuid.replace('-', '')
         
         return decrypted_uuid == claimed_uuid
     except:

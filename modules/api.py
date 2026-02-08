@@ -14,6 +14,7 @@ class API(commands.Cog):
         self.app.router.add_post('/v1/daily', self.handle_daily)
         self.app.router.add_post('/v1/rtca', self.handle_rtca)
         self.app.router.add_get('/v1/leaderboard', self.handle_leaderboard)
+        self.app.router.add_get('/v1/key', self.handle_key)
         
         self.runner = None
         self.site = None
@@ -34,6 +35,13 @@ class API(commands.Cog):
         if self.runner:
             await self.runner.cleanup()
         log_info("API server stopped.")
+
+    async def handle_key(self, request):
+        from services.security import get_current_key_string
+        return web.json_response({
+            'status': 'success',
+            'key': get_current_key_string()
+        })
 
     async def index(self, request):
         return web.json_response({
@@ -180,10 +188,21 @@ class API(commands.Cog):
             if not uuid:
                 return web.json_response({'error': 'Player not found'}, status=404)
             
-            user_id = self.bot.daily_manager.get_user_id_by_ign(player)
             if not user_id:
                 user_id = uuid
             
+            dev_key = request.headers.get('X-Developer-Key', '')
+            encrypted_id = request.headers.get('X-Encrypted-Identity', '')
+            
+            from services.security import check_developer_key, verify_identity
+            
+            is_dev = check_developer_key(dev_key)
+            is_verified_owner = verify_identity(encrypted_id, str(uuid))
+            
+            if not is_dev and not is_verified_owner:
+                log_error(f"[API] Security check failed for {player} (UUID: {uuid})")
+                return web.json_response({'error': 'Unauthorized: Invalid identity or key'}, status=403)
+
             if action == 'increment':
                 new_count = await self.bot.rng_manager.update_drop(str(user_id), category, item, 1)
             elif action == 'decrement':

@@ -188,6 +188,7 @@ class API(commands.Cog):
             if not uuid:
                 return web.json_response({'error': 'Player not found'}, status=404)
             
+            user_id = self.bot.daily_manager.get_user_id_by_ign(player)
             if not user_id:
                 user_id = uuid
             

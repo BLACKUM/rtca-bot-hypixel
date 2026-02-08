@@ -255,7 +255,7 @@ class API(commands.Cog):
             player_classes = dungeons.get("player_classes", {})
 
             dungeon_classes = {
-                cls: data["experience"]
+                cls: data.get("experience", 0)
                 for cls, data in player_classes.items()
                 if cls in ["archer", "berserk", "healer", "mage", "tank"]
             }

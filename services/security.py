@@ -4,7 +4,7 @@ from cryptography.hazmat.primitives import padding
 import base64
 import hashlib
 
-from core.secrets import SECRET_KEY, DEVELOPER_KEY
+from core.secrets import DEVELOPER_KEY
 from core.logger import log_error, log_info
 
 import os

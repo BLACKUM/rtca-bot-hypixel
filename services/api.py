@@ -391,7 +391,6 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
         best_score = tier_data.get("best_score", {})
         
         for tier in runs.keys():
-            if tier == "total": continue
             
             if tier == "0": floor_name = "Entrance" if prefix == "F" else "M0"
             else: floor_name = f"{prefix}{tier}"

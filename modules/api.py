@@ -52,12 +52,9 @@ class API(commands.Cog):
 
     async def handle_profile(self, request):
         try:
-            player = request.query.get('player')
+            profile_name = request.query.get('profile')
             
-            if not player:
-                 return web.json_response({'error': 'Missing player parameter'}, status=400)
-
-            log_info(f"[API] Received profile request for: {player}")
+            log_info(f"[API] Received profile request for: {player} (Profile: {profile_name})")
             
             from services.api import get_uuid, get_dungeon_stats, get_recent_runs
             
@@ -65,7 +62,7 @@ class API(commands.Cog):
             if not uuid:
                 return web.json_response({'error': 'Player not found'}, status=404)
                 
-            stats = await get_dungeon_stats(uuid)
+            stats = await get_dungeon_stats(uuid, profile_name=profile_name)
             recent_runs = await get_recent_runs(uuid)
             
             teammates = self.bot.recent_manager.get_teammates(uuid)

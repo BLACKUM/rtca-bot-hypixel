@@ -8,26 +8,34 @@ from typing import List, Optional
 
 
 class ProfileSelect(discord.ui.Select):
-    def __init__(self, profiles: List[dict], current_profile: Optional[str]):
+    def __init__(self, profiles: List[dict], current_profile: Optional[str], tracked_profile: Optional[str]):
         options = []
         current_lower = current_profile.lower() if current_profile else None
+        tracked_lower = tracked_profile.lower() if tracked_profile else None
         
         for p in profiles:
             name = p.get("cute_name", "Unknown")
-            is_bot_current = current_lower == name.lower() if current_lower else False
+            is_viewing = current_lower == name.lower() if current_lower else False
+            is_tracked = tracked_lower == name.lower() if tracked_lower else False
             is_game_selected = p.get("selected", False)
             
-            label = f"{name} (Selected)" if is_game_selected else name
+            label = f"{name}"
+            if is_game_selected:
+                label += " (Selected)"
+            
+            desc = []
+            if is_tracked:
+                desc.append("Currently Tracking")
             
             options.append(discord.SelectOption(
                 label=label,
                 value=name,
-                description="Currently tracking" if is_bot_current else None,
-                default=is_bot_current
+                description=" • ".join(desc) if desc else None,
+                default=is_viewing
             ))
 
         super().__init__(
-            placeholder=f"Selected: {current_profile}" if current_profile else "Select a profile to track (Required)",
+            placeholder=f"Viewing: {current_profile}" if current_profile else "Select a profile to view",
             min_values=1,
             max_values=1,
             options=options
@@ -37,26 +45,67 @@ class ProfileSelect(discord.ui.Select):
         view: 'ProfileSelectView' = self.view
         selected = self.values[0]
 
-        await view.bot.daily_manager.set_user_profile(interaction.user.id, selected)
         view.selected_profile = selected
-        new_select = ProfileSelect(view.profile_data.get("profiles", []), selected)
-        view.clear_items()
-        view.add_item(new_select)
-
+        view.update_view()
+        
         embed = view.create_embed(selected)
         await interaction.response.edit_message(embed=embed, view=view)
 
 
+class TrackProfileButton(discord.ui.Button):
+    def __init__(self, profile_name: str):
+        super().__init__(label=f"Track '{profile_name}'", style=discord.ButtonStyle.success, custom_id="track_profile")
+        self.profile_name = profile_name
+
+    async def callback(self, interaction: discord.Interaction):
+        view: 'ProfileSelectView' = self.view
+        
+        viewer_ign = view.bot.link_manager.get_link(interaction.user.id)
+        if not viewer_ign:
+             await interaction.response.send_message("❌ You must link your account to track profiles.", ephemeral=True)
+             return
+             
+        viewer_uuid = await get_uuid(viewer_ign)
+        
+        if viewer_uuid != view.uuid:
+             await interaction.response.send_message("❌ You can only track your own profiles.", ephemeral=True)
+             return
+
+        await view.bot.daily_manager.set_user_profile(interaction.user.id, self.profile_name)
+        
+        await interaction.response.send_message(f"✅ Now tracking profile **{self.profile_name}** for leaderboards and daily stats!", ephemeral=True)
+        
+        view.forced_profile = self.profile_name
+        view.update_view()
+        embed = view.create_embed(view.selected_profile)
+        await interaction.edit_original_response(embed=embed, view=view)
+
+
 class ProfileSelectView(discord.ui.View):
-    def __init__(self, bot: commands.Bot, uuid: str, ign: str, profile_data: dict, selected_profile: Optional[str]):
+    def __init__(self, bot: commands.Bot, uuid: str, ign: str, profile_data: dict, forced_profile: Optional[str], selected_profile: Optional[str] = None):
         super().__init__(timeout=300)
         self.bot = bot
         self.uuid = uuid
         self.ign = ign
         self.profile_data = profile_data
-        self.selected_profile = selected_profile
+        self.forced_profile = forced_profile
+        self.selected_profile = selected_profile or forced_profile
+        
+        if not self.selected_profile:
+             self.selected_profile = next((p.get("cute_name") for p in profile_data.get("profiles", []) if p.get("selected")), None)
+             if not self.selected_profile and profile_data.get("profiles"):
+                 self.selected_profile = profile_data.get("profiles")[0].get("cute_name")
 
-        self.add_item(ProfileSelect(profile_data.get("profiles", []), selected_profile))
+        self.update_view()
+
+    def update_view(self):
+        self.clear_items()
+        
+        self.add_item(ProfileSelect(self.profile_data.get("profiles", []), self.selected_profile, self.forced_profile))
+        
+        if self.selected_profile and self.selected_profile != self.forced_profile:
+            self.add_item(TrackProfileButton(self.selected_profile))
+
 
     def create_embed(self, selected_profile_name: Optional[str]) -> discord.Embed:
         profiles = self.profile_data.get("profiles", [])
@@ -93,12 +142,17 @@ class ProfileSelectView(discord.ui.View):
         
         embed.description = "\n".join(description)
         
-        if selected_profile_name:
-            footer = f"Tracking: **{selected_profile_name}**"
-            footer += "\n\nNote: Selecting a profile is required for leaderboard tracking."
-            embed.set_footer(text=footer)
-        else:
-            embed.set_footer(text="⚠️ Selecting a profile is required for leaderboard tracking.")
+        items_footer = []
+        if self.forced_profile:
+            items_footer.append(f"Currently tracking: {self.forced_profile}")
+        
+        if self.forced_profile != cute_name:
+             items_footer.append(f"Viewing: {cute_name}")
+             
+        if not self.forced_profile:
+            items_footer.append("⚠️ No profile selected for tracking.")
+            
+        embed.set_footer(text=" • ".join(items_footer))
             
         return embed
 
@@ -173,34 +227,41 @@ class Settings(commands.Cog):
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.command(name="profile", description="View profile stats and select which profile to track")
-    async def profile(self, interaction: discord.Interaction):
-        ign = self.bot.link_manager.get_link(interaction.user.id)
-        if not ign:
-            await interaction.response.send_message("❌ You must link your account first using `/link`!", ephemeral=True)
-            return
-
-        await interaction.response.defer(ephemeral=True)
+    @app_commands.describe(ign="Minecraft IGN (optional if linked)")
+    async def profile(self, interaction: discord.Interaction, ign: str = None):
+        if ign is None:
+            ign = self.bot.link_manager.get_link(interaction.user.id)
+            if not ign:
+                await interaction.response.send_message("❌ You must link your account first using `/link` or provide an IGN!", ephemeral=True)
+                return
+        
+        await interaction.response.defer(ephemeral=False)
         
         uuid = await get_uuid(ign)
         if not uuid:
-            await interaction.followup.send("❌ Could not find your UUID.")
+            await interaction.followup.send(f"❌ Could not find UUID for {ign}.")
             return
 
         data = await get_profile_data(uuid)
         if not data or "profiles" not in data:
-            await interaction.followup.send("❌ Failed to fetch SkyBlock data.")
+            await interaction.followup.send(f"❌ Failed to fetch SkyBlock data for {ign}.")
             return
 
-        forced_profile = self.bot.daily_manager.data["users"].get(str(interaction.user.id), {}).get("forced_profile")
+        viewer_ign = self.bot.link_manager.get_link(interaction.user.id)
+        viewer_uuid = await get_uuid(viewer_ign) if viewer_ign else None
         
-        if not forced_profile:
-            selected_in_game = next((p.get("cute_name") for p in data.get("profiles", []) if p.get("selected")), None)
-            if selected_in_game:
-                await self.bot.daily_manager.set_user_profile(interaction.user.id, selected_in_game)
-                forced_profile = selected_in_game
+        forced_profile = None
+        if viewer_uuid == uuid:
+             forced_profile = self.bot.daily_manager.data["users"].get(str(interaction.user.id), {}).get("forced_profile")
+        
+             if not forced_profile:
+                selected_in_game = next((p.get("cute_name") for p in data.get("profiles", []) if p.get("selected")), None)
+                if selected_in_game:
+                    await self.bot.daily_manager.set_user_profile(interaction.user.id, selected_in_game)
+                    forced_profile = selected_in_game
         
         view = ProfileSelectView(self.bot, uuid, ign, data, forced_profile)
-        embed = view.create_embed(forced_profile)
+        embed = view.create_embed(view.selected_profile)
         
         await interaction.followup.send(embed=embed, view=view)
 

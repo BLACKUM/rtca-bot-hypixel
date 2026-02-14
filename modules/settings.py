@@ -118,6 +118,13 @@ class Settings(commands.Cog):
 
         await self.bot.link_manager.link_user(interaction.user.id, ign)
         await self.bot.daily_manager.register_user(interaction.user.id, ign, uuid)
+        
+        data = await get_profile_data(uuid)
+        if data and "profiles" in data:
+            selected_in_game = next((p.get("cute_name") for p in data.get("profiles", []) if p.get("selected")), None)
+            if selected_in_game:
+                await self.bot.daily_manager.set_user_profile(interaction.user.id, selected_in_game)
+
         await interaction.response.send_message(f"✅ Successfully linked your Discord account to **{ign}**!", ephemeral=True)
 
     @app_commands.allowed_installs(guilds=True, users=True)
@@ -151,6 +158,12 @@ class Settings(commands.Cog):
             return
 
         forced_profile = self.bot.daily_manager.data["users"].get(str(interaction.user.id), {}).get("forced_profile")
+        
+        if not forced_profile:
+            selected_in_game = next((p.get("cute_name") for p in data.get("profiles", []) if p.get("selected")), None)
+            if selected_in_game:
+                await self.bot.daily_manager.set_user_profile(interaction.user.id, selected_in_game)
+                forced_profile = selected_in_game
         
         view = ProfileSelectView(self.bot, uuid, ign, data, forced_profile)
         embed = view.create_embed(forced_profile)

@@ -53,6 +53,7 @@ class API(commands.Cog):
     async def handle_profile(self, request):
         try:
             profile_name = request.query.get('profile')
+            player = request.query.get('player')
             
             log_info(f"[API] Received profile request for: {player} (Profile: {profile_name})")
             

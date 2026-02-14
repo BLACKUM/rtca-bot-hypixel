@@ -13,13 +13,16 @@ class ProfileSelect(discord.ui.Select):
         
         for p in profiles:
             name = p.get("cute_name", "Unknown")
-            is_current = current_lower == name.lower() if current_lower else False
+            is_bot_current = current_lower == name.lower() if current_lower else False
+            is_game_selected = p.get("selected", False)
+            
+            label = f"{name} (Selected)" if is_game_selected else name
             
             options.append(discord.SelectOption(
-                label=name,
+                label=label,
                 value=name,
-                description="Currently tracking" if is_current else None,
-                default=is_current
+                description="Currently tracking" if is_bot_current else None,
+                default=is_bot_current
             ))
 
         super().__init__(

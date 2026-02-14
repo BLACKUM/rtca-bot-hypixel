@@ -61,19 +61,32 @@ class API(commands.Cog):
             uuid = await get_uuid(player)
             if not uuid:
                 return web.json_response({'error': 'Player not found'}, status=404)
-            
             profile_data = await get_profile_data(uuid)
             profiles_list = []
+            
+            target_found = False
+            if profile_name and profile_data and "profiles" in profile_data:
+                for p in profile_data["profiles"]:
+                    if p.get("cute_name", "").lower() == profile_name.lower():
+                        target_found = True
+                        break
+
             if profile_data and "profiles" in profile_data:
                 for p in profile_data["profiles"]:
+                    is_selected = p.get("selected", False)
+                    name = p.get("cute_name")
+                    
+                    if target_found:
+                        is_selected = (name.lower() == profile_name.lower())
+
                     profiles_list.append({
-                        "name": p.get("cute_name"),
+                        "name": name,
                         "id": p.get("profile_id"),
-                        "selected": p.get("selected", False)
+                        "selected": is_selected
                     })
 
             stats = await get_dungeon_stats(uuid, profile_name=profile_name)
-            recent_runs = await get_recent_runs(uuid)
+            recent_runs = await get_recent_runs(uuid, profile_name=profile_name)
             
             teammates = self.bot.recent_manager.get_teammates(uuid)
             

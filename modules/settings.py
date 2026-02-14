@@ -9,9 +9,12 @@ from typing import List, Optional
 class ProfileSelect(discord.ui.Select):
     def __init__(self, profiles: List[dict], current_profile: Optional[str]):
         options = []
+        current_lower = current_profile.lower() if current_profile else None
+        
         for p in profiles:
             name = p.get("cute_name", "Unknown")
-            is_current = name == current_profile
+            is_current = current_lower == name.lower() if current_lower else False
+            
             options.append(discord.SelectOption(
                 label=name,
                 value=name,
@@ -20,7 +23,7 @@ class ProfileSelect(discord.ui.Select):
             ))
 
         super().__init__(
-            placeholder=f"Currently tracking: {current_profile}" if current_profile else "Select a profile to track...",
+            placeholder=f"Selected: {current_profile}" if current_profile else "Select a profile to track (Required)",
             min_values=1,
             max_values=1,
             options=options
@@ -73,7 +76,6 @@ class ProfileSelectView(discord.ui.View):
         embed = discord.Embed(title=title, color=discord.Color.blue())
         
         description = [
-            f"Skill Average\n**{stats['skill_avg']:.2f}**",
             f"Catacombs\n**{stats['catacombs']:.2f}**",
             f"Most Played Class\n**{stats['class_name']} ({stats['class_level']:.1f})**",
             f"Networth\n**{format_number(stats['networth'])}**",
@@ -82,21 +84,17 @@ class ProfileSelectView(discord.ui.View):
             f"Slayers\n**{stats['slayers']}**",
             f"Fairy Souls\n**{stats['fairy_souls']}**",
             f"Skyblock Level\n**{stats['sb_level']:.2f}**",
-            f"Bestiary\n**{stats['bestiary']:.1f}**",
-            f"Minion Slots\n**{stats['unique_minions']} ({stats['minion_slots']} slots)**",
-            f"Mithril Powder\n**{format_number(stats['mithril_powder'])}**",
-            f"Gemstone Powder\n**{format_number(stats['gemstone_powder'])}**",
-            f"Glacite Powder\n**{format_number(stats['glacite_powder'])}**"
+            f"Minion Slots\n**{stats['unique_minions']} ({stats['minion_slots']} slots)**"
         ]
         
         embed.description = "\n".join(description)
         
         if selected_profile_name:
             footer = f"Tracking: **{selected_profile_name}**"
-            footer += "\n\nNote: Changing profile resets leaderboard progress for this period."
+            footer += "\n\nNote: Selecting a profile is required for leaderboard tracking."
             embed.set_footer(text=footer)
         else:
-            embed.set_footer(text="Please select a profile to start tracking.")
+            embed.set_footer(text="⚠️ Selecting a profile is required for leaderboard tracking.")
             
         return embed
 

@@ -470,11 +470,35 @@ class AdminView(View):
         view.add_item(ConfigSelect(self.bot))
         await interaction.response.send_message("⚙️ **Configuration Editor**", view=view, ephemeral=True)
 
-    @discord.ui.button(label="System", style=discord.ButtonStyle.danger, emoji="🖥️", row=1)
+    @discord.ui.button(label="System", style=discord.ButtonStyle.secondary, emoji="🖥️", row=1)
     async def system(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = View()
         view.add_item(SystemSelect(self.bot))
         await interaction.response.send_message("🖥️ **System Operations**", view=view, ephemeral=True)
+
+    @discord.ui.button(label="Update & Restart", style=discord.ButtonStyle.danger, emoji="🚀", row=2)
+    async def update_restart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                "git pull",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await proc.communicate()
+            output = stdout.decode() + stderr.decode()
+            
+            if len(output) > 1900:
+                output = output[:1900] + "..."
+            
+            await interaction.followup.send(f"📥 **Update & Restart Initiated**\n\n**Git Output:**\n```\n{output}\n```\n🔄 Restarting in 3 seconds (loop script)...")
+            
+            await asyncio.sleep(1)
+            await self.bot.close()
+            sys.exit(0)
+            
+        except Exception as e:
+            await interaction.followup.send(f"❌ Update failed: {e}")
 
 
 class Admin(commands.Cog):

@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from services.api import get_uuid, get_profile_data, get_player_discord
 from services.profile_parser import parse_profile_stats, format_number
+from core.config import config
 from typing import List, Optional
 
 
@@ -118,41 +119,40 @@ class Settings(commands.Cog):
             await interaction.followup.send(f"❌ Could not find player with IGN: {ign}")
             return
 
-        # Verification
-        discord_link = await get_player_discord(uuid)
-        if not discord_link:
-             await interaction.followup.send(
-                f"❌ **{ign}** does not have a Discord account linked on Hypixel!\n\n"
-                "**How to link:**\n"
-                "1. Go to Hypixel Lobby\n"
-                "2. Right-click **My Profile** (Head) -> **Social Media** -> **Discord**\n"
-                "3. Paste your Discord username/tag and confirm."
-            )
-             return
-
-        # Check if the linked Discord matches the user
-        user_tag = str(interaction.user)
-        user_name = interaction.user.name
+        is_owner = interaction.user.id in config.owner_ids
         
-        # discord_link might be "User#1234" or just "user"
-        # We check if it matches either the full tag or just the name
-        msg_discord = discord_link.lower().strip()
-        
-        normalized_tag = user_tag.lower().strip()
-        normalized_name = user_name.lower().strip()
-        
-        # Some users might still have discriminators in their Hypixel link
-        if msg_discord != normalized_tag and msg_discord != normalized_name:
-             await interaction.followup.send(
-                f"❌ The Discord account linked to **{ign}** is `{discord_link}`, but your account is **{user_tag}**.\n"
-                "Please update your social media on Hypixel to match your current Discord account."
-            )
-             return
+        if not is_owner:
+            discord_link = await get_player_discord(uuid)
+            if not discord_link:
+                 await interaction.followup.send(
+                    f"❌ **{ign}** does not have a Discord account linked on Hypixel!\n\n"
+                    "**How to link:**\n"
+                    "1. Go to Hypixel Lobby\n"
+                    "2. Right-click **My Profile** (Head) -> **Social Media** -> **Discord**\n"
+                    "3. Paste your Discord username/tag and confirm."
+                )
+                 return
+    
+            user_tag = str(interaction.user)
+            user_name = interaction.user.name
+            
+            msg_discord = discord_link.lower().strip()
+            
+            normalized_tag = user_tag.lower().strip()
+            normalized_name = user_name.lower().strip()
+            
+            if msg_discord != normalized_tag and msg_discord != normalized_name:
+                 await interaction.followup.send(
+                    f"❌ The Discord account linked to **{ign}** is `{discord_link}`, but your account is **{user_tag}**.\n"
+                    "Please update your social media on Hypixel to match your current Discord account."
+                )
+                 return
+        else:
+            await interaction.followup.send(f"⚠️ **Admin Bypass Activated**: Skipping verification for **{ign}**.")
 
         await self.bot.link_manager.link_user(interaction.user.id, ign)
         await self.bot.daily_manager.register_user(interaction.user.id, ign, uuid)
         
-        # Auto-select in-game profile for new link
         data = await get_profile_data(uuid)
         if data and "profiles" in data:
             selected_in_game = next((p.get("cute_name") for p in data.get("profiles", []) if p.get("selected")), None)

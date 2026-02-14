@@ -108,6 +108,40 @@ class API(commands.Cog):
                 
                 data['daily_stats'] = daily_stats
                 data['monthly_stats'] = monthly_stats if monthly_stats else {}
+                async def fetch_profile_stats(p_entry):
+                    p_name = p_entry['name']
+                    if target_found and p_name.lower() == profile_name.lower() and stats:
+                        p_data = stats.copy()
+                        p_data['recent_runs'] = recent_runs if recent_runs else []
+                        p_data['teammates'] = teammates if teammates else []
+                        p_data['daily_stats'] = daily_stats if daily_stats else {}
+                        p_data['monthly_stats'] = monthly_stats if monthly_stats else {}
+                        p_data['profiles'] = [] 
+                        return p_name, p_data
+                    
+                    p_stats = await get_dungeon_stats(uuid, profile_name=p_name)
+                    p_recent = await get_recent_runs(uuid, profile_name=p_name)
+                    
+                    if p_stats:
+                        p_data = p_stats
+                        p_data['recent_runs'] = p_recent if p_recent else []
+                        p_data['teammates'] = teammates if teammates else []
+                        p_data['daily_stats'] = daily_stats if daily_stats else {}
+                        p_data['monthly_stats'] = monthly_stats if monthly_stats else {}
+                        p_data['profiles'] = []
+                        return p_name, p_data
+                    return p_name, None
+
+                import asyncio
+                tasks = [fetch_profile_stats(p) for p in profiles_list]
+                results = await asyncio.gather(*tasks)
+                
+                stats_map = {name: s_data for name, s_data in results if s_data}
+                
+                for p in profiles_list:
+                    if p['name'] in stats_map:
+                        p['stats'] = stats_map[p['name']]
+
                 data['profiles'] = profiles_list
                 
                 return web.json_response({'status': 'success', 'player': player, 'data': data})

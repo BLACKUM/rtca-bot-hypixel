@@ -179,6 +179,31 @@ async def get_ah_prices():
         await cache_set("ah_prices", {}, ttl=config.prices_cache_ttl)
         return {}
 
+
+async def get_player_discord(uuid: str) -> Optional[str]:
+    log_debug(f"Requesting player Discord for {uuid}")
+    
+    if not _SESSION:
+        await init_session()
+
+    url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/player?uuid={uuid}"
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            if r.status != 200:
+                log_error(f"Player request failed ({r.status})")
+                return None
+            data = await r.json(loads=json_utils.loads)
+            player = data.get("player", {})
+            if not player:
+                return None
+            
+            social = player.get("socialMedia", {})
+            links = social.get("links", {})
+            return links.get("DISCORD")
+    except Exception as e:
+        log_error(f"Player request error: {e}")
+        return None
+
 async def get_special_prices():
     urls = {
         "SHINY_NECRON_HANDLE": "https://sky.coflnet.com/api/item/price/NECRON_HANDLE?IsShiny=true",

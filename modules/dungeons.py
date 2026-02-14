@@ -455,13 +455,14 @@ class Dungeons(commands.Cog):
             await interaction.followup.send("❌ Failed to fetch SkyBlock data.")
             return
         
-        profiles = profile_data.get("profiles")
-        if not profiles:
-            await interaction.followup.send("❌ No SkyBlock profile found.")
-            return
+        forced_profile = self.bot.daily_manager.data["users"].get(str(interaction.user.id), {}).get("forced_profile")
         
-        best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
-        member = best_profile["members"][uuid]
+        from services.api import _select_member
+        member = _select_member(profile_data, uuid, forced_profile)
+        if not member:
+            await interaction.followup.send("❌ Failed to select a SkyBlock profile.")
+            return
+
         dungeons = member.get("dungeons", {})
         player_classes = dungeons.get("player_classes", {})
         
@@ -564,7 +565,8 @@ class Dungeons(commands.Cog):
                 await interaction.followup.send(f"❌ Could not find UUID for `{ign}`.")
                 return
 
-            stats = await get_dungeon_stats(uuid)
+            forced_profile = self.bot.daily_manager.data["users"].get(str(interaction.user.id), {}).get("forced_profile")
+            stats = await get_dungeon_stats(uuid, profile_name=forced_profile)
             if not stats:
                 await interaction.followup.send(f"❌ Could not fetch dungeon stats for `{ign}` (Profile might be private or API error).")
                 return

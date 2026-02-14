@@ -932,7 +932,8 @@ class Leaderboard(commands.Cog):
              await interaction.followup.send("❌ User not found.")
              return
              
-        runs = await get_recent_runs(uuid)
+        forced_profile = self.bot.daily_manager.data["users"].get(str(interaction.user.id), {}).get("forced_profile")
+        runs = await get_recent_runs(uuid, profile_name=forced_profile)
         if runs:
             await self.bot.recent_manager.update_runs(uuid, runs)
              

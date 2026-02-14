@@ -77,7 +77,8 @@ class DailyManager:
                         log_error(f"Skipping update for {user_id}: No UUID")
                         errors += 1
                     else:
-                        xp_data = await get_dungeon_xp(uuid)
+                        forced_profile = self.data["users"].get(user_id, {}).get("forced_profile")
+                        xp_data = await get_dungeon_xp(uuid, profile_name=forced_profile)
                         if xp_data:
                             await self.update_user_data(user_id, xp_data, save=False)
                             updated_count += 1
@@ -138,7 +139,8 @@ class DailyManager:
         if user_id not in self.data["users"]:
             self.data["users"][user_id] = {
                 "ign": ign,
-                "uuid": uuid
+                "uuid": uuid,
+                "forced_profile": None
             }
             await self._save_data()
             log_info(f"Registered user {ign} ({user_id}) for daily tracking.")
@@ -154,6 +156,22 @@ class DailyManager:
             if info["ign"].lower() == ign.lower():
                 return user_id
         return None
+
+    async def set_user_profile(self, user_id: str, profile_name: Optional[str]):
+        user_id = str(user_id)
+        if user_id not in self.data["users"]:
+            return False
+        
+        self.data["users"][user_id]["forced_profile"] = profile_name
+        
+        # Reset snapshots to prevent phantom XP gains
+        if user_id in self.data["current_xp"]:
+            self.data["daily_snapshots"][user_id] = self.data["current_xp"][user_id]
+            self.data["monthly_snapshots"][user_id] = self.data["current_xp"][user_id]
+            
+        await self._save_data()
+        log_info(f"Set forced profile for {user_id} to {profile_name}")
+        return True
 
     async def update_user_data(self, user_id: str, xp_data: dict, save: bool = True):
         user_id = str(user_id)

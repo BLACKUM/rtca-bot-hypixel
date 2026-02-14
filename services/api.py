@@ -233,17 +233,30 @@ def get_prices_expiry():
     return get_cache_expiry("ah_prices")
 
 
-async def get_dungeon_runs(uuid: str):
+def _select_member(profile_data, uuid, profile_name=None):
+    profiles = profile_data.get("profiles")
+    if not profiles:
+        return None
+    
+    if profile_name:
+        profile = next((p for p in profiles if p.get("cute_name", "").lower() == profile_name.lower()), None)
+    else:
+        profile = next((p for p in profiles if p.get("selected")), profiles[0])
+    
+    if not profile:
+        profile = next((p for p in profiles if p.get("selected")), profiles[0])
+
+    return profile.get("members", {}).get(uuid, {})
+
+async def get_dungeon_runs(uuid: str, profile_name: str = None):
     profile_data = await get_profile_data(uuid)
     if not profile_data:
         return {}
     
-    profiles = profile_data.get("profiles")
-    if not profiles:
+    member = _select_member(profile_data, uuid, profile_name)
+    if not member:
         return {}
     
-    best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
-    member = best_profile.get("members", {}).get(uuid, {})
     dungeons = member.get("dungeons", {})
     
     catacombs_data = dungeons.get("dungeon_types", {}).get("catacombs", {})
@@ -277,17 +290,15 @@ async def get_dungeon_runs(uuid: str):
     return run_counts
 
 
-async def get_dungeon_xp(uuid: str):
+async def get_dungeon_xp(uuid: str, profile_name: str = None):
     profile_data = await get_profile_data(uuid)
     if not profile_data:
         return None
     
-    profiles = profile_data.get("profiles")
-    if not profiles:
+    member = _select_member(profile_data, uuid, profile_name)
+    if not member:
         return None
-    
-    best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
-    member = best_profile.get("members", {}).get(uuid, {})
+        
     dungeons = member.get("dungeons", {})
     
     catacombs = dungeons.get("dungeon_types", {}).get("catacombs", {})
@@ -316,17 +327,15 @@ async def get_dungeon_xp(uuid: str):
     }
 
 
-async def get_dungeon_stats(uuid: str):
+async def get_dungeon_stats(uuid: str, profile_name: str = None):
     profile_data = await get_profile_data(uuid)
     if not profile_data:
         return None
     
-    profiles = profile_data.get("profiles")
-    if not profiles:
+    member = _select_member(profile_data, uuid, profile_name)
+    if not member:
         return None
-    
-    best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
-    member = best_profile.get("members", {}).get(uuid, {})
+        
     dungeons = member.get("dungeons", {})
     
     catacombs = dungeons.get("dungeon_types", {}).get("catacombs", {})
@@ -385,17 +394,15 @@ async def get_dungeon_stats(uuid: str):
         "floors": floors
     }
 
-async def get_recent_runs(uuid: str):
+async def get_recent_runs(uuid: str, profile_name: str = None):
     profile_data = await get_profile_data(uuid)
     if not profile_data:
         return []
     
-    profiles = profile_data.get("profiles")
-    if not profiles:
+    member = _select_member(profile_data, uuid, profile_name)
+    if not member:
         return []
-    
-    best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
-    member = best_profile.get("members", {}).get(uuid, {})
+        
     dungeons = member.get("dungeons", {})
     
     treasures = dungeons.get("treasures", {})

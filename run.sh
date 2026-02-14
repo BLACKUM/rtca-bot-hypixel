@@ -55,6 +55,6 @@ pip install -r requirements.txt
 echo "Starting RTCA Discord Bot inside Tmux... (Press Ctrl+C to stop)"
 while true; do
     python3 main.py
-    echo "Bot stopped. Restarting in 5 seconds..."
-    sleep 5
+    echo "Bot stopped. Restarting in 3 seconds..."
+    sleep 3
 done

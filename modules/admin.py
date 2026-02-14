@@ -264,6 +264,7 @@ class SystemSelect(Select):
             discord.SelectOption(label="Host Info", value="host_info", description="View location and system stats", emoji="ℹ️"),
             discord.SelectOption(label="Restart (Internal)", value="restart", description="Restart via os.exec", emoji="🔄"),
             discord.SelectOption(label="Restart (Loop/Tmux)", value="restart_loop", description="Exit process (requires loop script)", emoji="🔁"),
+            discord.SelectOption(label="Update & Restart Loop", value="update_restart", description="Git pull + Restart (3s)", emoji="🚀"),
             discord.SelectOption(label="Shutdown", value="shutdown", description="Turn off the bot", emoji="🛑"),
         ]
         super().__init__(placeholder="Select a system action...", options=options)
@@ -286,6 +287,29 @@ class SystemSelect(Select):
                     output = output[:1900] + "..."
                 
                 await interaction.followup.send(f"git pull output:\n```\n{output}\n```")
+            except Exception as e:
+                await interaction.followup.send(f"❌ Update failed: {e}")
+
+        elif val == "update_restart":
+            await interaction.response.defer(ephemeral=True)
+            try:
+                proc = await asyncio.create_subprocess_shell(
+                    "git pull",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                output = stdout.decode() + stderr.decode()
+                
+                if len(output) > 1900:
+                    output = output[:1900] + "..."
+                
+                await interaction.followup.send(f"📥 **Update & Restart Initiated**\n\n**Git Output:**\n```\n{output}\n```\n🔄 Restarting in 3 seconds (loop script)...")
+                
+                await asyncio.sleep(1)
+                await self.bot.close()
+                sys.exit(0)
+                
             except Exception as e:
                 await interaction.followup.send(f"❌ Update failed: {e}")
                 

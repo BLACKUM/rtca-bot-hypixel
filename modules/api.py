@@ -56,12 +56,22 @@ class API(commands.Cog):
             
             log_info(f"[API] Received profile request for: {player} (Profile: {profile_name})")
             
-            from services.api import get_uuid, get_dungeon_stats, get_recent_runs
+            from services.api import get_uuid, get_bazaar_prices, get_dungeon_stats, get_recent_runs, get_profile_data
             
             uuid = await get_uuid(player)
             if not uuid:
                 return web.json_response({'error': 'Player not found'}, status=404)
-                
+            
+            profile_data = await get_profile_data(uuid)
+            profiles_list = []
+            if profile_data and "profiles" in profile_data:
+                for p in profile_data["profiles"]:
+                    profiles_list.append({
+                        "name": p.get("cute_name"),
+                        "id": p.get("profile_id"),
+                        "selected": p.get("selected", False)
+                    })
+
             stats = await get_dungeon_stats(uuid, profile_name=profile_name)
             recent_runs = await get_recent_runs(uuid)
             
@@ -84,6 +94,7 @@ class API(commands.Cog):
                 
                 data['daily_stats'] = daily_stats
                 data['monthly_stats'] = monthly_stats if monthly_stats else {}
+                data['profiles'] = profiles_list
                 
                 return web.json_response({'status': 'success', 'player': player, 'data': data})
             else:

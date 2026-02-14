@@ -42,12 +42,18 @@ def get_slayer_level(xp: int, slayer_type: str) -> int:
 
 
 def parse_profile_stats(member: dict, profile: dict) -> dict:
+    skills_data = member.get("skills", {})
     total_skill_lvl = 0
+    skills_count = 0
     for s in SKILLS:
-        lvl = member.get(f"skill_{s}_level", 0) 
+        lvl = member.get(f"skill_{s}_level")
+        if lvl is None:
+            lvl = skills_data.get(s, {}).get("level", 0)
+        
         total_skill_lvl += lvl
+        skills_count += 1
     
-    skill_avg = total_skill_lvl / len(SKILLS) if SKILLS else 0
+    skill_avg = total_skill_lvl / skills_count if skills_count > 0 else 0
     
     cata_xp = member.get("dungeons", {}).get("dungeon_types", {}).get("catacombs", {}).get("experience", 0)
     cata_lvl = get_dungeon_level(cata_xp)
@@ -63,9 +69,15 @@ def parse_profile_stats(member: dict, profile: dict) -> dict:
     
     best_class_lvl = get_dungeon_level(best_xp) if best_xp != -1 else 0
     
-    purse = member.get("currencies", {}).get("coin_purse", 0)
+    # Networth - Adjectils proxy provides a networth object
+    nw_data = member.get("networth", {})
+    networth = nw_data.get("networth", 0)
     bank = profile.get("banking", {}).get("balance", 0)
-    networth = purse + bank
+    purse = member.get("currencies", {}).get("coin_purse", 0)
+    
+    if networth == 0:
+        # Fallback if proxy didn't provide it
+        networth = purse + bank
     
     slayers_data = member.get("slayer", {}).get("slayer_bosses", {})
     slayer_levels = []
@@ -75,19 +87,29 @@ def parse_profile_stats(member: dict, profile: dict) -> dict:
     
     slayer_str = " / ".join(slayer_levels)
     
-    fairy_souls = member.get("fairy_souls", {}).get("collected", 0)
+    fairy_souls = member.get("fairy_soul", {}).get("total_collected", 0)
+    if fairy_souls == 0:
+         fairy_souls = member.get("fairy_souls_collected", 0)
     
     sb_level = member.get("leveling", {}).get("experience", 0) / SB_LEVEL_DIVISOR
     
-    bestiary_lvl = member.get("bestiary", {}).get("milestone", {}).get("last_milestone", 0)
+    bestiary_lvl = member.get("bestiary", {}).get("milestone", 0)
     
     unique_minions = len(member.get("player_data", {}).get("crafted_generators", []))
     minion_slots = MINION_SLOT_BASE + (unique_minions // MINION_SLOT_DIVISOR)
     
     mining_core = member.get("mining_core", {})
     mithril_powder = mining_core.get("powder_mithril_total", 0)
+    if mithril_powder == 0:
+        mithril_powder = mining_core.get("powder_mithril", 0) + mining_core.get("powder_spent_mithril", 0)
+        
     gemstone_powder = mining_core.get("powder_gemstone_total", 0)
+    if gemstone_powder == 0:
+        gemstone_powder = mining_core.get("powder_gemstone", 0) + mining_core.get("powder_spent_gemstone", 0)
+
     glacite_powder = mining_core.get("powder_glacite_total", 0)
+    if glacite_powder == 0:
+        glacite_powder = mining_core.get("powder_glacite", 0) + mining_core.get("powder_spent_glacite", 0)
     
     return {
         "skill_avg": skill_avg,

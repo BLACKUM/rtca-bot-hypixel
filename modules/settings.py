@@ -8,23 +8,17 @@ from typing import List, Optional
 
 class ProfileSelect(discord.ui.Select):
     def __init__(self, profiles: List[dict]):
-        options = [discord.SelectOption(label="Auto (Selected)", value="auto", description="Use currently selected profile on Hypixel")]
+        options = []
         for p in profiles:
             name = p.get("cute_name", "Unknown")
             options.append(discord.SelectOption(label=name, value=name))
         
-        super().__init__(placeholder="Select a profile...", min_values=1, max_values=1, options=options)
+        super().__init__(placeholder="Select a profile to track...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         view: 'ProfileSelectView' = self.view
         selected = self.values[0]
         
-        if selected == "auto":
-            await view.bot.daily_manager.set_user_profile(interaction.user.id, None)
-            embed = view.create_embed(None)
-            await interaction.response.edit_message(embed=embed, view=view)
-            return
-
         await view.bot.daily_manager.set_user_profile(interaction.user.id, selected)
         embed = view.create_embed(selected)
         await interaction.response.edit_message(embed=embed, view=view)
@@ -45,7 +39,9 @@ class ProfileSelectView(discord.ui.View):
         
         if selected_profile_name:
             profile = next((p for p in profiles if p.get("cute_name") == selected_profile_name), None)
-        else:
+        
+        if not selected_profile_name or not profile:
+            # Default to first profile if none selected yet, but show it's not active
             profile = next((p for p in profiles if p.get("selected")), profiles[0])
 
         if not profile:
@@ -71,7 +67,6 @@ class ProfileSelectView(discord.ui.View):
             f"Skyblock Level\n**{stats['sb_level']:.2f}**",
             f"Bestiary\n**{stats['bestiary']:.1f}**",
             f"Minion Slots\n**{stats['unique_minions']} ({stats['minion_slots']} slots)**",
-            f"Heart of the Mountain\nCurrently Hypixel has removed this from the API, so it's not available, look at powders and have a guess?",
             f"Mithril Powder\n**{format_number(stats['mithril_powder'])}**",
             f"Gemstone Powder\n**{format_number(stats['gemstone_powder'])}**",
             f"Glacite Powder\n**{format_number(stats['glacite_powder'])}**"
@@ -79,11 +74,13 @@ class ProfileSelectView(discord.ui.View):
         
         embed.description = "\n".join(description)
         
-        status = f"Tracking: **{selected_profile_name if selected_profile_name else 'Auto'}**"
         if selected_profile_name:
-            status += "\n\n**Note**: Changing profile resets leaderboard progress for this period."
-        
-        embed.set_footer(text=status)
+            footer = f"Tracking: **{selected_profile_name}**"
+            footer += "\n\nNote: Changing profile resets leaderboard progress for this period."
+            embed.set_footer(text=footer)
+        else:
+            embed.set_footer(text="Please select a profile to start tracking.")
+            
         return embed
 
 

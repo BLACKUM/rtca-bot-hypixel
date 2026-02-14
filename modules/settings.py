@@ -7,19 +7,35 @@ from typing import List, Optional
 
 
 class ProfileSelect(discord.ui.Select):
-    def __init__(self, profiles: List[dict]):
+    def __init__(self, profiles: List[dict], current_profile: Optional[str]):
         options = []
         for p in profiles:
             name = p.get("cute_name", "Unknown")
-            options.append(discord.SelectOption(label=name, value=name))
-        
-        super().__init__(placeholder="Select a profile to track...", min_values=1, max_values=1, options=options)
+            is_current = name == current_profile
+            options.append(discord.SelectOption(
+                label=name,
+                value=name,
+                description="Currently tracking" if is_current else None,
+                default=is_current
+            ))
+
+        super().__init__(
+            placeholder=f"Currently tracking: {current_profile}" if current_profile else "Select a profile to track...",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
 
     async def callback(self, interaction: discord.Interaction):
         view: 'ProfileSelectView' = self.view
         selected = self.values[0]
-        
+
         await view.bot.daily_manager.set_user_profile(interaction.user.id, selected)
+        view.selected_profile = selected
+        new_select = ProfileSelect(view.profile_data.get("profiles", []), selected)
+        view.clear_items()
+        view.add_item(new_select)
+
         embed = view.create_embed(selected)
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -31,17 +47,18 @@ class ProfileSelectView(discord.ui.View):
         self.uuid = uuid
         self.ign = ign
         self.profile_data = profile_data
-        
-        self.add_item(ProfileSelect(profile_data.get("profiles", [])))
+        self.selected_profile = selected_profile
+
+        self.add_item(ProfileSelect(profile_data.get("profiles", []), selected_profile))
 
     def create_embed(self, selected_profile_name: Optional[str]) -> discord.Embed:
         profiles = self.profile_data.get("profiles", [])
-        
+
+        profile = None
         if selected_profile_name:
             profile = next((p for p in profiles if p.get("cute_name") == selected_profile_name), None)
-        
-        if not selected_profile_name or not profile:
-            # Default to first profile if none selected yet, but show it's not active
+
+        if not profile:
             profile = next((p for p in profiles if p.get("selected")), profiles[0])
 
         if not profile:

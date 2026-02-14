@@ -308,7 +308,6 @@ class SystemSelect(Select):
                 
                 await asyncio.sleep(1)
                 await self.bot.close()
-                sys.exit(0)
                 
             except Exception as e:
                 await interaction.followup.send(f"❌ Update failed: {e}")
@@ -495,7 +494,6 @@ class AdminView(View):
             
             await asyncio.sleep(1)
             await self.bot.close()
-            sys.exit(0)
             
         except Exception as e:
             await interaction.followup.send(f"❌ Update failed: {e}")

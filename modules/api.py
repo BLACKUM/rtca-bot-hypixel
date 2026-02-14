@@ -279,6 +279,7 @@ class API(commands.Cog):
         try:
             data = await request.json()
             player = data.get('player')
+            target_profile_name = data.get('profile')
             floor_name = data.get('floor', 'M7')
             
             if not player:
@@ -305,7 +306,16 @@ class API(commands.Cog):
             if not profiles:
                 return web.json_response({'error': 'No profiles found'}, status=404)
 
-            best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
+            best_profile = None
+            
+            if target_profile_name:
+                for p in profiles:
+                    if p.get("cute_name", "").lower() == target_profile_name.lower():
+                        best_profile = p
+                        break
+            
+            if not best_profile:
+                best_profile = next((p for p in profiles if p.get("selected")), profiles[0])
             member = best_profile.get("members", {}).get(uuid, {})
             dungeons = member.get("dungeons", {})
             player_classes = dungeons.get("player_classes", {})

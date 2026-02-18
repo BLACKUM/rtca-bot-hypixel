@@ -70,7 +70,7 @@ class IrcHandler:
         try:
             webhook = discord.Webhook.from_url(target_webhook_url, session=self.webhook_session)
             await webhook.send(
-                content=f"[#{channel}] {message}" if channel != "general" else message,
+                content=message,
                 username=user,
                 avatar_url=avatar_url
             )

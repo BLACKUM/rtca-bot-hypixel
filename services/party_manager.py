@@ -3,8 +3,8 @@ import uuid
 
 class PartyManager:
     def __init__(self):
-        self.parties = {} # leader_uuid -> party_data
-        self.cleanup_interval = 600 # 10 minutes
+        self.parties = {}
+        self.cleanup_interval = 600
 
     def add_party(self, player_name, player_uuid, floor, note, reqs, max_size=5):
         self.cleanup()
@@ -38,9 +38,24 @@ class PartyManager:
 
     def get_parties(self, floor=None):
         self.cleanup()
-        if floor:
-            return [p for p in self.parties.values() if p["floor"].upper() == floor.upper()]
-        return list(self.parties.values())
+        
+        all_parties = list(self.parties.values())
+        
+        floor_order = ["M7", "M6", "M5", "M4", "M3", "M2", "M1", 
+                       "F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance", "F0"]
+        
+        def get_sort_key(p):
+            f = p["floor"].upper()
+            try:
+                return floor_order.index(f)
+            except ValueError:
+                return 99
+
+        if floor and floor.upper() != "ALL":
+            filtered = [p for p in all_parties if p["floor"].upper() == floor.upper()]
+            return sorted(filtered, key=get_sort_key)
+            
+        return sorted(all_parties, key=get_sort_key)
 
     def cleanup(self):
         now = time.time()

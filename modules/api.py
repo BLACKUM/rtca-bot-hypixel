@@ -15,6 +15,10 @@ class API(commands.Cog):
         self.app.router.add_post('/v1/rtca', self.handle_rtca)
         self.app.router.add_get('/v1/leaderboard', self.handle_leaderboard)
         self.app.router.add_get('/v1/key', self.handle_key)
+        self.app.router.add_get('/v1/party/list', self.handle_party_list)
+        self.app.router.add_post('/v1/party/create', self.handle_party_create)
+        self.app.router.add_post('/v1/party/unqueue', self.handle_party_unqueue)
+        self.app.router.add_post('/v1/party/update', self.handle_party_update)
         
         self.runner = None
         self.site = None
@@ -435,6 +439,73 @@ class API(commands.Cog):
 
         except Exception as e:
             log_error(f"[API] Error processing leaderboard request: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_party_list(self, request):
+        try:
+            floor = request.query.get('floor')
+            from services.party_manager import party_manager
+            parties = party_manager.get_parties(floor)
+            return web.json_response({'status': 'success', 'parties': parties})
+        except Exception as e:
+            log_error(f"[API] Error in party list: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_party_create(self, request):
+        try:
+            data = await request.json()
+            player = data.get('player')
+            floor = data.get('floor')
+            note = data.get('note', '')
+            reqs = data.get('reqs', {})
+            max_size = data.get('max_size', 5)
+
+            from services.api import get_uuid
+            uuid = await get_uuid(player)
+            if not uuid:
+                return web.json_response({'error': 'Player not found'}, status=404)
+
+            from services.party_manager import party_manager
+            party = party_manager.add_party(player, uuid, floor, note, reqs, max_size)
+            log_info(f"[API] Party created by {player} for {floor}")
+            return web.json_response({'status': 'success', 'party': party})
+        except Exception as e:
+            log_error(f"[API] Error in party create: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_party_unqueue(self, request):
+        try:
+            data = await request.json()
+            player = data.get('player')
+
+            from services.api import get_uuid
+            uuid = await get_uuid(player)
+            if not uuid:
+                return web.json_response({'error': 'Player not found'}, status=404)
+
+            from services.party_manager import party_manager
+            success = party_manager.remove_party(uuid)
+            return web.json_response({'status': 'success', 'removed': success})
+        except Exception as e:
+            log_error(f"[API] Error in party unqueue: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_party_update(self, request):
+        try:
+            data = await request.json()
+            player = data.get('player')
+            member_count = data.get('member_count')
+
+            from services.api import get_uuid
+            uuid = await get_uuid(player)
+            if not uuid:
+                return web.json_response({'error': 'Player not found'}, status=404)
+
+            from services.party_manager import party_manager
+            success = party_manager.update_party(uuid, member_count)
+            return web.json_response({'status': 'success', 'updated': success})
+        except Exception as e:
+            log_error(f"[API] Error in party update: {e}")
             return web.json_response({'error': str(e)}, status=500)
 
 async def setup(bot):

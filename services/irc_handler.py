@@ -3,7 +3,7 @@ from aiohttp import web
 import json
 import asyncio
 from core.logger import log_info, log_error
-from core.config import config, IRC_WEBHOOK_URL
+from core.config import config, IRC_WEBHOOK_URL, IRC_CHANNEL_ID
 import discord
 
 class IrcHandler:
@@ -75,16 +75,21 @@ class IrcHandler:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
+    asyncio.create_task(self.broadcast_to_mods(user, content))
+
     def on_discord_message(self, message):
         if message.author.bot:
             return
         
-        if message.channel.id != config.irc_channel_id:
+        log_info(f"Discord message in {message.channel.id}: {message.content[:20]}... (Looking for {IRC_CHANNEL_ID})")
+        
+        if message.channel.id != IRC_CHANNEL_ID:
             return
 
         content = message.clean_content
         user = message.author.display_name
-
+        
+        log_info(f"Broadcasting Discord message from {user}")
         asyncio.create_task(self.broadcast_to_mods(user, content))
 
 irc_handler = None

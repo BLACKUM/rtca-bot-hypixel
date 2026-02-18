@@ -1,6 +1,6 @@
 import discord
 try:
-    from core.secrets import TOKEN, IRC_WEBHOOK_URL
+    from core.secrets import TOKEN, IRC_WEBHOOK_URL, IRC_CHANNEL_ID
 except ImportError:
     raise ImportError(
         "secrets.py not found! Please copy secrets.example.py to secrets.py and add your Discord bot token."

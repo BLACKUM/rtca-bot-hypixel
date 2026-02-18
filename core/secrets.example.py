@@ -7,9 +7,15 @@ Copy this file to secrets.py and fill in your actual token
 # Get your token from: https://discord.com/developers/applications
 TOKEN = "your_discord_bot_token_here"
 
-# Developer Key (Admin Access)
-DEVELOPER_KEY = "myDevKey123"
+# Encryption Secret (MUST MATCH CLIENT)
+SECRET_KEY = "your_secret_key_here"
 
-# IRC Webhook URL for mod-to-discord bridge
-IRC_WEBHOOK_URL = "your_webhook_url_here"
+# Developer Key (Admin Access)
+DEVELOPER_KEY = "your_dev_key_here"
+
+# IRC Channel ID (Discord Channel for IRC Relay)
+IRC_CHANNEL_ID = 0
+
+# IRC Webhook URL (Discord Webhook for IRC Relay)
+IRC_WEBHOOK_URL = ""
 

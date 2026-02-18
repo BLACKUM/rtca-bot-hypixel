@@ -10,7 +10,9 @@ class IrcHandler:
     def __init__(self, bot):
         self.bot = bot
         self.connections = {}
+        self.history = {}
         self.webhook_session = None
+        self.history_limit = 100
 
     async def initialize(self):
         self.webhook_session = aiohttp.ClientSession()
@@ -36,6 +38,15 @@ class IrcHandler:
             "type": "auth",
             "is_admin": is_admin
         }))
+
+        for channel, messages in self.history.items():
+            if channel == "admin" and not is_admin:
+                continue
+            await ws.send_str(json.dumps({
+                "type": "history",
+                "channel": channel,
+                "messages": messages
+            }))
 
         try:
             async for msg in ws:
@@ -79,10 +90,19 @@ class IrcHandler:
                 username=user,
                 avatar_url=avatar_url
             )
+            
+            await self.broadcast_to_mods(user, message, channel, exclude_ws=ws)
         except Exception as e:
             log_error(f"Failed to send IRC message to Discord: {e}")
 
-    async def broadcast_to_mods(self, user, message, channel="general"):
+    async def broadcast_to_mods(self, user, message, channel="general", exclude_ws=None):
+        if channel not in self.history:
+            self.history[channel] = []
+        
+        self.history[channel].append({"user": user, "message": message})
+        if len(self.history[channel]) > self.history_limit:
+            self.history[channel].pop(0)
+
         if not self.connections:
             return
 
@@ -95,6 +115,8 @@ class IrcHandler:
 
         tasks = []
         for ws, info in self.connections.items():
+            if ws == exclude_ws:
+                continue
             if channel == "admin" and not info.get("is_admin", False):
                 continue
             tasks.append(ws.send_str(payload))

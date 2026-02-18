@@ -75,8 +75,6 @@ class IrcHandler:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    asyncio.create_task(self.broadcast_to_mods(user, content))
-
     def on_discord_message(self, message):
         if message.author.bot:
             return

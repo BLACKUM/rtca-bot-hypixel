@@ -10,3 +10,6 @@ TOKEN = "your_discord_bot_token_here"
 # IRC Webhook URL for mod-to-discord bridge
 IRC_WEBHOOK_URL = "your_webhook_url_here"
 
+# IRC Webhook URL for mod-to-discord bridge
+IRC_WEBHOOK_URL = ""
+

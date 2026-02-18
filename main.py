@@ -33,7 +33,7 @@ bot.irc_handler = init_irc_handler(bot)
 
 @bot.listen()
 async def on_message(message):
-    bot.irc_handler.on_discord_message(message)
+    await bot.irc_handler.on_discord_message(message)
 
 @tasks.loop(hours=2)
 async def track_daily_stats():

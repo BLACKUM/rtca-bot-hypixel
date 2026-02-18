@@ -36,7 +36,7 @@ class IrcHandler:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     data = json.loads(msg.data)
-                    await self.process_mod_message(data)
+                    await self.process_mod_message(ws, data)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     log_error(f"IRC WebSocket connection closed with exception {ws.exception()}")
         finally:

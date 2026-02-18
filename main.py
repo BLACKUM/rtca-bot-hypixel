@@ -6,6 +6,7 @@ from services.rng_manager import RngManager
 from services.link_manager import LinkManager
 from services.recent_manager import RecentManager
 from services.api import get_dungeon_xp, init_session, close_session
+from services.irc_handler import init_irc_handler
 from core.cache import initialize as init_cache
 import asyncio
 import os
@@ -19,6 +20,7 @@ class RTCABot(commands.Bot):
         await self.daily_manager.initialize()
         await self.rng_manager.initialize()
         await self.recent_manager.initialize()
+        await self.irc_handler.initialize()
         await self.daily_manager.sanitize_data()
 
 bot = RTCABot(command_prefix="!", intents=INTENTS)
@@ -27,6 +29,11 @@ bot.daily_manager = DailyManager()
 bot.rng_manager = RngManager()
 bot.link_manager = LinkManager()
 bot.recent_manager = RecentManager()
+bot.irc_handler = init_irc_handler(bot)
+
+@bot.listen()
+async def on_message(message):
+    bot.irc_handler.on_discord_message(message)
 
 @tasks.loop(hours=2)
 async def track_daily_stats():
@@ -85,6 +92,7 @@ async def main():
         log_error(f"Failed to start bot: {e}")
         raise
     finally:
+        await bot.irc_handler.close()
         await close_session()
 
 if __name__ == "__main__":

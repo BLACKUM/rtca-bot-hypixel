@@ -19,6 +19,7 @@ class API(commands.Cog):
         self.app.router.add_post('/v1/party/create', self.handle_party_create)
         self.app.router.add_post('/v1/party/unqueue', self.handle_party_unqueue)
         self.app.router.add_post('/v1/party/update', self.handle_party_update)
+        self.app.router.add_get('/v1/irc', self.handle_irc)
         
         self.runner = None
         self.site = None
@@ -507,6 +508,13 @@ class API(commands.Cog):
         except Exception as e:
             log_error(f"[API] Error in party update: {e}")
             return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_irc(self, request):
+        from services.irc_handler import get_irc_handler
+        handler = get_irc_handler()
+        if not handler:
+            return web.json_response({'error': 'IRC Handler not initialized'}, status=503)
+        return await handler.handle_websocket(request)
 
 async def setup(bot):
     await bot.add_cog(API(bot))

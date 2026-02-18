@@ -42,7 +42,7 @@ class PartyManager:
         all_parties = list(self.parties.values())
         
         floor_order = ["M7", "M6", "M5", "M4", "M3", "M2", "M1", 
-                       "F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance", "F0"]
+                       "F7", "F6", "F5", "F4", "F3", "F2", "F1", "Entrance"]
         
         def get_sort_key(p):
             f = p["floor"].upper()

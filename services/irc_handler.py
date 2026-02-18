@@ -9,7 +9,7 @@ import discord
 class IrcHandler:
     def __init__(self, bot):
         self.bot = bot
-        self.connections = set()
+        self.connections = {}
         self.webhook_session = None
 
     async def initialize(self):
@@ -25,8 +25,12 @@ class IrcHandler:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
 
-        self.connections.add(ws)
-        log_info(f"New IRC connection established. Total: {len(self.connections)}")
+        provided_key = request.query.get("key", "")
+        from services.security import check_developer_key
+        is_admin = check_developer_key(provided_key)
+        
+        self.connections[ws] = {"is_admin": is_admin}
+        log_info(f"New IRC connection established. Admin: {is_admin}. Total: {len(self.connections)}")
 
         try:
             async for msg in ws:
@@ -36,15 +40,21 @@ class IrcHandler:
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     log_error(f"IRC WebSocket connection closed with exception {ws.exception()}")
         finally:
-            self.connections.remove(ws)
+            if ws in self.connections:
+                del self.connections[ws]
             log_info(f"IRC connection closed. Total: {len(self.connections)}")
 
         return ws
 
-    async def process_mod_message(self, data):
+    async def process_mod_message(self, ws, data):
         user = data.get("user", "Unknown")
         uuid = data.get("uuid", "")
         message = data.get("message", "")
+        channel = data.get("channel", "general")
+
+        if channel == "admin" and not self.connections.get(ws, {}).get("is_admin", False):
+            log_error(f"Unauthorized admin channel message from {user}")
+            return
 
         if not message or not IRC_WEBHOOK_URL:
             return
@@ -54,41 +64,53 @@ class IrcHandler:
         try:
             webhook = discord.Webhook.from_url(IRC_WEBHOOK_URL, session=self.webhook_session)
             await webhook.send(
-                content=message,
+                content=f"[#{channel}] {message}" if channel != "general" else message,
                 username=user,
                 avatar_url=avatar_url
             )
         except Exception as e:
             log_error(f"Failed to send IRC message to Discord: {e}")
 
-    async def broadcast_to_mods(self, user, message):
+    async def broadcast_to_mods(self, user, message, channel="general"):
         if not self.connections:
             return
 
         payload = json.dumps({
             "type": "chat",
             "user": user,
-            "message": message
+            "message": message,
+            "channel": channel
         })
 
-        tasks = [ws.send_str(payload) for ws in self.connections]
+        tasks = []
+        for ws, info in self.connections.items():
+            if channel == "admin" and not info.get("is_admin", False):
+                continue
+            tasks.append(ws.send_str(payload))
+
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    def on_discord_message(self, message):
+    async def on_discord_message(self, message):
         if message.author.bot:
             return
         
-        log_info(f"Discord message in {message.channel.id}: {message.content[:20]}... (Looking for {IRC_CHANNEL_ID})")
+        from core.secrets import IRC_CHANNEL_ID, ANNOUNCEMENTS_CHANNEL_ID, ADMIN_CHANNEL_ID
         
-        if message.channel.id != IRC_CHANNEL_ID:
+        channel_map = {
+            IRC_CHANNEL_ID: "general",
+            ANNOUNCEMENTS_CHANNEL_ID: "announcements",
+            ADMIN_CHANNEL_ID: "admin"
+        }
+        
+        if message.channel.id not in channel_map:
             return
 
+        irc_channel = channel_map[message.channel.id]
         content = message.clean_content
         user = message.author.display_name
         
-        log_info(f"Broadcasting Discord message from {user}")
-        asyncio.create_task(self.broadcast_to_mods(user, content))
+        await self.broadcast_to_mods(user, content, irc_channel)
 
 irc_handler = None
 

@@ -32,6 +32,11 @@ class IrcHandler:
         self.connections[ws] = {"is_admin": is_admin}
         log_info(f"New IRC connection established. Admin: {is_admin}. Total: {len(self.connections)}")
 
+        await ws.send_str(json.dumps({
+            "type": "auth",
+            "is_admin": is_admin
+        }))
+
         try:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:

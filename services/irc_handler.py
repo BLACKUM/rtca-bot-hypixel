@@ -56,13 +56,19 @@ class IrcHandler:
             log_error(f"Unauthorized admin channel message from {user}")
             return
 
-        if not message or not IRC_WEBHOOK_URL:
+        from core.config import IRC_WEBHOOK_URL, ADMIN_WEBHOOK_URL
+        
+        target_webhook_url = IRC_WEBHOOK_URL
+        if channel == "admin":
+            target_webhook_url = ADMIN_WEBHOOK_URL
+
+        if not message or not target_webhook_url:
             return
 
         avatar_url = f"https://mc-heads.net/avatar/{uuid}" if uuid else None
 
         try:
-            webhook = discord.Webhook.from_url(IRC_WEBHOOK_URL, session=self.webhook_session)
+            webhook = discord.Webhook.from_url(target_webhook_url, session=self.webhook_session)
             await webhook.send(
                 content=f"[#{channel}] {message}" if channel != "general" else message,
                 username=user,

@@ -67,6 +67,7 @@ class IrcHandler:
         uuid = data.get("uuid", "")
         message = data.get("message", "")
         channel = data.get("channel", "general")
+        timestamp = data.get("timestamp", int(asyncio.get_event_loop().time() * 1000))
 
         if channel == "admin" and not self.connections.get(ws, {}).get("is_admin", False):
             log_error(f"Unauthorized admin channel message from {user}")
@@ -91,15 +92,19 @@ class IrcHandler:
                 avatar_url=avatar_url
             )
             
-            await self.broadcast_to_mods(user, message, channel, exclude_ws=ws)
+            await self.broadcast_to_mods(user, message, channel, exclude_ws=ws, timestamp=timestamp)
         except Exception as e:
             log_error(f"Failed to send IRC message to Discord: {e}")
 
-    async def broadcast_to_mods(self, user, message, channel="general", exclude_ws=None):
+    async def broadcast_to_mods(self, user, message, channel="general", exclude_ws=None, timestamp=None):
+        if timestamp is None:
+            import time
+            timestamp = int(time.time() * 1000)
+
         if channel not in self.history:
             self.history[channel] = []
         
-        self.history[channel].append({"user": user, "message": message})
+        self.history[channel].append({"user": user, "message": message, "timestamp": timestamp})
         if len(self.history[channel]) > self.history_limit:
             self.history[channel].pop(0)
 
@@ -110,7 +115,8 @@ class IrcHandler:
             "type": "chat",
             "user": user,
             "message": message,
-            "channel": channel
+            "channel": channel,
+            "timestamp": timestamp
         })
 
         tasks = []
@@ -142,8 +148,9 @@ class IrcHandler:
         irc_channel = channel_map[message.channel.id]
         content = message.clean_content
         user = message.author.display_name
+        timestamp = int(message.created_at.timestamp() * 1000)
         
-        await self.broadcast_to_mods(user, content, irc_channel)
+        await self.broadcast_to_mods(user, content, irc_channel, timestamp=timestamp)
 
 irc_handler = None
 

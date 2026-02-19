@@ -5,6 +5,7 @@ import asyncio
 from core.logger import log_info, log_error
 from core.config import config, IRC_WEBHOOK_URL, IRC_CHANNEL_ID
 import discord
+import time
 
 class IrcHandler:
     def __init__(self, bot):
@@ -67,7 +68,7 @@ class IrcHandler:
         uuid = data.get("uuid", "")
         message = data.get("message", "")
         channel = data.get("channel", "general")
-        timestamp = data.get("timestamp", int(asyncio.get_event_loop().time() * 1000))
+        timestamp = data.get("timestamp", int(time.time() * 1000))
 
         if channel == "admin" and not self.connections.get(ws, {}).get("is_admin", False):
             log_error(f"Unauthorized admin channel message from {user}")
@@ -98,7 +99,6 @@ class IrcHandler:
 
     async def broadcast_to_mods(self, user, message, channel="general", exclude_ws=None, timestamp=None):
         if timestamp is None:
-            import time
             timestamp = int(time.time() * 1000)
 
         if channel not in self.history:

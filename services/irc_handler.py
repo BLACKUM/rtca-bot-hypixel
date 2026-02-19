@@ -150,6 +150,10 @@ class IrcHandler:
         user = message.author.display_name
         timestamp = int(message.created_at.timestamp() * 1000)
         
+        if message.attachments:
+            for attachment in message.attachments:
+                content += f" {attachment.url}"
+
         await self.broadcast_to_mods(user, content, irc_channel, timestamp=timestamp)
 
 irc_handler = None

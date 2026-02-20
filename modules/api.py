@@ -1,12 +1,13 @@
 from aiohttp import web
 from discord.ext import commands
 from core.logger import log_info, log_error
+from services.rate_limiter import rate_limiter
 import os
 
 class API(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.app = web.Application()
+        self.app = web.Application(middlewares=[rate_limiter.middleware])
         self.app.router.add_get('/', self.index)
         self.app.router.add_get('/v1/profile', self.handle_profile)
         self.app.router.add_get('/v1/rng', self.handle_rng_get)

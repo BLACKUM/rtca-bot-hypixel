@@ -11,6 +11,7 @@ from services.name_manager import name_manager
 from core.cache import initialize as init_cache
 import asyncio
 import os
+import traceback
 
 class RTCABot(commands.Bot):
     async def setup_hook(self):
@@ -102,3 +103,10 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         pass
+    except Exception:
+        if not os.path.exists("logs"):
+            os.makedirs("logs")
+        with open("logs/crash.log", "w") as f:
+            f.write(traceback.format_exc())
+        print("\n❌ Bot crashed on startup! Error details saved to logs/crash.log")
+        log_error(f"Startup crash detected: {traceback.format_exc()}")

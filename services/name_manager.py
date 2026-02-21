@@ -15,22 +15,22 @@ class NameManager:
 
     async def load_names(self):
         if not os.path.exists(NAMES_FILE):
-             self.names = {}
-             if not os.path.exists("data"):
-                 os.makedirs("data")
-             async with aiofiles.open(NAMES_FILE, json.get_write_mode()) as f:
-                 await f.write(json.dumps({}, indent=4))
-             log_info("No custom names file found, created empty one.")
-             return
-         
+            self.names = {}
+            if not os.path.exists("data"):
+                os.makedirs("data")
+            async with aiofiles.open(NAMES_FILE, json.get_write_mode()) as f:
+                await f.write(json.dumps({}, indent=4))
+            log_info("No custom names file found, created empty one.")
+            return
+
         try:
-             async with aiofiles.open(NAMES_FILE, json.get_read_mode()) as f:
-                 content = await f.read()
-                 self.names = json.loads(content)
-             log_info(f"Loaded {len(self.names)} custom names.")
+            async with aiofiles.open(NAMES_FILE, json.get_read_mode()) as f:
+                content = await f.read()
+                self.names = json.loads(content)
+            log_info(f"Loaded {len(self.names)} custom names.")
         except Exception as e:
-             log_error(f"Failed to load custom names: {e}")
-             self.names = {}
+            log_error(f"Failed to load custom names: {e}")
+            self.names = {}
 
     async def save_names(self):
         try:

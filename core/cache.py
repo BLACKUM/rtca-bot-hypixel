@@ -28,8 +28,10 @@ async def _load_cache():
 async def _save_cache():
     try:
         os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
-        async with aiofiles.open(CACHE_FILE, 'w', encoding='utf-8') as f:
+        temp_path = CACHE_FILE + ".tmp"
+        async with aiofiles.open(temp_path, 'w', encoding='utf-8') as f:
             await f.write(json.dumps(_DATA_CACHE))
+        os.replace(temp_path, CACHE_FILE)
     except Exception as e:
         log_error(f"Failed to save cache: {e}")
 
@@ -51,16 +53,17 @@ async def cache_get(key: str):
 MAX_CACHE_SIZE = 10000
 
 async def _cleanup_cache():
+    import heapq
     now = time.time()
     expired_keys = [k for k, v in _DATA_CACHE.items() if now > v[0]]
     for k in expired_keys:
         del _DATA_CACHE[k]
     
     if len(_DATA_CACHE) >= MAX_CACHE_SIZE:
-        sorted_cache = sorted(_DATA_CACHE.items(), key=lambda item: item[1][0])
-        to_remove = len(_DATA_CACHE) - MAX_CACHE_SIZE + 1
-        for i in range(to_remove):
-            del _DATA_CACHE[sorted_cache[i][0]]
+        to_remove = len(_DATA_CACHE) - MAX_CACHE_SIZE + (MAX_CACHE_SIZE // 10)
+        oldest = heapq.nsmallest(to_remove, _DATA_CACHE.items(), key=lambda item: item[1][0])
+        for k, _ in oldest:
+            del _DATA_CACHE[k]
             
     await _save_cache()
 

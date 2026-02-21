@@ -40,20 +40,25 @@ async def on_message(message):
 
 @tasks.loop(hours=2)
 async def track_daily_stats():
-    log_info("Running scheduled daily stats update...")
-    
-    await bot.daily_manager.check_resets()
-    
-    users = bot.daily_manager.get_tracked_users()
-    if not users:
-        return
+    try:
+        log_info("Running scheduled daily stats update...")
+        
+        await bot.daily_manager.check_resets()
+        
+        users = bot.daily_manager.get_tracked_users()
+        if not users:
+            return
 
-    updated, errors, total = await bot.daily_manager.force_update_all()
-    
-    if updated > 0:
-        log_info(f"Daily stats update completed: {updated}/{total} updated, {errors} errors.")
-    else:
-        log_info("Daily stats update skipped or completed with no changes.")
+        updated, errors, total = await bot.daily_manager.force_update_all()
+        
+        if updated > 0:
+            log_info(f"Daily stats update completed: {updated}/{total} updated, {errors} errors.")
+        else:
+            log_info("Daily stats update skipped or completed with no changes.")
+    except Exception as e:
+        log_error(f"Unhandled exception in track_daily_stats loop: {e}")
+        import traceback
+        log_error(traceback.format_exc())
 
 @bot.listen()
 async def on_ready():

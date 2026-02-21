@@ -6,6 +6,9 @@ from core.logger import log_info, log_error
 from core.config import config, IRC_WEBHOOK_URL, IRC_CHANNEL_ID
 import discord
 import time
+import os
+
+HISTORY_FILE = "data/irc_history.json"
 
 class IrcHandler:
     def __init__(self, bot):
@@ -14,6 +17,25 @@ class IrcHandler:
         self.history = {}
         self.webhook_session = None
         self.history_limit = 100
+        self._load_history()
+
+    def _load_history(self):
+        try:
+            if os.path.exists(HISTORY_FILE):
+                with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                    self.history = json.load(f)
+                log_info(f"Loaded IRC history from {HISTORY_FILE}. Channels: {list(self.history.keys())}")
+        except Exception as e:
+            log_error(f"Failed to load IRC history: {e}")
+            self.history = {}
+
+    def _save_history(self):
+        try:
+            os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.history, f, indent=4)
+        except Exception as e:
+            log_error(f"Failed to save IRC history: {e}")
 
     async def initialize(self):
         self.webhook_session = aiohttp.ClientSession()
@@ -107,6 +129,8 @@ class IrcHandler:
         self.history[channel].append({"user": user, "message": message, "timestamp": timestamp})
         if len(self.history[channel]) > self.history_limit:
             self.history[channel].pop(0)
+            
+        self._save_history()
 
         if not self.connections:
             return

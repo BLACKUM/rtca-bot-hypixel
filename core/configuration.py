@@ -74,18 +74,20 @@ class BotConfig:
             self.load()
 
     def load(self):
+        from core.logger import log_error, log_info
         if os.path.exists(self.file_path):
             try:
                 with open(self.file_path, 'r') as f:
                     data = json.load(f)
                     self._update_from_dict(data)
             except Exception as e:
-                print(f"Failed to load config: {e}")
+                log_error(f"Failed to load config: {e}")
         else:
-            print("Config file not found, using defaults.")
+            log_info("Config file not found, using defaults.")
             self.save()
 
     def save(self):
+        from core.logger import log_error
         data = {
             "xp_per_run_default": self.xp_per_run_default,
             "target_level": self.target_level,
@@ -98,10 +100,12 @@ class BotConfig:
         }
         try:
             os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
-            with open(self.file_path, 'w') as f:
+            temp_path = self.file_path + ".tmp"
+            with open(temp_path, 'w') as f:
                 json.dump(data, f, indent=4)
+            os.replace(temp_path, self.file_path)
         except Exception as e:
-            print(f"Failed to save config: {e}")
+            log_error(f"Failed to save config: {e}")
 
     def _update_from_dict(self, data: Dict[str, Any]):
         self.xp_per_run_default = data.get("xp_per_run_default", self.xp_per_run_default)

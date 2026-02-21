@@ -121,8 +121,10 @@ class DailyManager:
 
     async def _save_data(self):
         try:
-            async with aiofiles.open(DAILY_DATA_FILE, json.get_write_mode()) as f:
+            temp_path = DAILY_DATA_FILE + ".tmp"
+            async with aiofiles.open(temp_path, json.get_write_mode()) as f:
                 await f.write(json.dumps(self.data, indent=4))
+            os.replace(temp_path, DAILY_DATA_FILE)
         except Exception as e:
             log_error(f"Failed to save daily data: {e}")
 

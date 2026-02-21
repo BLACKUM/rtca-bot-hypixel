@@ -7,9 +7,17 @@ class RateLimiter:
         self.requests_per_minute = requests_per_minute
         self.window_size = 60
         self.requests = {}
+        self.last_cleanup = time.time()
 
     def is_rate_limited(self, ip):
         current_time = time.time()
+        
+        if current_time - self.last_cleanup > 60:
+            self.last_cleanup = current_time
+            for key in list(self.requests.keys()):
+                self.requests[key] = [t for t in self.requests[key] if t > current_time - self.window_size]
+                if not self.requests[key]:
+                    del self.requests[key]
         
         if ip not in self.requests:
             self.requests[ip] = []

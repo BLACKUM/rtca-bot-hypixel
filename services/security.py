@@ -19,16 +19,27 @@ def get_current_key_string():
 def decrypt(encrypted_text):
     try:
         key = get_current_key()
-        cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
-        decryptor = cipher.decryptor()
-        
         decoded_data = base64.b64decode(encrypted_text)
-        padded_data = decryptor.update(decoded_data) + decryptor.finalize()
         
-        unpadder = padding.PKCS7(128).unpadder()
-        data = unpadder.update(padded_data) + unpadder.finalize()
-        
-        return data.decode('utf-8')
+        try:
+            if len(decoded_data) < 16:
+                raise ValueError("Data too short")
+            iv = decoded_data[:16]
+            ciphertext = decoded_data[16:]
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            decryptor = cipher.decryptor()
+            padded_data = decryptor.update(ciphertext) + decryptor.finalize()
+            unpadder = padding.PKCS7(128).unpadder()
+            data = unpadder.update(padded_data) + unpadder.finalize()
+            return data.decode('utf-8')
+        except Exception:
+            cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
+            decryptor = cipher.decryptor()
+            padded_data = decryptor.update(decoded_data) + decryptor.finalize()
+            unpadder = padding.PKCS7(128).unpadder()
+            data = unpadder.update(padded_data) + unpadder.finalize()
+            return data.decode('utf-8')
+            
     except Exception as e:
         log_error(f"Decryption failed: {e}")
         return None

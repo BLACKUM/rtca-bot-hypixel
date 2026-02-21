@@ -31,3 +31,4 @@ daily_data.json
 release/
 /logs
 /data
+!/data/custom_names.json

@@ -3,13 +3,15 @@ import os
 import atexit
 from queue import Queue
 from logging.handlers import TimedRotatingFileHandler, QueueHandler, QueueListener
-from core.config import config
 
 if not os.path.exists("logs"):
     os.makedirs("logs")
 
 logger = logging.getLogger("rtca_bot")
-logger.setLevel(logging.DEBUG if config.debug_mode else logging.INFO)
+logger.setLevel(logging.INFO)
+
+def set_debug_mode(debug_mode: bool):
+    logger.setLevel(logging.DEBUG if debug_mode else logging.INFO)
 
 formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 

@@ -10,6 +10,9 @@ from core.configuration import BotConfig
 
 config = BotConfig()
 
+from core.logger import set_debug_mode
+set_debug_mode(config.debug_mode)
+
 INTENTS = discord.Intents.default()
 INTENTS.message_content = True
 INTENTS.dm_messages = True

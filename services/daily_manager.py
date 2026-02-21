@@ -67,38 +67,34 @@ class DailyManager:
         updated_count = 0
         errors = 0
         processed_count = 0
-        sem = asyncio.Semaphore(5)
         
-        async def update_user(user_id, uuid):
-            nonlocal updated_count, errors, processed_count
-            async with sem:
-                try:
-                    if not uuid:
-                        log_error(f"Skipping update for {user_id}: No UUID")
-                        errors += 1
-                    else:
-                        forced_profile = self.data["users"].get(user_id, {}).get("forced_profile")
-                        xp_data = await get_dungeon_xp(uuid, profile_name=forced_profile)
-                        if xp_data:
-                            await self.update_user_data(user_id, xp_data, save=False)
-                            updated_count += 1
-                        else:
-                            errors += 1
-                except Exception as e:
-                    log_error(f"Error updating user {user_id}: {e}")
+        for user_id, uuid in tracked_users:
+            try:
+                if not uuid:
+                    log_error(f"Skipping update for {user_id}: No UUID")
                     errors += 1
-                finally:
-                    processed_count += 1
-                    if status_message and (processed_count <= 5 or processed_count % 5 == 0):
-                        try:
-                            asyncio.create_task(status_message.edit(
-                                content=f"🔄 **Force Update In Progress**\nProcessing: {processed_count}/{total_users}\nUpdated: {updated_count}\nErrors: {errors}"
-                            ))
-                        except Exception:
-                            pass
-
-        tasks = [update_user(uid, uuid) for uid, uuid in tracked_users]
-        await asyncio.gather(*tasks)
+                else:
+                    forced_profile = self.data["users"].get(user_id, {}).get("forced_profile")
+                    xp_data = await get_dungeon_xp(uuid, profile_name=forced_profile)
+                    if xp_data:
+                        await self.update_user_data(user_id, xp_data, save=False)
+                        updated_count += 1
+                    else:
+                        errors += 1
+            except Exception as e:
+                log_error(f"Error updating user {user_id}: {e}")
+                errors += 1
+            finally:
+                processed_count += 1
+                if status_message and (processed_count <= 5 or processed_count % 5 == 0 or processed_count == total_users):
+                    try:
+                        await status_message.edit(
+                            content=f"🔄 **Force Update In Progress**\nProcessing: {processed_count}/{total_users}\nUpdated: {updated_count}\nErrors: {errors}"
+                        )
+                    except Exception:
+                        pass
+            
+            await asyncio.sleep(0.25)
 
         if updated_count > 0:
             await self._save_data()

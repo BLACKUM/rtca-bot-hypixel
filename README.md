@@ -37,6 +37,15 @@ Discord bot for calculating class average 50 in Hypixel SkyBlock, tracking RNG d
 See [QUICKSTART.md](QUICKSTART.md) for detailed installation and setup instructions.
 
 ## Credits
-XP calculation logic and api stolen from [adjectils](https://adjectils.com/dungeon.html) by [adjectiven0un](https://github.com/adjectiven0un)
+
+- **adjectiven0un**: Inspiration and XP calculation logic from [adjectils](https://adjectils.com/dungeon.html).
+
+## Powered By
+
+- **Player Data**: UUID lookup provided by [PlayerDB](https://playerdb.co/).
+- **Hypixel Data**: Official [Hypixel API](https://api.hypixel.net/) for Bazaar prices.
+- **Auction Data**: Price averages provided by [Moulberry's Codes](https://moulberry.codes/).
+- **Special Prices**: Item pricing assistance from [Coflnet](https://sky.coflnet.com/).
+
 
 ![ZoKPU0I](https://github.com/user-attachments/assets/fbd17103-215e-4c34-87de-f34828de9a1b)

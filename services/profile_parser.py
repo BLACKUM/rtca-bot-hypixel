@@ -181,6 +181,9 @@ def parse_profile_stats(member: dict, profile: dict) -> dict:
     gemstone_powder = get_total_powder("gemstone")
     glacite_powder = get_total_powder("glacite")
 
+    maxwell = member.get("accessory_bag_storage", {})
+    magical_power = get_num(maxwell.get("highest_magical_power", 0))
+
     return {
         "skill_avg": skill_avg,
         "catacombs": cata_lvl,
@@ -197,5 +200,6 @@ def parse_profile_stats(member: dict, profile: dict) -> dict:
         "minion_slots": minion_slots,
         "mithril_powder": mithril_powder,
         "gemstone_powder": gemstone_powder,
-        "glacite_powder": glacite_powder
+        "glacite_powder": glacite_powder,
+        "magical_power": magical_power
     }

@@ -131,6 +131,7 @@ class ProfileSelectView(discord.ui.View):
         description = [
             f"Catacombs\n**{stats['catacombs']:.2f}**",
             f"Most Played Class\n**{stats['class_name']} ({stats['class_level']:.1f})**",
+            f"Magical Power\n**{format_number(stats['magical_power'])}**",
             f"Bank\n**{format_number(stats['bank'])}**",
             f"Purse\n**{format_number(stats['purse'])}**",
             f"Slayers\n**{stats['slayers']}**",

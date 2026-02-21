@@ -7,6 +7,7 @@ from services.link_manager import LinkManager
 from services.recent_manager import RecentManager
 from services.api import get_dungeon_xp, init_session, close_session
 from services.irc_handler import init_irc_handler
+from services.name_manager import name_manager
 from core.cache import initialize as init_cache
 import asyncio
 import os
@@ -20,6 +21,7 @@ class RTCABot(commands.Bot):
         await self.daily_manager.initialize()
         await self.rng_manager.initialize()
         await self.recent_manager.initialize()
+        await name_manager.initialize()
         await self.irc_handler.initialize()
         await self.daily_manager.sanitize_data()
 

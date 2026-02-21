@@ -20,6 +20,7 @@ class API(commands.Cog):
         self.app.router.add_post('/v1/party/create', self.handle_party_create)
         self.app.router.add_post('/v1/party/unqueue', self.handle_party_unqueue)
         self.app.router.add_post('/v1/party/update', self.handle_party_update)
+        self.app.router.add_get('/v1/names', self.handle_names)
         self.app.router.add_get('/v1/irc', self.handle_irc)
         
         self.runner = None
@@ -509,6 +510,13 @@ class API(commands.Cog):
         except Exception as e:
             log_error(f"[API] Error in party update: {e}")
             return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_names(self, request):
+        from services.name_manager import name_manager
+        return web.json_response({
+            'status': 'success',
+            'names': name_manager.get_names()
+        })
 
     async def handle_irc(self, request):
         from services.irc_handler import get_irc_handler

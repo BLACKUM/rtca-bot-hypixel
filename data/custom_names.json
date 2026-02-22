@@ -19,7 +19,8 @@
     },
     "steve99994": {
         "display": "Femboy",
-        "gradient": "linear-gradient(90deg,rgba(251, 0, 255, 1) 0%, rgba(171, 0, 173, 1) 50%, rgba(246, 157, 252, 1) 100%)",
+        "gradient": "",
+        "chroma": true,
         "animated": true,
         "speed": 1.3
     },

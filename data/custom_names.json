@@ -9,7 +9,7 @@
     },
     "furry_boykisser": {
         "display": "Furry_Boykisser",
-        "gradient": "linear-gradient(90deg,rgba(1, 181, 220, 1) 0%, rgba(227, 151, 168, 1) 25%, rgba(229, 229, 229, 1) 50%, rgba(227, 151, 168, 1) 75%, rgba(1, 181, 220, 1) 100%)"
+        "gradient": "radial-gradient(circle,rgba(229, 229, 229, 1) 0%, rgba(227, 151, 168, 1) 50%, rgba(1, 181, 220, 1) 100%);"
     },
     "steve99994": {
         "display": "Femboy",

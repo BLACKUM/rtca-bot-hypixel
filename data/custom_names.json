@@ -14,5 +14,9 @@
     "steve99994": {
         "display": "Femboy",
         "gradient": "linear-gradient(90deg,rgba(251, 0, 255, 1) 0%, rgba(171, 0, 173, 1) 2%, rgba(246, 157, 252, 1) 100%);"
+    },
+    "StormT_T": {
+        "display": "StormT_T",
+        "gradient": "linear-gradient(90deg, rgba(137, 58, 180, 1) 0%, rgba(253, 29, 29, 1) 50%, rgba(252, 176, 69, 1) 100%);"
     }
 }

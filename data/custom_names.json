@@ -7,7 +7,7 @@
     },
     "radioantenna": {
         "display": "RadioAntenna",
-        "gradient": "linear-gradient(90deg,rgba(20, 120, 220, 1) 0%, rgba(80, 220, 255, 1) 50%, rgba(20, 120, 220, 1) 100%)",
+        "gradient": "linear-gradient(90deg,rgba(51, 38, 64, 1) 0%, rgba(98, 61, 148, 1) 50%, rgba(51, 38, 64, 1) 100%)",
         "animated": true,
         "speed": 1.2
     },

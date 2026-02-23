@@ -79,7 +79,31 @@ async def get_uuid(name: str):
          return None
 
 
+async def get_soopy_player_data(uuid: str):
+    cached = await cache_get(f"soopy_player:{uuid}")
+    if cached:
+        return cached
+
+    if not _SESSION:
+        await init_session()
+
+    url = f"https://soopy.dev/api/v2/player/{uuid}"
+    log_debug(f"Requesting player data (soopy.dev): {url}")
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+            if r.status == 200:
+                data = await r.json(loads=json_utils.loads)
+                if data.get("success") and data.get("data"):
+                    result = data["data"]
+                    await cache_set(f"soopy_player:{uuid}", result, ttl=config.profile_cache_ttl)
+                    return result
+    except Exception as e:
+        log_error(f"soopy.dev player request error: {e}")
+    return None
+
+
 async def get_profile_data(uuid: str):
+
     cached = await cache_get(uuid)
     if cached:
         log_debug(f"Using cached data for {uuid}")
@@ -154,7 +178,7 @@ def _normalize_soopy(data: dict, uuid: str) -> dict:
     return {"profiles": profiles, "_source": "soopy"}
 
 
-def _parse_soopy_dungeon_stats(member: dict) -> dict:
+def _parse_soopy_dungeon_stats(member: dict, player_data: dict = None) -> dict:
     dungeons = member.get("dungeons", {})
     cata_xp = float(dungeons.get("catacombs_xp", 0) or 0)
 
@@ -187,7 +211,11 @@ def _parse_soopy_dungeon_stats(member: dict) -> dict:
 
     kills = member.get("kills", {})
     blood_mob_kills = int((kills or {}).get("watcher_summon_undead", 0) or 0)
+    
     secrets = -1
+    if player_data:
+        achievements = player_data.get("stats", {}).get("achievements", {}).get("skyblock", {})
+        secrets = achievements.get("dungeon_secrets", -1)
 
     accessory_reforge = member.get("accessory_reforge", {})
     magical_power = int((accessory_reforge or {}).get("highest_magical_power", 0) or 0)
@@ -200,6 +228,7 @@ def _parse_soopy_dungeon_stats(member: dict) -> dict:
         "floors": floors,
         "magical_power": magical_power,
     }
+
 
 
 async def get_bazaar_prices():
@@ -472,7 +501,9 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
     dungeons = member.get("dungeons", {})
 
     if "catacombs_xp" in dungeons:
-        return _parse_soopy_dungeon_stats(member)
+        player_data = await get_soopy_player_data(uuid)
+        return _parse_soopy_dungeon_stats(member, player_data)
+
 
     catacombs = dungeons.get("dungeon_types", {}).get("catacombs", {})
     master_catacombs = dungeons.get("dungeon_types", {}).get("master_catacombs", {})

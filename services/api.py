@@ -112,45 +112,79 @@ async def get_profile_data(uuid: str):
         log_error(f"Invalid UUID format: {uuid}")
         return None
 
-    if not _SESSION:
-        await init_session()
-
-    soopy_url = f"https://soopy.dev/api/v2/player_skyblock/{uuid}"
-    log_debug(f"Requesting profile data (soopy.dev): {soopy_url}")
+async def fetch_soopy_profile(uuid: str):
+    url = f"https://soopy.dev/api/v2/player_skyblock/{uuid}"
+    log_debug(f"Requesting profile data (soopy.dev): {url}")
     try:
-        async with _SESSION.get(soopy_url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
             if r.status == 200:
                 data = await r.json(loads=json_utils.loads)
                 if data.get("success") and data.get("data"):
-                    result = _normalize_soopy(data["data"], uuid)
-                    await cache_set(uuid, result, ttl=config.profile_cache_ttl)
-                    return result
+                    return _normalize_soopy(data["data"], uuid)
                 log_error(f"soopy.dev returned success=false for {uuid}")
             else:
                 log_error(f"soopy.dev profile request failed ({r.status})")
     except Exception as e:
         log_error(f"soopy.dev profile request error: {e}")
+    return None
 
-    fallback_url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/skyblock/profiles?uuid={uuid}"
-    log_debug(f"Requesting profile data (adjectilsbackend fallback): {fallback_url}")
+
+async def fetch_adjectils_profile(uuid: str):
+    url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/skyblock/profiles?uuid={uuid}"
+    log_debug(f"Requesting profile data (adjectilsbackend): {url}")
     try:
-        async with _SESSION.get(fallback_url, timeout=aiohttp.ClientTimeout(total=15)) as r:
-            if r.status != 200:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+            if r.status == 200:
+                data = await r.json(loads=json_utils.loads)
+                if data:
+                    data["_source"] = "skycrypt"
+                    return data
+            else:
                 try:
                     text = await r.text()
-                    log_error(f"Fallback profile request failed ({r.status}): {text[:200]}")
+                    log_error(f"Adjectils profile request failed ({r.status}): {text[:200]}")
                 except Exception:
-                    log_error(f"Fallback profile request failed ({r.status})")
-                return None
-            data = await r.json(loads=json_utils.loads)
-            await cache_set(uuid, data, ttl=config.profile_cache_ttl)
-            return data
+                    log_error(f"Adjectils profile request failed ({r.status})")
     except asyncio.TimeoutError:
-        log_error("Fallback profile request timed out (15s)")
-        return None
+        log_error("Adjectils profile request timed out (15s)")
     except Exception as e:
-        log_error(f"Fallback profile request error: {e}")
+        log_error(f"Adjectils profile request error: {e}")
+    return None
+
+
+async def get_profile_data(uuid: str):
+    cached = await cache_get(uuid)
+    if cached:
+        log_debug(f"Using cached data for {uuid}")
+        return cached
+
+    if not uuid or len(uuid) != 32 or not all(c in '0123456789abcdefABCDEF' for c in uuid):
+        log_error(f"Invalid UUID format: {uuid}")
         return None
+
+    if not _SESSION:
+        await init_session()
+
+    primary = getattr(config, "primary_api", "soopy").lower()
+    
+    if primary == "skycrypt":
+        result = await fetch_adjectils_profile(uuid)
+        if result:
+            await cache_set(uuid, result, ttl=config.profile_cache_ttl)
+            return result
+        result = await fetch_soopy_profile(uuid)
+    else:
+        result = await fetch_soopy_profile(uuid)
+        if result:
+            await cache_set(uuid, result, ttl=config.profile_cache_ttl)
+            return result
+        result = await fetch_adjectils_profile(uuid)
+    if result:
+        await cache_set(uuid, result, ttl=config.profile_cache_ttl)
+        return result
+    
+    return None
+
 
 
 def _normalize_soopy(data: dict, uuid: str) -> dict:
@@ -231,8 +265,6 @@ def _parse_soopy_dungeon_stats(member: dict, player_data: dict = None) -> dict:
             "highest_magical_power": magical_power
         }
     }
-
-
 
 
 
@@ -505,7 +537,7 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
 
     dungeons = member.get("dungeons", {})
 
-    if "catacombs_xp" in dungeons:
+    if profile_data.get("_source") == "soopy" or "catacombs_xp" in dungeons:
         player_data = await get_soopy_player_data(uuid)
         return _parse_soopy_dungeon_stats(member, player_data)
 
@@ -572,7 +604,6 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
             "highest_magical_power": magical_power
         }
     }
-
 
 async def get_recent_runs(uuid: str, profile_name: str = None):
     profile_data = await get_profile_data(uuid)

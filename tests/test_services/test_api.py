@@ -58,7 +58,52 @@ async def test_get_profile_data(mocker):
     assert data == {"profiles": []}
 
 @pytest.mark.asyncio
-async def test_get_bazaar_prices(mocker):
+async def test_get_profile_data_priority(mocker):
+    mocker.patch("services.api.cache_get", return_value=None)
+    mocker.patch("services.api.cache_set")
+    mocker.patch("services.api.init_session")
+    
+    mock_soopy = mocker.patch("services.api.fetch_soopy_profile", return_value=None)
+    mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value=None)
+    
+    from core.config import config
+    config.primary_api = "soopy"
+    await api.get_profile_data("a"*32)
+    
+    assert mock_soopy.called
+    assert mock_adjectils.called
+    
+    mock_soopy.reset_mock()
+    mock_adjectils.reset_mock()
+    
+    config.primary_api = "skycrypt"
+    await api.get_profile_data("a"*32)
+    
+    assert mock_adjectils.called
+    assert mock_soopy.called
+
+@pytest.mark.asyncio
+async def test_get_profile_data_success_stop(mocker):
+    mocker.patch("services.api.cache_get", return_value=None)
+    mocker.patch("services.api.cache_set")
+    mocker.patch("services.api.init_session")
+    
+    mock_soopy = mocker.patch("services.api.fetch_soopy_profile", return_value={"_source": "soopy"})
+    mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value={"_source": "skycrypt"})
+    
+    from core.config import config
+    config.primary_api = "soopy"
+    result = await api.get_profile_data("a"*32)
+    assert result["_source"] == "soopy"
+    assert not mock_adjectils.called
+    
+    mock_soopy.reset_mock()
+    mock_adjectils.reset_mock()
+    
+    config.primary_api = "skycrypt"
+    result = await api.get_profile_data("a"*32)
+    assert result["_source"] == "skycrypt"
+    assert not mock_soopy.called
     mocker.patch("services.api.cache_get", return_value=None)
     mock_set = mocker.patch("services.api.cache_set")
     

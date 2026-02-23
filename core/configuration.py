@@ -13,6 +13,7 @@ class BotConfig:
         self.profile_cache_ttl: int = 60
         self.prices_cache_ttl: int = 259200
         self.irc_channel_id: int = 0
+        self.primary_api: str = "soopy"
         self.owner_ids: List[int] = [377351386637271041, 679725029109399574]
         self.congrats_gifs: List[str] = [
             "https://c.tenor.com/n5-r2F_JeGMAAAAd/tenor.gif",
@@ -95,6 +96,7 @@ class BotConfig:
             "profile_cache_ttl": self.profile_cache_ttl,
             "prices_cache_ttl": self.prices_cache_ttl,
             "irc_channel_id": self.irc_channel_id,
+            "primary_api": self.primary_api,
             "owner_ids": self.owner_ids,
             "congrats_gifs": self.congrats_gifs
         }
@@ -114,6 +116,7 @@ class BotConfig:
         self.profile_cache_ttl = data.get("profile_cache_ttl", self.profile_cache_ttl)
         self.prices_cache_ttl = data.get("prices_cache_ttl", self.prices_cache_ttl)
         self.irc_channel_id = data.get("irc_channel_id", self.irc_channel_id)
+        self.primary_api = data.get("primary_api", self.primary_api)
         if "owner_ids" in data:
             self.owner_ids = data["owner_ids"]
         if "congrats_gifs" in data:

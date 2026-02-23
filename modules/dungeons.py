@@ -464,14 +464,21 @@ class Dungeons(commands.Cog):
             return
 
         dungeons = member.get("dungeons", {})
-        player_classes = dungeons.get("player_classes", {})
-        
-        dungeon_classes = {
-            cls: data["experience"]
-            for cls, data in player_classes.items()
-            if cls in ["archer", "berserk", "healer", "mage", "tank"]
-        }
-        
+
+        if "class_levels" in dungeons:
+            class_levels = dungeons.get("class_levels", {})
+            dungeon_classes = {
+                cls: float((class_levels.get(cls) or {}).get("xp", 0) or 0)
+                for cls in ["archer", "berserk", "healer", "mage", "tank"]
+            }
+        else:
+            player_classes = dungeons.get("player_classes", {})
+            dungeon_classes = {
+                cls: data["experience"]
+                for cls, data in player_classes.items()
+                if cls in ["archer", "berserk", "healer", "mage", "tank"]
+            }
+
         if not dungeon_classes:
             await interaction.followup.send("❌ This player has no dungeon data.")
             return
@@ -533,7 +540,10 @@ class Dungeons(commands.Cog):
         
         log_debug(f"Dungeon XP per run: {dungeon_xp:,.0f}")
         
-        current_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
+        if "catacombs_xp" in dungeons:
+            current_cata_xp = float(dungeons.get("catacombs_xp", 0) or 0)
+        else:
+            current_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
         
         runs_total, results = await simulate_async(dungeon_classes, base_floor, bonuses)
         

@@ -187,7 +187,7 @@ def _parse_soopy_dungeon_stats(member: dict) -> dict:
 
     kills = member.get("kills", {})
     blood_mob_kills = int((kills or {}).get("watcher_summon_undead", 0) or 0)
-    secrets = int((kills or {}).get("dungeon_secret_bat", 0) or 0)
+    secrets = -1
 
     accessory_reforge = member.get("accessory_reforge", {})
     magical_power = int((accessory_reforge or {}).get("highest_magical_power", 0) or 0)

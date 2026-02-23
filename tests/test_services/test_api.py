@@ -121,6 +121,7 @@ async def test_get_ah_prices(mocker):
     assert result["secrets"] == 74445
     assert result["blood_mob_kills"] == 50
     assert result["magical_power"] == 450
+    assert result["accessory_bag_storage"]["highest_magical_power"] == 450
     assert result["classes"]["Archer"] == 100.0
     assert result["classes"]["Berserk"] == 200.0
     assert result["floors"]["F1"]["runs"] == 10
@@ -158,6 +159,7 @@ async def test_get_dungeon_stats_soopy_with_extra_api(mocker):
     stats = await api.get_dungeon_stats("uuid")
     
     assert stats["magical_power"] == 123
+    assert stats["accessory_bag_storage"]["highest_magical_power"] == 123
     assert stats["secrets"] == 74445
 
 

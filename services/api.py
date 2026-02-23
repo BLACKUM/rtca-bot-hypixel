@@ -227,7 +227,12 @@ def _parse_soopy_dungeon_stats(member: dict, player_data: dict = None) -> dict:
         "classes": class_xp,
         "floors": floors,
         "magical_power": magical_power,
+        "accessory_bag_storage": {
+            "highest_magical_power": magical_power
+        }
     }
+
+
 
 
 
@@ -563,7 +568,11 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
         "classes": class_xp,
         "floors": floors,
         "magical_power": magical_power,
+        "accessory_bag_storage": {
+            "highest_magical_power": magical_power
+        }
     }
+
 
 async def get_recent_runs(uuid: str, profile_name: str = None):
     profile_data = await get_profile_data(uuid)

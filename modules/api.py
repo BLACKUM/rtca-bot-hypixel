@@ -37,11 +37,14 @@ class API(commands.Cog):
         log_info(f"API server started on http://{self.host}:{self.port}")
 
     async def cog_unload(self):
-        if self.site:
-            await self.site.stop()
-        if self.runner:
-            await self.runner.cleanup()
-        log_info("API server stopped.")
+        try:
+            if self.site:
+                await self.site.stop()
+            if self.runner:
+                await self.runner.cleanup()
+            log_info("API server stopped.")
+        except Exception as e:
+            log_error(f"Error during API shutdown: {e}")
 
     async def handle_key(self, request):
         from services.security import get_current_key_string

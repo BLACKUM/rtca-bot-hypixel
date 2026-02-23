@@ -78,6 +78,10 @@ class IrcHandler:
                     await self.process_mod_message(ws, data)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     log_error(f"IRC WebSocket connection closed with exception {ws.exception()}")
+        except asyncio.CancelledError:
+            log_info("IRC WebSocket connection cancelled during shutdown.")
+            await ws.close()
+            raise
         finally:
             if ws in self.connections:
                 del self.connections[ws]

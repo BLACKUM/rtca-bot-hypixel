@@ -105,3 +105,58 @@ async def test_get_ah_prices(mocker):
     assert prices == {"ITEM_ID": 200.0}
     mock_set.assert_called_once()
 
+def test_parse_soopy_dungeon_stats():
+    member_data = {
+        "dungeons": {
+            "catacombs_xp": 1000.5,
+            "class_levels": {
+                "archer": {"xp": 100},
+                "berserk": {"xp": 200}
+            },
+            "floorStats": {
+                "f1": {"completions": 10, "fastest_time_s": {"raw": 100}}
+            }
+        },
+        "kills": {
+            "watcher_summon_undead": 50,
+            "dungeon_secret_bat": 15
+        },
+        "accessory_reforge": {
+            "highest_magical_power": 450
+        }
+    }
+    
+    result = api._parse_soopy_dungeon_stats(member_data)
+    
+    assert result["catacombs"] == 1000.5
+    assert result["secrets"] == 15
+    assert result["blood_mob_kills"] == 50
+    assert result["magical_power"] == 450
+    assert result["classes"]["Archer"] == 100.0
+    assert result["classes"]["Berserk"] == 200.0
+    assert result["floors"]["F1"]["runs"] == 10
+    assert result["floors"]["F1"]["fastest_s"] == 100
+
+@pytest.mark.asyncio
+async def test_get_dungeon_stats_magical_power(mocker):
+    mock_profile = {
+        "profiles": [
+            {
+                "selected": True,
+                "members": {
+                    "uuid": {
+                        "dungeons": {"catacombs_xp": 10},
+                        "accessory_reforge": {"highest_magical_power": 123},
+                        "kills": {"dungeon_secret_bat": 5}
+                    }
+                }
+            }
+        ]
+    }
+    mocker.patch("services.api.get_profile_data", return_value=mock_profile)
+    
+    stats = await api.get_dungeon_stats("uuid")
+    
+    assert stats["magical_power"] == 123
+    assert stats["secrets"] == 5
+

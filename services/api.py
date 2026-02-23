@@ -187,13 +187,18 @@ def _parse_soopy_dungeon_stats(member: dict) -> dict:
 
     kills = member.get("kills", {})
     blood_mob_kills = int((kills or {}).get("watcher_summon_undead", 0) or 0)
+    secrets = int((kills or {}).get("dungeon_secret_bat", 0) or 0)
+
+    accessory_reforge = member.get("accessory_reforge", {})
+    magical_power = int((accessory_reforge or {}).get("highest_magical_power", 0) or 0)
 
     return {
         "catacombs": cata_xp,
-        "secrets": 0,
+        "secrets": secrets,
         "blood_mob_kills": blood_mob_kills,
         "classes": class_xp,
         "floors": floors,
+        "magical_power": magical_power,
     }
 
 
@@ -488,6 +493,9 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
     kills = player_stats.get("kills", {})
     blood_mob_kills = kills.get("watcher_summon_undead", 0)
 
+    accessory_bag = member.get("accessory_bag_storage", {})
+    magical_power = int((accessory_bag or {}).get("highest_magical_power", 0) or 0)
+
     floors = {}
 
     def process_tier(tier_data, prefix="F"):
@@ -523,6 +531,7 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
         "blood_mob_kills": blood_mob_kills,
         "classes": class_xp,
         "floors": floors,
+        "magical_power": magical_power,
     }
 
 async def get_recent_runs(uuid: str, profile_name: str = None):

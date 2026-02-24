@@ -90,7 +90,7 @@ async def get_soopy_player_data(uuid: str):
     url = f"https://soopy.dev/api/v2/player/{uuid}"
     log_debug(f"Requesting player data (soopy.dev): {url}")
     try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
                 data = await r.json(loads=json_utils.loads)
                 if data.get("success") and data.get("data"):
@@ -116,7 +116,7 @@ async def fetch_soopy_profile(uuid: str):
     url = f"https://soopy.dev/api/v2/player_skyblock/{uuid}"
     log_debug(f"Requesting profile data (soopy.dev): {url}")
     try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
                 data = await r.json(loads=json_utils.loads)
                 if data.get("success") and data.get("data"):
@@ -133,11 +133,11 @@ async def fetch_adjectils_profile(uuid: str):
     url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/skyblock/profiles?uuid={uuid}"
     log_debug(f"Requesting profile data (adjectilsbackend): {url}")
     try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
                 data = await r.json(loads=json_utils.loads)
                 if data:
-                    data["_source"] = "skycrypt"
+                    data["_source"] = "adjectils"
                     return data
             else:
                 try:
@@ -149,6 +149,40 @@ async def fetch_adjectils_profile(uuid: str):
         log_error("Adjectils profile request timed out (15s)")
     except Exception as e:
         log_error(f"Adjectils profile request error: {e}")
+    return None
+
+
+async def fetch_skycrypt_shiiyu_profile(uuid: str):
+    from services.skycrypt_service import get_skycrypt_profile
+    ign = await get_ign(uuid)
+    if not ign:
+        return None
+    
+    url = f"https://sky.shiiyu.moe/api/stats/{ign}"
+    log_debug(f"Requesting profile data (sky.shiiyu.moe): {url}")
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
+            if r.status == 200:
+                data = await r.json(content_type=None)
+                if data and "profiles" in data:
+                    data["_source"] = "skycrypt"
+                    return data
+            else:
+                log_error(f"sky.shiiyu.moe profile request failed ({r.status})")
+    except Exception as e:
+        log_error(f"sky.shiiyu.moe profile request error: {e}")
+    return None
+
+
+async def get_ign(uuid: str) -> Optional[str]:
+    url = f"https://playerdb.co/api/player/minecraft/{uuid}"
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            if r.status == 200:
+                data = await r.json()
+                return data.get("data", {}).get("player", {}).get("username")
+    except Exception:
+        pass
     return None
 
 
@@ -165,26 +199,17 @@ async def get_profile_data(uuid: str):
     if not _SESSION:
         await init_session()
 
-    primary = getattr(config, "primary_api", "soopy").lower()
-    
-    if primary == "skycrypt":
-        result = await fetch_adjectils_profile(uuid)
-        if result:
-            await cache_set(uuid, result, ttl=config.profile_cache_ttl)
-            return result
+    result = await fetch_adjectils_profile(uuid)
+    if not result:
         result = await fetch_soopy_profile(uuid)
-    else:
-        result = await fetch_soopy_profile(uuid)
-        if result:
-            await cache_set(uuid, result, ttl=config.profile_cache_ttl)
-            return result
-        result = await fetch_adjectils_profile(uuid)
+    if not result:
+        result = await fetch_skycrypt_shiiyu_profile(uuid)
+
     if result:
         await cache_set(uuid, result, ttl=config.profile_cache_ttl)
         return result
     
     return None
-
 
 
 def _normalize_soopy(data: dict, uuid: str) -> dict:
@@ -232,15 +257,15 @@ def _parse_soopy_dungeon_stats(member: dict, player_data: dict = None) -> dict:
         "m5": "M5", "m6": "M6", "m7": "M7",
     }
     for raw_key, display_key in floor_key_map.items():
-        floor_data = floor_stats_raw.get(raw_key, {})
-        completions = int((floor_data or {}).get("completions", 0) or 0)
-        s_raw = ((floor_data or {}).get("fastest_time_s") or {}).get("raw")
-        s_plus_raw = ((floor_data or {}).get("fastest_time_s_plus") or {}).get("raw")
+        floor_data = floor_stats_raw.get(raw_key) or {}
+        completions = int(floor_data.get("completions") or 0)
+        s_raw = (floor_data.get("fastest_time_s") or {}).get("raw")
+        s_plus_raw = (floor_data.get("fastest_time_s_plus") or {}).get("raw")
         floors[display_key] = {
             "runs": completions,
-            "best_score": 0,
-            "fastest_s": int(s_raw) if isinstance(s_raw, (int, float)) else 0,
-            "fastest_s_plus": int(s_plus_raw) if isinstance(s_plus_raw, (int, float)) else 0,
+            "best_score": int(floor_data.get("best_score") or 0),
+            "fastest_s": int(s_raw) if isinstance(s_raw, (int, float)) and not isinstance(s_raw, bool) else 0,
+            "fastest_s_plus": int(s_plus_raw) if isinstance(s_plus_raw, (int, float)) and not isinstance(s_plus_raw, bool) else 0,
         }
 
     kills = member.get("kills", {})
@@ -536,6 +561,12 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
         return None
 
     dungeons = member.get("dungeons", {})
+
+    if profile_data.get("_source") == "skycrypt":
+        from services.skycrypt_service import get_dungeon_stats_skycrypt
+        ign = await get_ign(uuid)
+        if ign:
+            return await get_dungeon_stats_skycrypt(ign, profile_name)
 
     if profile_data.get("_source") == "soopy" or "catacombs_xp" in dungeons:
         player_data = await get_soopy_player_data(uuid)

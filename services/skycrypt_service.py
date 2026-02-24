@@ -29,23 +29,25 @@ async def _get_build_id() -> Optional[str]:
         return cached
 
     session = await _get_session()
+    # Scrape from a profile page as version.json gives an incorrect ID
+    url = f"{SKYCRYPT_BASE}/stats/BLACKUM"
     try:
         import aiohttp
-        async with session.get(SKYCRYPT_BASE, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
-                log_error(f"SkyCrypt HTML fetch failed: {resp.status}")
+                log_error(f"SkyCrypt profile page fetch failed: {resp.status}")
                 return None
             html = await resp.text()
+            match = BUILD_ID_PATTERN.search(html)
+            if match:
+                build_id = match.group(1)
+            else:
+                log_error("Could not extract SkyCrypt build ID from profile page HTML")
+                return None
     except Exception as e:
-        log_error(f"SkyCrypt HTML fetch error: {e}")
+        log_error(f"SkyCrypt build ID scraping error: {e}")
         return None
 
-    match = BUILD_ID_PATTERN.search(html)
-    if not match:
-        log_error("Could not extract SkyCrypt build ID from HTML")
-        return None
-
-    build_id = match.group(1)
     log_debug(f"SkyCrypt build ID discovered: {build_id}")
     await cache_set(BUILD_ID_CACHE_KEY, build_id, ttl=BUILD_ID_TTL)
     return build_id

@@ -64,23 +64,15 @@ async def test_get_profile_data_priority(mocker):
     mocker.patch("services.api.init_session")
     
     mock_soopy = mocker.patch("services.api.fetch_soopy_profile", return_value=None)
+    mock_shiiyu = mocker.patch("services.api.fetch_skycrypt_shiiyu_profile", return_value=None)
     mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value=None)
     
     from core.config import config
-    config.primary_api = "soopy"
-    await api.get_profile_data("a"*32)
-    
-    assert mock_soopy.called
-    assert mock_adjectils.called
-    
-    mock_soopy.reset_mock()
-    mock_adjectils.reset_mock()
-    
-    config.primary_api = "skycrypt"
     await api.get_profile_data("a"*32)
     
     assert mock_adjectils.called
     assert mock_soopy.called
+    assert mock_shiiyu.called
 
 @pytest.mark.asyncio
 async def test_get_profile_data_success_stop(mocker):
@@ -89,21 +81,33 @@ async def test_get_profile_data_success_stop(mocker):
     mocker.patch("services.api.init_session")
     
     mock_soopy = mocker.patch("services.api.fetch_soopy_profile", return_value={"_source": "soopy"})
-    mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value={"_source": "skycrypt"})
+    mock_shiiyu = mocker.patch("services.api.fetch_skycrypt_shiiyu_profile", return_value={"_source": "skycrypt"})
+    mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value={"_source": "adjectils"})
     
-    from core.config import config
-    config.primary_api = "soopy"
+    # First should be adjectils
+    result = await api.get_profile_data("a"*32)
+    assert result["_source"] == "adjectils"
+    assert not mock_soopy.called
+    assert not mock_shiiyu.called
+    
+    mock_adjectils.reset_mock()
+    mock_adjectils.return_value = None
+    
+    # Second should be soopy
     result = await api.get_profile_data("a"*32)
     assert result["_source"] == "soopy"
-    assert not mock_adjectils.called
+    assert mock_adjectils.called
+    assert mock_soopy.called
+    assert not mock_shiiyu.called
     
     mock_soopy.reset_mock()
-    mock_adjectils.reset_mock()
+    mock_soopy.return_value = None
     
-    config.primary_api = "skycrypt"
+    # Third should be skycrypt
     result = await api.get_profile_data("a"*32)
     assert result["_source"] == "skycrypt"
-    assert not mock_soopy.called
+    assert mock_soopy.called
+    assert mock_shiiyu.called
     mocker.patch("services.api.cache_get", return_value=None)
     mock_set = mocker.patch("services.api.cache_set")
     

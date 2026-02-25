@@ -8,7 +8,7 @@ from services.recent_manager import RecentManager
 from services.api import get_dungeon_xp, init_session, close_session
 from services.irc_handler import init_irc_handler
 from services.name_manager import name_manager
-from core.cache import initialize as init_cache
+from core.cache import initialize as init_cache, shutdown as shutdown_cache
 import asyncio
 import os
 import traceback
@@ -100,6 +100,7 @@ async def main():
         log_error(f"Failed to start bot: {e}")
         raise
     finally:
+        await shutdown_cache()
         await bot.irc_handler.close()
         await close_session()
 

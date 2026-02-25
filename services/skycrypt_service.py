@@ -29,7 +29,6 @@ async def _get_build_id() -> Optional[str]:
         return cached
 
     session = await _get_session()
-    # Scrape from a profile page as version.json gives an incorrect ID
     url = f"{SKYCRYPT_BASE}/stats/BLACKUM"
     try:
         import aiohttp

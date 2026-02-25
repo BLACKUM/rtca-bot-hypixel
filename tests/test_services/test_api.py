@@ -84,7 +84,6 @@ async def test_get_profile_data_success_stop(mocker):
     mock_shiiyu = mocker.patch("services.api.fetch_skycrypt_shiiyu_profile", return_value={"_source": "skycrypt"})
     mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value={"_source": "adjectils"})
     
-    # First should be adjectils
     result = await api.get_profile_data("a"*32)
     assert result["_source"] == "adjectils"
     assert not mock_soopy.called
@@ -93,7 +92,6 @@ async def test_get_profile_data_success_stop(mocker):
     mock_adjectils.reset_mock()
     mock_adjectils.return_value = None
     
-    # Second should be soopy
     result = await api.get_profile_data("a"*32)
     assert result["_source"] == "soopy"
     assert mock_adjectils.called
@@ -103,7 +101,6 @@ async def test_get_profile_data_success_stop(mocker):
     mock_soopy.reset_mock()
     mock_soopy.return_value = None
     
-    # Third should be skycrypt
     result = await api.get_profile_data("a"*32)
     assert result["_source"] == "skycrypt"
     assert mock_soopy.called

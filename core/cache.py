@@ -15,7 +15,7 @@ CACHE_FILE = "data/cache.json"
 _DATA_CACHE = {}
 _DIRTY = False
 _SAVE_INTERVAL_SECONDS = 60
-MAX_CACHE_SIZE = 500
+MAX_CACHE_SIZE = 50
 
 
 def _serialize(data) -> bytes:

@@ -53,7 +53,7 @@ class RecentManager:
         try:
             os.makedirs(os.path.dirname(RECENT_DATA_FILE), exist_ok=True)
             async with aiofiles.open(RECENT_DATA_FILE, 'wb') as f:
-                await f.write(json.dumps(self.data, indent=4))
+                await f.write(json.dumps(self.data))
         except Exception as e:
             log_error(f"Failed to save recent data: {e}")
 

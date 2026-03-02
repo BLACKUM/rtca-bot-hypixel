@@ -1,5 +1,8 @@
 import aiohttp
 import asyncio
+import os
+import time
+import aiofiles
 from services import json_utils
 from urllib.parse import quote
 from core.config import config
@@ -9,6 +12,10 @@ from core.logger import log_debug, log_error, log_info
 from core.cache import cache_get, cache_set, get_cache_expiry
 from typing import Optional
 
+PRICES_CACHE_FILE = "data/prices_cache.json"
+_prices_memory: Optional[dict] = None
+_prices_fetched_at: float = 0.0
+
 
 _SESSION: Optional[aiohttp.ClientSession] = None
 _CONNECTOR: Optional[aiohttp.TCPConnector] = None
@@ -16,7 +23,7 @@ _CONNECTOR: Optional[aiohttp.TCPConnector] = None
 async def init_session():
     global _SESSION, _CONNECTOR
     if _SESSION is None:
-        _CONNECTOR = aiohttp.TCPConnector(force_close=True)
+        _CONNECTOR = aiohttp.TCPConnector(limit=10)
         _SESSION = aiohttp.ClientSession(headers=HEADERS, connector=_CONNECTOR)
         log_info("Global API Session initialized.")
 
@@ -293,75 +300,79 @@ def _parse_soopy_dungeon_stats(member: dict, player_data: dict = None) -> dict:
 
 
 
-async def get_bazaar_prices():
-    cached = await cache_get("bazaar_prices")
-    if cached is not None:
-        return cached
-    
+async def _load_prices_from_disk() -> Optional[dict]:
+    if not os.path.exists(PRICES_CACHE_FILE):
+        return None
+    try:
+        async with aiofiles.open(PRICES_CACHE_FILE, "rb") as f:
+            content = await f.read()
+        data = json_utils.loads(content)
+        fetched_at = data.get("_fetched_at", 0)
+        if time.time() - fetched_at > config.prices_cache_ttl:
+            log_info("Prices cache file is expired, will re-fetch.")
+            return None
+        log_info(f"Loaded prices from disk (age: {int(time.time() - fetched_at)}s).")
+        prices = {k: v for k, v in data.items() if k != "_fetched_at"}
+        return prices
+    except Exception as e:
+        log_error(f"Failed to load prices from disk: {e}")
+        return None
+
+
+async def _save_prices_to_disk(prices: dict):
+    try:
+        os.makedirs(os.path.dirname(PRICES_CACHE_FILE), exist_ok=True)
+        payload = dict(prices)
+        payload["_fetched_at"] = time.time()
+        temp_path = PRICES_CACHE_FILE + ".tmp"
+        async with aiofiles.open(temp_path, "wb") as f:
+            await f.write(json_utils.dumps(payload))
+        os.replace(temp_path, PRICES_CACHE_FILE)
+        log_info("Prices saved to disk.")
+    except Exception as e:
+        log_error(f"Failed to save prices to disk: {e}")
+
+
+async def _fetch_bazaar_prices() -> dict:
     url = "https://api.hypixel.net/skyblock/bazaar"
-    log_debug("Fetching Bazaar prices")
-    
+    log_info("Fetching Bazaar prices from API...")
     if not _SESSION:
         await init_session()
-
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
             if r.status != 200:
-                try:
-                    text = await r.text()
-                    log_error(f"Bazaar request failed ({r.status}): {text[:200]}")
-                except:
-                    log_error(f"Bazaar request failed ({r.status})")
-                await cache_set("bazaar_prices", {}, ttl=config.prices_cache_ttl)
+                log_error(f"Bazaar request failed ({r.status})")
                 return {}
             data = await r.json(loads=json_utils.loads)
             products = data.get("products", {})
-            prices = {
-                pid: info["quick_status"]["sellPrice"] 
+            return {
+                pid: info["quick_status"]["sellPrice"]
                 for pid, info in products.items()
             }
-            await cache_set("bazaar_prices", prices, ttl=config.prices_cache_ttl)
-            return prices
     except Exception as e:
         log_error(f"Failed to fetch Bazaar prices: {e}")
-        await cache_set("bazaar_prices", {}, ttl=config.prices_cache_ttl)
         return {}
 
 
-async def get_ah_prices():
-    cached = await cache_get("ah_prices")
-    if cached is not None:
-        return cached
-        
+async def _fetch_ah_prices() -> dict:
     url = "https://moulberry.codes/auction_averages_lbin/3day.json"
-    log_debug("Fetching AH prices (3-day avg)")
-    
+    log_info("Fetching AH prices from API...")
     if not _SESSION:
         await init_session()
-
-    log_debug(f"Requesting AH prices: {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
             if r.status != 200:
-                try:
-                    text = await r.text()
-                    log_error(f"AH request failed ({r.status}): {text[:200]}")
-                except:
-                    log_error(f"AH request failed ({r.status})")
-                await cache_set("ah_prices", {}, ttl=config.prices_cache_ttl)
+                log_error(f"AH request failed ({r.status})")
                 return {}
-            prices = await r.json(loads=json_utils.loads)
-            await cache_set("ah_prices", prices, ttl=config.prices_cache_ttl)
-            return prices
+            return await r.json(loads=json_utils.loads)
     except Exception as e:
         log_error(f"Failed to fetch AH prices: {e}")
-        await cache_set("ah_prices", {}, ttl=config.prices_cache_ttl)
         return {}
 
 
 async def get_player_discord(uuid: str) -> Optional[str]:
     log_debug(f"Requesting player Discord for {uuid}")
-    
+
     if not _SESSION:
         await init_session()
 
@@ -375,7 +386,6 @@ async def get_player_discord(uuid: str) -> Optional[str]:
             player = data.get("player", {})
             if not player:
                 return None
-            
             social = player.get("socialMedia", {})
             links = social.get("links", {})
             return links.get("DISCORD")
@@ -383,27 +393,6 @@ async def get_player_discord(uuid: str) -> Optional[str]:
         log_error(f"Player request error: {e}")
         return None
 
-async def get_special_prices():
-    urls = {
-        "SHINY_NECRON_HANDLE": "https://sky.coflnet.com/api/item/price/NECRON_HANDLE?IsShiny=true",
-        SKELETON_MASTER_CHESTPLATE_50: "https://sky.coflnet.com/api/item/price/SKELETON_MASTER_CHESTPLATE?ItemTier=10-10&NoOtherValuableEnchants=true&BaseStatBoost=50"
-    }
-    
-    special_prices = {}
-    
-    if not _SESSION:
-        await init_session()
-
-    tasks = []
-    for key, url in urls.items():
-        tasks.append(fetch_special_price(_SESSION, key, url))
-    
-    results = await asyncio.gather(*tasks)
-    for key, price in results:
-        if price is not None:
-            special_prices[key] = price
-                
-    return special_prices
 
 async def fetch_special_price(session, key, url):
     try:
@@ -416,25 +405,55 @@ async def fetch_special_price(session, key, url):
         log_error(f"Failed to fetch special price for {key}: {e}")
     return key, None
 
-async def get_all_prices():
-    bz_future = get_bazaar_prices()
-    ah_future = get_ah_prices()
-    special_future = get_special_prices()
-    
-    bz_prices, ah_prices, special_prices = await asyncio.gather(bz_future, ah_future, special_future)
-    
-    prices = bz_prices.copy()
-    prices.update(ah_prices)
-    prices.update(special_prices)
-    
+
+async def get_special_prices() -> dict:
+    if not _SESSION:
+        await init_session()
+    tasks = [
+        fetch_special_price(_SESSION, "SHINY_NECRON_HANDLE",
+            "https://sky.coflnet.com/api/item/price/NECRON_HANDLE?IsShiny=true"),
+        fetch_special_price(_SESSION, SKELETON_MASTER_CHESTPLATE_50,
+            "https://sky.coflnet.com/api/item/price/SKELETON_MASTER_CHESTPLATE?ItemTier=10-10&NoOtherValuableEnchants=true&BaseStatBoost=50"),
+    ]
+    results = await asyncio.gather(*tasks)
+    return {k: v for k, v in results if v is not None}
+
+
+async def get_all_prices() -> dict:
+    global _prices_memory, _prices_fetched_at
+
+    if _prices_memory is not None:
+        age = time.time() - _prices_fetched_at
+        if age < config.prices_cache_ttl:
+            return _prices_memory
+
+    from_disk = await _load_prices_from_disk()
+    if from_disk is not None:
+        _prices_memory = from_disk
+        _prices_fetched_at = time.time()
+        return _prices_memory
+
+    bz, ah, special = await asyncio.gather(
+        _fetch_bazaar_prices(),
+        _fetch_ah_prices(),
+        get_special_prices(),
+    )
+    prices = bz.copy()
+    prices.update(ah)
+    prices.update(special)
     if SKELETON_MASTER_CHESTPLATE_50 not in prices:
         prices[SKELETON_MASTER_CHESTPLATE_50] = 40_000_000
-    
+
+    _prices_memory = prices
+    _prices_fetched_at = time.time()
+    await _save_prices_to_disk(prices)
     return prices
 
 
-def get_prices_expiry():
-    return get_cache_expiry("ah_prices")
+def get_prices_expiry() -> float:
+    if not os.path.exists(PRICES_CACHE_FILE):
+        return 0.0
+    return os.path.getmtime(PRICES_CACHE_FILE) + config.prices_cache_ttl
 
 
 def _select_member(profile_data, uuid, profile_name=None):

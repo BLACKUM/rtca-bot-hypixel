@@ -71,7 +71,7 @@ class RngManager:
     async def save_data(self):
         try:
             async with aiofiles.open(DATA_FILE, json.get_write_mode()) as f:
-                await f.write(json.dumps(self.data, indent=4))
+                await f.write(json.dumps(self.data))
         except Exception as e:
             log_error(f"Failed to save RNG data: {e}")
 

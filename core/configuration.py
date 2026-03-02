@@ -13,7 +13,7 @@ class BotConfig:
         self.profile_cache_ttl: int = 60
         self.prices_cache_ttl: int = 259200
         self.irc_channel_id: int = 0
-        self.primary_api: str = "soopy"
+        self.primary_api: str = "adjectils"
         self.owner_ids: List[int] = [377351386637271041, 679725029109399574]
         self.congrats_gifs: List[str] = [
             "https://c.tenor.com/n5-r2F_JeGMAAAAd/tenor.gif",

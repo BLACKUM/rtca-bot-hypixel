@@ -14,8 +14,8 @@ except ImportError:
 CACHE_FILE = "data/cache.json"
 _DATA_CACHE = {}
 _DIRTY = False
-_SAVE_INTERVAL_SECONDS = 30
-MAX_CACHE_SIZE = 10000
+_SAVE_INTERVAL_SECONDS = 60
+MAX_CACHE_SIZE = 500
 
 
 def _serialize(data) -> bytes:
@@ -42,10 +42,14 @@ async def _load_cache():
     try:
         async with aiofiles.open(CACHE_FILE, "rb") as f:
             content = await f.read()
+            if not content:
+                return
             data = _deserialize(content)
             if isinstance(data, dict):
-                _DATA_CACHE = data
-                log_info(f"Loaded {len(_DATA_CACHE)} entries from cache.")
+                now = time.time()
+                _DATA_CACHE = {k: v for k, v in data.items() if v[0] > now}
+                pruned = len(data) - len(_DATA_CACHE)
+                log_info(f"Loaded {len(_DATA_CACHE)} cache entries ({pruned} expired entries pruned).")
     except Exception as e:
         log_error(f"Failed to load cache: {e}")
 

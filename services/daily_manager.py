@@ -123,7 +123,7 @@ class DailyManager:
         try:
             temp_path = DAILY_DATA_FILE + ".tmp"
             async with aiofiles.open(temp_path, json.get_write_mode()) as f:
-                await f.write(json.dumps(self.data, indent=4))
+                await f.write(json.dumps(self.data))
             os.replace(temp_path, DAILY_DATA_FILE)
         except Exception as e:
             log_error(f"Failed to save daily data: {e}")
@@ -307,15 +307,21 @@ class DailyManager:
         leaderboard.sort(key=lambda x: x["gained"], reverse=True)
         return leaderboard
 
-    # i have no idea why uuid was invalid in the first place, but i've made this function to fix it in the future
-    # somebody changed a name... ig that's why
     async def sanitize_data(self):
+        sanitize_stamp = "data/.last_sanitize"
+        now = time.time()
+        if os.path.exists(sanitize_stamp):
+            last_run = os.path.getmtime(sanitize_stamp)
+            if now - last_run < 86400:
+                log_info("Skipping sanitize_data (ran within last 24h).")
+                return
+
         log_info("Sanitizing daily data...")
         updates = False
         for user_id, info in self.data["users"].items():
             uuid = info.get("uuid", "")
             ign = info.get("ign", "")
-            
+
             if not uuid or len(uuid) != 32:
                 log_info(f"Detected invalid UUID for {ign} ({uuid}). Fetching correct UUID...")
                 new_uuid = await get_uuid(ign)
@@ -331,3 +337,6 @@ class DailyManager:
             log_info("Daily data sanitized and saved.")
         else:
             log_info("Daily data is clean.")
+
+        with open(sanitize_stamp, "w") as f:
+            f.write(str(now))

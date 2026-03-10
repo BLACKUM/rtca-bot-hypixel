@@ -43,7 +43,7 @@
     },
     "At0msplitKatana": {
         "display": "At0msplitKatana",
-        "gradient": "background: linear-gradient(90deg,rgba(35, 235, 235, 1) 0%, rgba(234, 83, 237, 1) 100%);",
+        "gradient": "linear-gradient(90deg,rgba(35, 235, 235, 1) 0%, rgba(234, 83, 237, 1) 100%);",
         "chroma": false,
         "animated": true,
         "speed": 1.2

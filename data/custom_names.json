@@ -54,5 +54,12 @@
         "chroma": false,
         "animated": true,
         "speed": 1.5
+    },
+    "conungede": {
+        "display": "conungede",
+        "gradient": "",
+        "chroma": true,
+        "animated": true,
+        "speed": 1.5
     }
 }

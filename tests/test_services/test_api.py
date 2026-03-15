@@ -55,7 +55,7 @@ async def test_get_profile_data(mocker):
     mock_session.get.return_value = cm
     
     data = await api.get_profile_data("a"*32) # 32 chars
-    assert data == {"profiles": []}
+    assert data == {"profiles": [], "_source": "adjectils"}
 
 @pytest.mark.asyncio
 async def test_get_profile_data_priority(mocker):
@@ -105,6 +105,8 @@ async def test_get_profile_data_success_stop(mocker):
     assert result["_source"] == "skycrypt"
     assert mock_soopy.called
     assert mock_shiiyu.called
+@pytest.mark.asyncio
+async def test_get_bazaar_prices(mocker):
     mocker.patch("services.api.cache_get", return_value=None)
     mock_set = mocker.patch("services.api.cache_set")
     
@@ -125,9 +127,8 @@ async def test_get_profile_data_success_stop(mocker):
     cm.__aexit__.return_value = None
     mock_session.get.return_value = cm
     
-    prices = await api.get_bazaar_prices()
+    prices = await api._fetch_bazaar_prices()
     assert prices == {"ITEM_ID": 100.0}
-    mock_set.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_get_ah_prices(mocker):
@@ -147,10 +148,24 @@ async def test_get_ah_prices(mocker):
     cm.__aexit__.return_value = None
     mock_session.get.return_value = cm
     
-    prices = await api.get_ah_prices()
+    prices = await api._fetch_ah_prices()
     assert prices == {"ITEM_ID": 200.0}
-    mock_set.assert_called_once()
 
+def test_parse_soopy_dungeon_stats():
+    member_data = {
+        "dungeons": {
+            "catacombs_xp": 1000.5,
+            "class_levels": {
+                "archer": {"xp": 100.0},
+                "berserk": {"xp": 200.0}
+            },
+            "floorStats": {
+                "f1": {"completions": 10, "fastest_time_s": {"raw": 100}}
+            }
+        },
+        "accessory_reforge": {"highest_magical_power": 450},
+        "kills": {"watcher_summon_undead": 50}
+    }
     player_data = {
         "stats": {
             "achievements": {

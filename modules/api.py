@@ -30,6 +30,9 @@ class API(commands.Cog):
         self.port = int(os.getenv('API_PORT', '8080'))
 
     async def cog_load(self):
+        import logging
+        logging.getLogger("aiohttp.server").setLevel(logging.ERROR)
+        
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, self.host, self.port)
@@ -67,7 +70,7 @@ class API(commands.Cog):
             
             log_info(f"[API] Received profile request for: {player} (Profile: {profile_name})")
             
-            from services.api import get_uuid, get_bazaar_prices, get_dungeon_stats, get_recent_runs, get_profile_data
+            from services.api import get_uuid, get_dungeon_stats, get_recent_runs, get_profile_data
             
             uuid = await get_uuid(player)
             if not uuid:

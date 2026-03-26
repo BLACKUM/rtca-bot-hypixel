@@ -77,7 +77,7 @@
         "speed": 1.5
     },
     "notyukimii": {
-        "display": "notyukimii",
+        "display": "Yukimi",
         "gradient": "linear-gradient(90deg, rgba(224, 140, 255, 1) 0%, rgba(224, 140, 255, 1) 100%);",
         "chroma": false,
         "animated": false,

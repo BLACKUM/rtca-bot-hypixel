@@ -69,7 +69,8 @@ class GithubManager:
                     return False
         else:
             await self.run_git_command(["remote", "set-url", "origin", authed_url])
-            await self.run_git_command(["pull", "origin", "main"])
+            await self.run_git_command(["config", "pull.rebase", "false"])
+            await self.run_git_command(["pull", "origin", "main", "--allow-unrelated-histories"])
             
         return True
 

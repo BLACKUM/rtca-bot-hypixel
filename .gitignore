@@ -31,4 +31,6 @@ daily_data.json
 release/
 /logs
 /data/*
-!/data/custom_names.json
+# GitHub Backup
+.github_backup/
+core/github_secrets.py

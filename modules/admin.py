@@ -438,6 +438,25 @@ class DataAdminView(View):
 
          await interaction.response.send_message(embed=embeds[0], ephemeral=True)
 
+    @discord.ui.button(label="GitHub Backup", style=discord.ButtonStyle.success, emoji="📤")
+    async def github_backup(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.bot.github_manager.is_enabled():
+            await interaction.response.send_message("❌ **GitHub Backup is not configured.** Please set up `core/github_secrets.py` to use this feature.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=False)
+        try:
+            msg = await interaction.followup.send("📤 **Initiating GitHub data backup...**")
+            success, message = await self.bot.github_manager.backup_data()
+            if success:
+                await msg.edit(content=f"✅ **Backup Success:** {message}")
+            else:
+                await msg.edit(content=f"❌ **Backup Failed:** {message}")
+        except Exception as e:
+            from core.logger import log_error
+            log_error(f"Manual GitHub backup failed: {e}")
+            await interaction.followup.send("❌ Error during backup process.")
+
 
 class AdminView(View):
     def __init__(self, bot):

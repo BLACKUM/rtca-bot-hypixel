@@ -8,6 +8,7 @@ from services.recent_manager import RecentManager
 from services.api import get_dungeon_xp, init_session, close_session
 from services.irc_handler import init_irc_handler
 from services.name_manager import name_manager
+from services.github_manager import GithubManager
 from core.cache import initialize as init_cache, shutdown as shutdown_cache
 import asyncio
 import os
@@ -32,6 +33,7 @@ bot.daily_manager = DailyManager()
 bot.rng_manager = RngManager()
 bot.link_manager = LinkManager()
 bot.recent_manager = RecentManager()
+bot.github_manager = GithubManager()
 bot.irc_handler = init_irc_handler(bot)
 
 @bot.listen()
@@ -60,10 +62,27 @@ async def track_daily_stats():
         import traceback
         log_error(traceback.format_exc())
 
+@tasks.loop(hours=24)
+async def backup_github():
+    try:
+        log_info("Running scheduled GitHub data backup...")
+        success, message = await bot.github_manager.backup_data()
+        if success:
+            log_info(f"GitHub backup: {message}")
+        else:
+            log_error(f"GitHub backup failed: {message}")
+    except Exception as e:
+        log_error(f"Unhandled exception in backup_github loop: {e}")
+        import traceback
+        log_error(traceback.format_exc())
+
 @bot.listen()
 async def on_ready():
     if not track_daily_stats.is_running():
         track_daily_stats.start()
+    
+    if bot.github_manager.is_enabled() and not backup_github.is_running():
+        backup_github.start()
     
     log_info(f"✅ Logged in as {bot.user}")
     try:

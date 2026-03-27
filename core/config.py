@@ -6,6 +6,12 @@ except ImportError:
         "secrets.py not found! Please copy secrets.example.py to secrets.py and add your Discord bot token."
     )
 
+try:
+    from core.github_secrets import GITHUB_BACKUP_REPO, GITHUB_BACKUP_TOKEN
+except ImportError:
+    GITHUB_BACKUP_REPO = ""
+    GITHUB_BACKUP_TOKEN = ""
+
 from core.configuration import BotConfig
 
 config = BotConfig()

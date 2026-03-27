@@ -34,3 +34,4 @@ release/
 # GitHub Backup
 .github_backup/
 core/github_secrets.py
+!/data/custom_names.json

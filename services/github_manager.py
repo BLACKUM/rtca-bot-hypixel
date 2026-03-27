@@ -100,13 +100,8 @@ class GithubManager:
         
         await self.run_git_command(["add", "."])
         
-        process = await asyncio.create_subprocess_exec(
-            "git", "diff-index", "--quiet", "HEAD", "--",
-            cwd=self.backup_dir
-        )
-        await process.wait()
-        
-        if process.returncode == 0:
+        success, output = await self.run_git_command(["status", "--porcelain"])
+        if not output:
             return True, "No changes detected in data files."
         
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

@@ -479,9 +479,8 @@ class RemoveClearSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         uuid = self.values[0]
         success, msg = await self.bot.solo_manager.remove_run(self.floor, uuid)
-        await interaction.response.send_message(f"{'✅' if success else '❌'} {msg}", ephemeral=True)
         self.disabled = True
-        await interaction.message.edit(view=self.view)
+        await interaction.response.edit_message(content=f"{'✅' if success else '❌'} {msg}", view=self.view)
 
 class RemoveClearView(View):
     def __init__(self, bot, runs, floor):

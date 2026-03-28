@@ -233,11 +233,11 @@ class LeaderboardView(View):
                 medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"**{i}.**"
                 ign = run.get("ign", "Unknown")
                 
-                discord_id = str(run.get("discord_id", ""))
+                user_id = self.bot.daily_manager.get_user_id_by_ign(ign)
                 if ign.upper() == "BLACKUM":
                     display_name = "<@679725029109399574>"
-                elif discord_id.isdigit():
-                    display_name = f"<@{discord_id}>"
+                elif user_id:
+                    display_name = f"<@{user_id}>"
                 else:
                     display_name = f"**{ign}**"
 

@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ui import View, Button, Modal, TextInput
+from discord.ui import View, Button, Modal, TextInput, Select
 from core.logger import log_info, log_error
 
 try:
@@ -74,7 +74,7 @@ class SubmitModal(Modal):
         self.proof = TextInput(
             label="Proof",
             style=discord.TextStyle.paragraph,
-            placeholder="You can put a video URL here or your Discord nickname so we can DM you and ask for proof.",
+            placeholder="You can put a video URL here or screenshot. Keep in mind that for high ranks we may ask for video proof.",
             required=True,
             max_length=1000
         )
@@ -125,21 +125,102 @@ class SubmitModal(Modal):
         await target_channel.send(embed=embed, view=view)
         await interaction.followup.send(f"✅ {msg}")
 
+class RunSelect(Select):
+    def __init__(self, view, runs):
+        self._lb_view = view
+        options = []
+        for i, run in enumerate(runs[:25], 1):
+            ign = run.get('ign', 'Unknown')
+            time_str = format_time(run.get('time_ms', 0))
+            emoji = "✅" if run.get("verified") else "⏱️"
+            options.append(discord.SelectOption(
+                label=f"#{i} - {ign}",
+                description=f"Time: {time_str}",
+                value=run['uuid'],
+                emoji=emoji
+            ))
+        
+        super().__init__(placeholder="Inspect run details...", min_values=1, max_values=1, options=options, custom_id="run_inspect_select")
+
+    async def callback(self, interaction: discord.Interaction):
+        uuid = self.values[0]
+        self._lb_view.inspect_uuid = uuid
+        await self._lb_view.update_message(interaction)
+
 class LeaderboardView(View):
     def __init__(self, bot, floor, category="all"):
         super().__init__(timeout=None)
         self.bot = bot
         self.floor = floor
         self.category = category
-        self.update_button_styles()
+        self.inspect_uuid = None
+        self.update_components()
 
-    def update_button_styles(self):
-        for child in self.children:
-            if isinstance(child, discord.ui.Button):
-                child.style = discord.ButtonStyle.primary if child.label.lower() == self.category else discord.ButtonStyle.secondary
+    def update_components(self):
+        self.clear_items()
+
+        if self.inspect_uuid:
+            btn = discord.ui.Button(label="⬅ Back to Leaderboard", style=discord.ButtonStyle.secondary, custom_id="lb_back")
+            btn.callback = self.btn_back
+            self.add_item(btn)
+        else:
+            cat_ver = discord.ui.Button(label="Verified", style=discord.ButtonStyle.primary if self.category == "verified" else discord.ButtonStyle.secondary, custom_id="lb_cat_verified")
+            cat_unver = discord.ui.Button(label="Unverified", style=discord.ButtonStyle.primary if self.category == "unverified" else discord.ButtonStyle.secondary, custom_id="lb_cat_unverified")
+            cat_all = discord.ui.Button(label="All", style=discord.ButtonStyle.primary if self.category == "all" else discord.ButtonStyle.secondary, custom_id="lb_cat_all")
+            
+            cat_ver.callback = self.btn_verified
+            cat_unver.callback = self.btn_unverified
+            cat_all.callback = self.btn_all
+            
+            self.add_item(cat_ver)
+            self.add_item(cat_unver)
+            self.add_item(cat_all)
+
+            runs = self.bot.solo_manager.get_leaderboard(self.floor, self.category)
+            if runs:
+                self.add_item(RunSelect(self, runs[:10]))
 
     def build_embed(self):
         runs = self.bot.solo_manager.get_leaderboard(self.floor, self.category)
+        
+        if self.inspect_uuid:
+            target_run = next((r for r in runs if r['uuid'] == self.inspect_uuid), None)
+            if not target_run:
+                self.inspect_uuid = None
+                return self.build_embed()
+
+            time_str = format_time(target_run.get('time_ms', 0))
+            ts = target_run.get('date_achieved', 0)
+            secrets = target_run.get('secrets', 0)
+            puzzles = target_run.get('puzzles', [])
+            prince = target_run.get('prince', False)
+            mimic = target_run.get('mimic', False)
+            proof = target_run.get('proof_text', 'None provided')
+            
+            emb = discord.Embed(title=f"Run Details - {target_run.get('ign')}", color=0x3498db)
+            emb.add_field(name="Floor", value=self.floor, inline=True)
+            emb.add_field(name="Time", value=time_str, inline=True)
+            emb.add_field(name="Status", value="Verified ✅" if target_run.get('verified') else "Unverified ⏱️", inline=True)
+            emb.add_field(name="Date", value=f"<t:{ts}:D> (<t:{ts}:R>)", inline=False)
+            
+            score = target_run.get('score', 0)
+            deaths = target_run.get('deaths', 0)
+            crypts = target_run.get('crypts', 0)
+
+            emb.add_field(name="Score", value=str(score) if score > 0 else "Unknown", inline=True)
+            emb.add_field(name="Crypts", value=str(crypts), inline=True)
+            emb.add_field(name="Deaths", value=str(deaths), inline=True)
+            
+            emb.add_field(name="Secrets", value=str(secrets), inline=True)
+            emb.add_field(name="Puzzles", value=str(len(puzzles)), inline=True)
+            emb.add_field(name="Objectives", value=f"Prince: {'✅' if prince else '❌'}  |  Mimic: {'✅' if mimic else '❌'}", inline=False)
+            
+            if puzzles:
+                emb.add_field(name="Puzzle List", value=", ".join(puzzles), inline=False)
+                
+            emb.add_field(name="Proof", value=proof, inline=False)
+            return emb
+
         embed = discord.Embed(title=f"Solo Leaderboard - {self.floor} ({self.category.title()})", color=0x3498db)
         if not runs:
             embed.description = "No clears found for this category."
@@ -156,22 +237,26 @@ class LeaderboardView(View):
         return embed
 
     async def update_message(self, interaction: discord.Interaction):
-        self.update_button_styles()
+        self.update_components()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
-    @discord.ui.button(label="Verified", style=discord.ButtonStyle.secondary, custom_id="lb_cat_verified")
-    async def btn_verified(self, interaction: discord.Interaction, button: Button):
+    async def btn_back(self, interaction: discord.Interaction):
+        self.inspect_uuid = None
+        await self.update_message(interaction)
+
+    async def btn_verified(self, interaction: discord.Interaction):
         self.category = "verified"
+        self.inspect_uuid = None
         await self.update_message(interaction)
 
-    @discord.ui.button(label="Unverified", style=discord.ButtonStyle.secondary, custom_id="lb_cat_unverified")
-    async def btn_unverified(self, interaction: discord.Interaction, button: Button):
+    async def btn_unverified(self, interaction: discord.Interaction):
         self.category = "unverified"
+        self.inspect_uuid = None
         await self.update_message(interaction)
 
-    @discord.ui.button(label="All", style=discord.ButtonStyle.primary, custom_id="lb_cat_all")
-    async def btn_all(self, interaction: discord.Interaction, button: Button):
+    async def btn_all(self, interaction: discord.Interaction):
         self.category = "all"
+        self.inspect_uuid = None
         await self.update_message(interaction)
 
 class SoloClears(commands.Cog):

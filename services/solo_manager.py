@@ -36,7 +36,9 @@ class SoloManager:
         except Exception as e:
             log_error(f"Failed to save solo clears data: {e}")
 
-    async def submit_run(self, floor, ign, uuid, time_ms, proof_text, discord_id):
+    async def submit_run(self, floor, ign, uuid, time_ms, proof_text, discord_id, 
+                         secrets=0, puzzles=None, prince=False, mimic=False,
+                         score=0, deaths=0, crypts=0, auto_verify=False):
         floor = floor.upper()
         if floor not in self.data:
             self.data[floor] = {}
@@ -49,9 +51,16 @@ class SoloManager:
             "ign": ign,
             "time_ms": time_ms,
             "date_achieved": int(time.time()),
-            "verified": False,
+            "verified": auto_verify,
             "proof_text": proof_text,
-            "discord_id": str(discord_id)
+            "discord_id": str(discord_id),
+            "secrets": secrets,
+            "puzzles": puzzles if puzzles else [],
+            "prince": prince,
+            "mimic": mimic,
+            "score": score,
+            "deaths": deaths,
+            "crypts": crypts
         }
 
         await self._save_data()

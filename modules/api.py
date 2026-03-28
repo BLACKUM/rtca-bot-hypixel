@@ -22,6 +22,7 @@ class API(commands.Cog):
         self.app.router.add_post('/v1/party/update', self.handle_party_update)
         self.app.router.add_get('/v1/names', self.handle_names)
         self.app.router.add_get('/v1/irc', self.handle_irc)
+        self.app.router.add_post('/v1/solo_clear', self.handle_solo_clear)
         
         self.runner = None
         self.site = None
@@ -530,6 +531,76 @@ class API(commands.Cog):
         if not handler:
             return web.json_response({'error': 'IRC Handler not initialized'}, status=503)
         return await handler.handle_websocket(request)
+
+    async def handle_solo_clear(self, request):
+        try:
+            data = await request.json()
+            player = data.get('player')
+            floor = data.get('floor')
+            time_str = data.get('time')
+            secrets = data.get('secrets', 0)
+            puzzles = data.get('puzzles', [])
+            prince = data.get('prince', False)
+            mimic = data.get('mimic', False)
+
+            if not player or not floor or not time_str:
+                return web.json_response({'error': 'Missing required fields (player, floor, time)'}, status=400)
+
+            from services.api import get_uuid
+            uuid = await get_uuid(player)
+            if not uuid:
+                return web.json_response({'error': 'Player not found'}, status=404)
+
+            dev_key = request.headers.get('X-Developer-Key', '')
+            encrypted_id = request.headers.get('X-Encrypted-Identity', '')
+            
+            from services.security import check_developer_key, verify_identity
+            is_dev = check_developer_key(dev_key)
+            is_verified_owner = verify_identity(encrypted_id, str(uuid))
+            
+            if not is_dev and not is_verified_owner:
+                log_error(f"[API] Security check failed for solo clear by {player}")
+                return web.json_response({'error': 'Unauthorized: Invalid identity or key'}, status=403)
+
+            from modules.solo_clears import parse_time
+            time_ms = parse_time(time_str)
+            if time_ms <= 0:
+                return web.json_response({'error': 'Invalid time format'}, status=400)
+
+            proof = "Auto-submitted via BlackAddons Mod API"
+            discord_id = self.bot.daily_manager.get_user_id_by_ign(player) or uuid
+
+            success, msg = await self.bot.solo_manager.submit_run(
+                floor, player, uuid, time_ms, proof, discord_id, 
+                secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic
+            )
+
+            if not success:
+                return web.json_response({'error': msg}, status=400)
+            
+            import discord
+            from modules.solo_clears import VerifyView
+            try:
+                from core.secrets import ADMIN_CHANNEL_ID
+            except ImportError:
+                ADMIN_CHANNEL_ID = None
+                
+            if ADMIN_CHANNEL_ID:
+                admin_ch = self.bot.get_channel(ADMIN_CHANNEL_ID)
+                if admin_ch:
+                    view = VerifyView(self.bot, floor, uuid)
+                    embed = discord.Embed(title="New API Solo Clear Submission", color=0x00ffff)
+                    embed.add_field(name="Player", value=f"`{player}`", inline=True)
+                    embed.add_field(name="Floor", value=floor, inline=True)
+                    embed.add_field(name="Time", value=time_str, inline=True)
+                    embed.add_field(name="Stats", value=f"Secrets: {secrets}\\nPuzzles: {len(puzzles)}\\nPrince: {'✅' if prince else '❌'}\\nMimic: {'✅' if mimic else '❌'}", inline=False)
+                    embed.add_field(name="Proof", value=proof, inline=False)
+                    await admin_ch.send(embed=embed, view=view)
+
+            return web.json_response({'status': 'success', 'message': msg})
+        except Exception as e:
+            log_error(f"[API] Error processing POST /v1/solo_clear: {e}")
+            return web.json_response({'error': str(e)}, status=500)
 
 async def setup(bot):
     await bot.add_cog(API(bot))

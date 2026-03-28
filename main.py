@@ -5,6 +5,7 @@ from services.daily_manager import DailyManager
 from services.rng_manager import RngManager
 from services.link_manager import LinkManager
 from services.recent_manager import RecentManager
+from services.solo_manager import SoloManager
 from services.api import get_dungeon_xp, init_session, close_session
 from services.irc_handler import init_irc_handler
 from services.name_manager import name_manager
@@ -23,6 +24,7 @@ class RTCABot(commands.Bot):
         await self.daily_manager.initialize()
         await self.rng_manager.initialize()
         await self.recent_manager.initialize()
+        await self.solo_manager.initialize()
         await name_manager.initialize()
         await self.irc_handler.initialize()
         await self.daily_manager.sanitize_data()
@@ -33,6 +35,7 @@ bot.daily_manager = DailyManager()
 bot.rng_manager = RngManager()
 bot.link_manager = LinkManager()
 bot.recent_manager = RecentManager()
+bot.solo_manager = SoloManager()
 bot.github_manager = GithubManager()
 bot.irc_handler = init_irc_handler(bot)
 
@@ -99,7 +102,8 @@ async def load_extensions():
         "modules.settings",
         "modules.error_handler",
         "modules.admin",
-        "modules.api"
+        "modules.api",
+        "modules.solo_clears"
     ]
     for ext in extensions:
         try:

@@ -485,7 +485,15 @@ class RemoveClearSelect(discord.ui.Select):
 class RemoveClearView(View):
     def __init__(self, bot, runs, floor):
         super().__init__(timeout=180)
+        self.bot = bot
         self.add_item(RemoveClearSelect(bot, runs, floor))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        from core.config import config
+        if interaction.user.id not in config.owner_ids:
+            await interaction.response.send_message("❌ Don't touch this.", ephemeral=True)
+            return False
+        return True
 
 class RemoveClearFloorModal(Modal):
     def __init__(self, bot):
@@ -501,7 +509,7 @@ class RemoveClearFloorModal(Modal):
             await interaction.response.send_message(f"❌ No clears found for {floor}.", ephemeral=True)
             return
         
-        await interaction.response.send_message(f"Select a clear to remove from **{floor}**:", view=RemoveClearView(self.bot, runs, floor), ephemeral=True)
+        await interaction.response.send_message(f"Select a clear to remove from **{floor}**:", view=RemoveClearView(self.bot, runs, floor), ephemeral=False)
 
 class ForceAddSoloClearModal(Modal):
     def __init__(self, bot):

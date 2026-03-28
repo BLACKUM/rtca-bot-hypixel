@@ -69,6 +69,14 @@ class SoloManager:
             return True, "Run added to leaderboards."
         return True, "Run submitted successfully and is pending verification."
 
+    async def remove_run(self, floor, uuid):
+        floor = floor.upper()
+        if floor in self.data and uuid in self.data[floor]:
+            del self.data[floor][uuid]
+            await self._save_data()
+            return True, "Run successfully removed."
+        return False, "Run not found on this floor."
+
     async def verify_run(self, floor, uuid, approved: bool):
         floor = floor.upper()
         if floor not in self.data or uuid not in self.data[floor]:

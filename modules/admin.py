@@ -477,11 +477,16 @@ class RemoveClearSelect(discord.ui.Select):
         super().__init__(placeholder=f"Select a clear to remove from {floor}...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        uuid = self.values[0]
-        success, msg = await self.bot.solo_manager.remove_run(self.floor, uuid)
-        self.disabled = True
-        await interaction.edit_original_response(content=f"{'✅' if success else '❌'} {msg}", view=self.view)
+        try:
+            await interaction.response.defer()
+            uuid = self.values[0]
+            success, msg = await self.bot.solo_manager.remove_run(self.floor, uuid)
+            self.disabled = True
+            await interaction.edit_original_response(content=f"{'✅' if success else '❌'} {msg}", view=self.view)
+        except Exception as e:
+            import traceback
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            await interaction.followup.send(f"❌ ERROR:\n```py\n{tb[-1500:]}\n```")
 
 class RemoveClearView(View):
     def __init__(self, bot, runs, floor):

@@ -232,10 +232,19 @@ class LeaderboardView(View):
             for i, run in enumerate(runs[:10], 1):
                 medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"**{i}.**"
                 ign = run.get("ign", "Unknown")
+                
+                discord_id = str(run.get("discord_id", ""))
+                if ign.upper() == "BLACKUM":
+                    display_name = "<@679725029109399574>"
+                elif discord_id.isdigit():
+                    display_name = f"<@{discord_id}>"
+                else:
+                    display_name = f"**{ign}**"
+
                 time_str = format_time(run.get("time_ms", 0))
                 ts = run.get("date_achieved", 0)
                 ver_emoji = "✅" if run.get("verified") else "⏱️"
-                desc += f"{medal} **{ign}** • `{time_str}` • {ver_emoji} <t:{ts}:R>\n"
+                desc += f"{medal} {display_name} • `{time_str}` • {ver_emoji} <t:{ts}:R>\n"
             embed.description = desc
         return embed
 

@@ -458,25 +458,51 @@ class DataAdminView(View):
             await interaction.followup.send("❌ Error during backup process.")
 
 
-class RemoveSoloClearModal(Modal):
-    def __init__(self, bot):
-        super().__init__(title="Remove Solo Clear")
+class RemoveClearSelect(discord.ui.Select):
+    def __init__(self, bot, runs, floor):
         self.bot = bot
-        self.ign = TextInput(label="Minecraft IGN", required=True)
+        self.floor = floor
+        options = []
+        from modules.solo_clears import format_time
+        for run in runs[:25]:
+            ign = run.get('ign', 'Unknown')
+            time_str = format_time(run.get('time_ms', 0))
+            is_verified = run.get('verified', False)
+            options.append(discord.SelectOption(
+                label=f"{ign} - {time_str}",
+                value=run['uuid'],
+                description="Verified" if is_verified else "Unverified",
+                emoji="✅" if is_verified else "⏱️"
+            ))
+        super().__init__(placeholder=f"Select a clear to remove from {floor}...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        uuid = self.values[0]
+        success, msg = await self.bot.solo_manager.remove_run(self.floor, uuid)
+        await interaction.response.send_message(f"{'✅' if success else '❌'} {msg}", ephemeral=True)
+        self.disabled = True
+        await interaction.message.edit(view=self.view)
+
+class RemoveClearView(View):
+    def __init__(self, bot, runs, floor):
+        super().__init__(timeout=180)
+        self.add_item(RemoveClearSelect(bot, runs, floor))
+
+class RemoveClearFloorModal(Modal):
+    def __init__(self, bot):
+        super().__init__(title="Select Floor to Remove Clear")
+        self.bot = bot
         self.floor = TextInput(label="Floor (e.g. M7)", required=True)
-        self.add_item(self.ign)
         self.add_item(self.floor)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        from services.api import get_uuid
-        uuid = await get_uuid(self.ign.value)
-        if not uuid:
-            await interaction.followup.send("❌ Player not found.")
+        floor = self.floor.value.upper()
+        runs = self.bot.solo_manager.get_leaderboard(floor, "all")
+        if not runs:
+            await interaction.response.send_message(f"❌ No clears found for {floor}.", ephemeral=True)
             return
         
-        success, msg = await self.bot.solo_manager.remove_run(self.floor.value, uuid)
-        await interaction.followup.send(f"{'✅' if success else '❌'} {msg}")
+        await interaction.response.send_message(f"Select a clear to remove from **{floor}**:", view=RemoveClearView(self.bot, runs, floor), ephemeral=True)
 
 class ForceAddSoloClearModal(Modal):
     def __init__(self, bot):
@@ -521,7 +547,7 @@ class SoloClearsAdminView(View):
 
     @discord.ui.button(label="Remove Clear", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def remove_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
-         await interaction.response.send_modal(RemoveSoloClearModal(self.bot))
+         await interaction.response.send_modal(RemoveClearFloorModal(self.bot))
 
 class AdminView(View):
     def __init__(self, bot):

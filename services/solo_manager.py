@@ -64,6 +64,9 @@ class SoloManager:
         }
 
         await self._save_data()
+        
+        if auto_verify:
+            return True, "Run added to leaderboards."
         return True, "Run submitted successfully and is pending verification."
 
     async def verify_run(self, floor, uuid, approved: bool):

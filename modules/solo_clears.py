@@ -74,7 +74,7 @@ class SubmitModal(Modal):
         self.proof = TextInput(
             label="Proof",
             style=discord.TextStyle.paragraph,
-            placeholder="You can put a video URL here or screenshot. Keep in mind that for high ranks we may ask for video proof.",
+            placeholder="Video URL or screenshot link. High ranks may require video proof.",
             required=True,
             max_length=1000
         )
@@ -207,16 +207,19 @@ class LeaderboardView(View):
             deaths = target_run.get('deaths', 0)
             crypts = target_run.get('crypts', 0)
 
-            emb.add_field(name="Score", value=str(score) if score > 0 else "Unknown", inline=True)
-            emb.add_field(name="Crypts", value=str(crypts), inline=True)
-            emb.add_field(name="Deaths", value=str(deaths), inline=True)
-            
-            emb.add_field(name="Secrets", value=str(secrets), inline=True)
-            emb.add_field(name="Puzzles", value=str(len(puzzles)), inline=True)
-            emb.add_field(name="Objectives", value=f"Prince: {'✅' if prince else '❌'}  |  Mimic: {'✅' if mimic else '❌'}", inline=False)
-            
-            if puzzles:
-                emb.add_field(name="Puzzle List", value=", ".join(puzzles), inline=False)
+            if score == 0 and deaths == 0 and crypts == 0 and secrets == 0 and not puzzles and not prince and not mimic:
+                emb.add_field(name="Run info", value="*Not provided (Manual Submission)*", inline=False)
+            else:
+                emb.add_field(name="Score", value=str(score) if score > 0 else "Unknown", inline=True)
+                emb.add_field(name="Crypts", value=str(crypts), inline=True)
+                emb.add_field(name="Deaths", value=str(deaths), inline=True)
+                
+                emb.add_field(name="Secrets", value=str(secrets), inline=True)
+                emb.add_field(name="Puzzles", value=str(len(puzzles)), inline=True)
+                emb.add_field(name="Objectives", value=f"Prince: {'✅' if prince else '❌'}  |  Mimic: {'✅' if mimic else '❌'}", inline=False)
+                
+                if puzzles:
+                    emb.add_field(name="Puzzle List", value=", ".join(puzzles), inline=False)
                 
             emb.add_field(name="Proof", value=proof, inline=False)
             return emb

@@ -458,6 +458,71 @@ class DataAdminView(View):
             await interaction.followup.send("❌ Error during backup process.")
 
 
+class RemoveSoloClearModal(Modal):
+    def __init__(self, bot):
+        super().__init__(title="Remove Solo Clear")
+        self.bot = bot
+        self.ign = TextInput(label="Minecraft IGN", required=True)
+        self.floor = TextInput(label="Floor (e.g. M7)", required=True)
+        self.add_item(self.ign)
+        self.add_item(self.floor)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        from services.api import get_uuid
+        uuid = await get_uuid(self.ign.value)
+        if not uuid:
+            await interaction.followup.send("❌ Player not found.")
+            return
+        
+        success, msg = await self.bot.solo_manager.remove_run(self.floor.value, uuid)
+        await interaction.followup.send(f"{'✅' if success else '❌'} {msg}")
+
+class ForceAddSoloClearModal(Modal):
+    def __init__(self, bot):
+        super().__init__(title="Force Add Solo Clear")
+        self.bot = bot
+        self.ign = TextInput(label="Minecraft IGN", required=True)
+        self.floor = TextInput(label="Floor (e.g. M7)", required=True)
+        self.time = TextInput(label="Time (MM:SS.ms)", placeholder="e.g. 4:20.50", required=True)
+        self.add_item(self.ign)
+        self.add_item(self.floor)
+        self.add_item(self.time)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        from services.api import get_uuid
+        from modules.solo_clears import parse_time
+        
+        time_ms = parse_time(self.time.value)
+        if time_ms <= 0:
+             await interaction.followup.send("❌ Invalid time format.")
+             return
+
+        uuid = await get_uuid(self.ign.value)
+        if not uuid:
+            await interaction.followup.send("❌ Player not found.")
+            return
+        
+        success, msg = await self.bot.solo_manager.submit_run(
+            self.floor.value, self.ign.value, uuid, time_ms, 
+            "Force Added via Admin Panel", interaction.user.id, auto_verify=True
+        )
+        await interaction.followup.send(f"{'✅' if success else '❌'} {msg}")
+
+class SoloClearsAdminView(View):
+    def __init__(self, bot):
+        super().__init__(timeout=180)
+        self.bot = bot
+    
+    @discord.ui.button(label="Force Add Clear", style=discord.ButtonStyle.success, emoji="➕")
+    async def force_add(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(ForceAddSoloClearModal(self.bot))
+
+    @discord.ui.button(label="Remove Clear", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def remove_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
+         await interaction.response.send_modal(RemoveSoloClearModal(self.bot))
+
 class AdminView(View):
     def __init__(self, bot):
         super().__init__(timeout=None)
@@ -493,6 +558,10 @@ class AdminView(View):
         view = View()
         view.add_item(SystemSelect(self.bot))
         await interaction.response.send_message("🖥️ **System Operations**", view=view, ephemeral=True)
+
+    @discord.ui.button(label="Solo Clears", style=discord.ButtonStyle.primary, emoji="⚔️", row=2)
+    async def solo_clears(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("⚔️ **Solo Clears Admin**", view=SoloClearsAdminView(self.bot), ephemeral=True)
 
     @discord.ui.button(label="Update & Restart", style=discord.ButtonStyle.danger, emoji="🚀", row=2)
     async def update_restart(self, interaction: discord.Interaction, button: discord.ui.Button):

@@ -477,10 +477,11 @@ class RemoveClearSelect(discord.ui.Select):
         super().__init__(placeholder=f"Select a clear to remove from {floor}...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         uuid = self.values[0]
         success, msg = await self.bot.solo_manager.remove_run(self.floor, uuid)
         self.disabled = True
-        await interaction.response.edit_message(content=f"{'✅' if success else '❌'} {msg}", view=self.view)
+        await interaction.message.edit(content=f"{'✅' if success else '❌'} {msg}", view=self.view)
 
 class RemoveClearView(View):
     def __init__(self, bot, runs, floor):
@@ -491,7 +492,7 @@ class RemoveClearView(View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         from core.config import config
         if interaction.user.id not in config.owner_ids:
-            await interaction.response.send_message("❌ Don't touch this.", ephemeral=True)
+            await interaction.response.send_message("❌ This admin menu is restricted.", ephemeral=True)
             return False
         return True
 

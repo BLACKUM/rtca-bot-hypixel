@@ -3,6 +3,11 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import View, Button, Modal, TextInput
 from core.logger import log_info, log_error
+
+try:
+    from core.secrets import ADMIN_CHANNEL_ID
+except ImportError:
+    ADMIN_CHANNEL_ID = None
 import time
 
 def parse_time(time_str: str) -> int:
@@ -38,7 +43,7 @@ class VerifyView(View):
         if success:
             embed = interaction.message.embeds[0]
             embed.color = 0x00ff00
-            embed.title = "✅ Solo Run Approved"
+            embed.title = "✅ Solo Clear Approved"
             embed.set_footer(text=f"Approved by {interaction.user.name}")
             await interaction.message.edit(embed=embed, view=None)
             await interaction.response.send_message(msg, ephemeral=True)
@@ -51,7 +56,7 @@ class VerifyView(View):
         if success:
             embed = interaction.message.embeds[0]
             embed.color = 0xff0000
-            embed.title = "❌ Solo Run Rejected"
+            embed.title = "❌ Solo Clear Rejected"
             embed.set_footer(text=f"Rejected by {interaction.user.name}")
             await interaction.message.edit(embed=embed, view=None)
             await interaction.response.send_message(msg, ephemeral=True)
@@ -60,7 +65,7 @@ class VerifyView(View):
 
 class SubmitModal(Modal):
     def __init__(self, bot, floor):
-        super().__init__(title=f"Submit Solo Run - {floor}")
+        super().__init__(title=f"Submit Solo Clear - {floor}")
         self.bot = bot
         self.floor = floor
 
@@ -105,39 +110,39 @@ class SubmitModal(Modal):
             return
 
         view = VerifyView(self.bot, self.floor, uuid)
-        embed = discord.Embed(title="New Solo Run Submission", color=0x00ffff)
+        embed = discord.Embed(title="New Solo Clear Submission", color=0x00ffff)
         embed.add_field(name="Player", value=f"`{ign_val}`\n<@{interaction.user.id}>", inline=True)
         embed.add_field(name="Floor", value=self.floor, inline=True)
         embed.add_field(name="Time", value=format_time(time_ms), inline=True)
         embed.add_field(name="Proof / Details", value=proof_val, inline=False)
         
-        await interaction.channel.send(embed=embed, view=view)
+        target_channel = interaction.channel
+        if ADMIN_CHANNEL_ID:
+            admin_ch = interaction.client.get_channel(ADMIN_CHANNEL_ID)
+            if admin_ch:
+                target_channel = admin_ch
+
+        await target_channel.send(embed=embed, view=view)
         await interaction.followup.send(f"✅ {msg}")
 
-class SoloClears(commands.Cog):
-    def __init__(self, bot):
+class LeaderboardView(View):
+    def __init__(self, bot, floor, category="all"):
+        super().__init__(timeout=None)
         self.bot = bot
+        self.floor = floor
+        self.category = category
+        self.update_button_styles()
 
-    @app_commands.command(name="submit_run", description="Submit a fast solo dungeon run.")
-    @app_commands.describe(floor="The dungeon floor (e.g., M7, F6)")
-    async def submit_run_cmd(self, interaction: discord.Interaction, floor: str):
-        floor = floor.upper()
-        await interaction.response.send_modal(SubmitModal(self.bot, floor))
+    def update_button_styles(self):
+        for child in self.children:
+            if isinstance(child, discord.ui.Button):
+                child.style = discord.ButtonStyle.primary if child.label.lower() == self.category else discord.ButtonStyle.secondary
 
-    @app_commands.command(name="solo_leaderboard", description="View the solo clears leaderboard.")
-    @app_commands.describe(floor="The dungeon floor (e.g., M7)", category="View verified, unverified, or all runs.")
-    @app_commands.choices(category=[
-        app_commands.Choice(name="Verified", value="verified"),
-        app_commands.Choice(name="Unverified", value="unverified"),
-        app_commands.Choice(name="All", value="all")
-    ])
-    async def solo_leaderboard_cmd(self, interaction: discord.Interaction, floor: str, category: str = "verified"):
-        floor = floor.upper()
-        runs = self.bot.solo_manager.get_leaderboard(floor, category)
-
-        embed = discord.Embed(title=f"Solo Leaderboard - {floor} ({category.title()})", color=0x3498db)
+    def build_embed(self):
+        runs = self.bot.solo_manager.get_leaderboard(self.floor, self.category)
+        embed = discord.Embed(title=f"Solo Leaderboard - {self.floor} ({self.category.title()})", color=0x3498db)
         if not runs:
-            embed.description = "No runs found for this category."
+            embed.description = "No clears found for this category."
         else:
             desc = ""
             for i, run in enumerate(runs[:10], 1):
@@ -146,12 +151,46 @@ class SoloClears(commands.Cog):
                 time_str = format_time(run.get("time_ms", 0))
                 ts = run.get("date_achieved", 0)
                 ver_emoji = "✅" if run.get("verified") else "⏱️"
-                
-                desc += f"{medal} **{ign}** • `{time_str}` • {ver_emoji} <t:{ts}:R>\\n"
-            
+                desc += f"{medal} **{ign}** • `{time_str}` • {ver_emoji} <t:{ts}:R>\n"
             embed.description = desc
-        
-        await interaction.response.send_message(embed=embed)
+        return embed
+
+    async def update_message(self, interaction: discord.Interaction):
+        self.update_button_styles()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="Verified", style=discord.ButtonStyle.secondary, custom_id="lb_cat_verified")
+    async def btn_verified(self, interaction: discord.Interaction, button: Button):
+        self.category = "verified"
+        await self.update_message(interaction)
+
+    @discord.ui.button(label="Unverified", style=discord.ButtonStyle.secondary, custom_id="lb_cat_unverified")
+    async def btn_unverified(self, interaction: discord.Interaction, button: Button):
+        self.category = "unverified"
+        await self.update_message(interaction)
+
+    @discord.ui.button(label="All", style=discord.ButtonStyle.primary, custom_id="lb_cat_all")
+    async def btn_all(self, interaction: discord.Interaction, button: Button):
+        self.category = "all"
+        await self.update_message(interaction)
+
+class SoloClears(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @app_commands.command(name="submit_clear", description="Submit a fast solo dungeon clear.")
+    @app_commands.describe(floor="The dungeon floor (default is F7)")
+    async def submit_clear_cmd(self, interaction: discord.Interaction, floor: str = "F7"):
+        floor = floor.upper()
+        await interaction.response.send_modal(SubmitModal(self.bot, floor))
+
+    @app_commands.command(name="solo_leaderboard", description="View the solo clears leaderboard.")
+    @app_commands.describe(floor="The dungeon floor (default is F7)")
+    async def solo_leaderboard_cmd(self, interaction: discord.Interaction, floor: str = "F7"):
+        floor = floor.upper()
+        view = LeaderboardView(self.bot, floor, category="all")
+        embed = view.build_embed()
+        await interaction.response.send_message(embed=embed, view=view)
 
 async def setup(bot):
     await bot.add_cog(SoloClears(bot))

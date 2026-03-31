@@ -223,4 +223,47 @@ async def test_get_dungeon_stats_soopy_with_extra_api(mocker):
     assert stats["accessory_bag_storage"]["highest_magical_power"] == 123
     assert stats["secrets"] == 74445
 
+@pytest.mark.asyncio
+async def test_get_dungeon_stats_ignores_total(mocker):
+    mock_profile = {
+        "profiles": [
+            {
+                "selected": True,
+                "members": {
+                    "uuid": {
+                        "dungeons": {
+                            "experience": 1000,
+                            "secrets": 10,
+                            "dungeon_types": {
+                                "catacombs": {
+                                    "tier_completions": {
+                                        "1": 10,
+                                        "total": 50
+                                    }
+                                },
+                                "master_catacombs": {
+                                    "tier_completions": {
+                                        "1": 5,
+                                        "total": 20
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+    mocker.patch("services.api.get_profile_data", return_value=mock_profile)
+    stats = await api.get_dungeon_stats("uuid")
+    
+    assert "F1" in stats["floors"]
+    assert "M1" in stats["floors"]
+    assert "FTotal" not in stats["floors"]
+    assert "MTotal" not in stats["floors"]
+    assert "Ftotal" not in stats["floors"]
+    assert "Mtotal" not in stats["floors"]
+    
+    total_runs = sum(f["runs"] for f in stats["floors"].values())
+    assert total_runs == 15
 

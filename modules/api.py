@@ -572,14 +572,13 @@ class API(commands.Cog):
 
             success, msg = await self.bot.solo_manager.submit_run(
                 floor, player, uuid, time_ms, proof, discord_id, 
-                secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic
+                secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic, auto_verify=True
             )
 
             if not success:
                 return web.json_response({'error': msg}, status=400)
             
             import discord
-            from modules.solo_clears import VerifyView
             try:
                 from core.secrets import ADMIN_CHANNEL_ID
             except ImportError:
@@ -588,14 +587,13 @@ class API(commands.Cog):
             if ADMIN_CHANNEL_ID:
                 admin_ch = self.bot.get_channel(ADMIN_CHANNEL_ID)
                 if admin_ch:
-                    view = VerifyView(self.bot, floor, uuid)
-                    embed = discord.Embed(title="New API Solo Clear Submission", color=0x00ffff)
+                    embed = discord.Embed(title="New Auto-Verified API Solo Clear", color=0x00ff00)
                     embed.add_field(name="Player", value=f"`{player}`", inline=True)
                     embed.add_field(name="Floor", value=floor, inline=True)
                     embed.add_field(name="Time", value=time_str, inline=True)
-                    embed.add_field(name="Stats", value=f"Secrets: {secrets}\\nPuzzles: {len(puzzles)}\\nPrince: {'✅' if prince else '❌'}\\nMimic: {'✅' if mimic else '❌'}", inline=False)
+                    embed.add_field(name="Stats", value=f"Secrets: {secrets}\nPuzzles: {len(puzzles)}\nPrince: {'✅' if prince else '❌'}\nMimic: {'✅' if mimic else '❌'}", inline=False)
                     embed.add_field(name="Proof", value=proof, inline=False)
-                    await admin_ch.send(embed=embed, view=view)
+                    await admin_ch.send(embed=embed)
 
             return web.json_response({'status': 'success', 'message': msg})
         except Exception as e:

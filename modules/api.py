@@ -23,6 +23,7 @@ class API(commands.Cog):
         self.app.router.add_get('/v1/names', self.handle_names)
         self.app.router.add_get('/v1/irc', self.handle_irc)
         self.app.router.add_post('/v1/solo_clear', self.handle_solo_clear)
+        self.app.router.add_get('/v1/solo_leaderboard', self.handle_solo_leaderboard)
         
         self.runner = None
         self.site = None
@@ -598,6 +599,29 @@ class API(commands.Cog):
             return web.json_response({'status': 'success', 'message': msg})
         except Exception as e:
             log_error(f"[API] Error processing POST /v1/solo_clear: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_solo_leaderboard(self, request):
+        try:
+            floor = request.rel_url.query.get('floor', 'F7').upper()
+            runs = self.bot.solo_manager.get_leaderboard(floor, 'verified')
+            from modules.solo_clears import format_time
+            result = []
+            for i, run in enumerate(runs[:25]):
+                result.append({
+                    'rank': i + 1,
+                    'ign': run.get('ign', 'Unknown'),
+                    'time_ms': run.get('time_ms', 0),
+                    'time_str': format_time(run.get('time_ms', 0)),
+                    'secrets': run.get('secrets', 0),
+                    'puzzles': run.get('puzzles', []),
+                    'prince': run.get('prince', False),
+                    'mimic': run.get('mimic', False),
+                    'date_achieved': run.get('date_achieved', 0),
+                })
+            return web.json_response({'floor': floor, 'runs': result})
+        except Exception as e:
+            log_error(f"[API] Error processing GET /v1/solo_leaderboard: {e}")
             return web.json_response({'error': str(e)}, status=500)
 
 async def setup(bot):

@@ -82,5 +82,12 @@
         "chroma": false,
         "animated": false,
         "speed": 1.5
+    },
+    "Recker": {
+        "display": "Recker",
+        "gradient": "background: linear-gradient(90deg, rgba(255, 255, 255, 1) 20%, rgba(255, 0, 0, 1) 90%);",
+        "chroma": true,
+        "animanted": false,
+        "speed": 1.5
     }
 }

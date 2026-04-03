@@ -87,7 +87,7 @@
         "display": "Recker",
         "gradient": "linear-gradient(90deg, rgba(255, 255, 255, 1) 20%, rgba(255, 0, 0, 1) 90%);",
         "chroma": true,
-        "animanted": false,
+        "animanted": true,
         "speed": 1.5
     }
 }

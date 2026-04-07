@@ -77,8 +77,8 @@
         "speed": 1.5
     },
     "MommyYuki": {
-        "display": "Yukimi",
-        "gradient": "linear-gradient(90deg, rgba(224, 140, 255, 1) 0%, rgba(224, 140, 255, 1) 100%);",
+        "display": "MommyYuki",
+        "gradient": "linear-gradient(90deg, #FFB7C5 0%, #FFC9D4 12.5%, #FFDBE2 25%, #FFEDF1 37.5%, #FFFFFF 50%, #FFEDF1 62.5%, #FFDBE2 75%, #FFC9D4 87.5%, #FFB7C5 100%)",
         "chroma": false,
         "animated": false,
         "speed": 1.5

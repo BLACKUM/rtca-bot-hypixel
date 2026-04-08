@@ -78,7 +78,14 @@
     },
     "MommyYuki": {
         "display": "MommyYuki",
-        "gradient": "linear-gradient(90deg, #FFB7C5 0%, #FFC9D4 12.5%, #FFDBE2 25%, #FFEDF1 37.5%, #FFFFFF 50%, #FFEDF1 62.5%, #FFDBE2 75%, #FFC9D4 87.5%, #FFB7C5 100%)",
+        "gradient": "linear-gradient(0deg, rgba(255, 102, 178, 1) 50%, rgba(255, 102, 178, 1) 100%);",
+        "chroma": false,
+        "animated": false,
+        "speed": 1.5
+    },
+    "KittyCatKurumi": {
+        "display": "Yuki's Wife",
+        "gradient": "linear-gradient(0deg, rgba(255, 102, 178, 1) 50%, rgba(255, 102, 178, 1) 100%);",
         "chroma": false,
         "animated": false,
         "speed": 1.5

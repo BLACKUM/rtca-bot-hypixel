@@ -82,12 +82,19 @@ class RecentManager:
             if ts > new_scan_ts:
                 new_scan_ts = ts
                 
-            d_type = run.get("dungeon_type", "catacombs")
-            tier = run.get("dungeon_tier", 0)
-            is_master = "master" in d_type
-            floor_prefix = "M" if is_master else "F"
-            floor_name = f"{floor_prefix}{tier}"
-            if tier == 0 and not is_master: floor_name = "Entrance"
+            type_str = run.get("type", "").upper()
+            d_type = "kuudra" if type_str == "KUUDRA" else run.get("dungeon_type", "catacombs")
+            
+            if d_type == "kuudra":
+                tier_id = run.get("tier_id", "NONE").upper()
+                kuudra_map = {"HOT": "Hot", "BURNING": "Burning", "FIERY": "Fiery", "INFERNAL": "Infernal"}
+                floor_name = kuudra_map.get(tier_id, "Basic")
+            else:
+                tier = run.get("dungeon_tier", 0)
+                is_master = "master" in d_type
+                floor_prefix = "M" if is_master else "F"
+                floor_name = f"{floor_prefix}{tier}"
+                if tier == 0 and not is_master: floor_name = "Entrance"
 
             for p in run.get("participants", []):
                 p_uuid = p.get("player_uuid")
@@ -125,6 +132,9 @@ class RecentManager:
                                 c_lvl = 0
                             tm["last_class"] = c_name
                             tm["last_class_level"] = c_lvl
+                        elif d_type == "kuudra":
+                            tm["last_class"] = class_part
+                            tm["last_class_level"] = -1
                 updated = True
 
         if updated:

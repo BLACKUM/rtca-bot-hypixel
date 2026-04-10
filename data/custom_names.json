@@ -1,5 +1,6 @@
 {
     "blackum": {
+        "uuid": "c89c700e-28ed-4c85-89d3-8565297eedb4",
         "display": "BLACKUM",
         "gradient": "linear-gradient(90deg,rgba(51, 38, 64, 1) 0%, rgba(98, 61, 148, 1) 50%, rgba(51, 38, 64, 1) 100%)",
         "chroma": false,
@@ -21,6 +22,7 @@
         "speed": 1.2
     },
     "radioantenna": {
+        "uuid": "229b2bc9-0c9f-4007-8722-7cb29c027867",
         "display": "RadioAntenna",
         "gradient": "linear-gradient(90deg,rgba(51, 38, 64, 1) 0%, rgba(98, 61, 148, 1) 50%, rgba(51, 38, 64, 1) 100%)",
         "chroma": false,
@@ -28,6 +30,7 @@
         "speed": 1.2
     },
     "furry_boykisser": {
+        "uuid": "9c238756-4e0b-4008-afd7-a700c8f39c92",
         "display": "Furry_Boykisser",
         "gradient": "linear-gradient(90deg,rgba(229, 229, 229, 1) 0%, rgba(227, 151, 168, 1) 50%, rgba(1, 181, 220, 1) 100%)",
         "chroma": false,
@@ -35,13 +38,15 @@
         "speed": 1.5
     },
     "steve99994": {
+        "uuid": "6f32cc24-6a4f-4597-8312-6f28f18bddd2",
         "display": "Femboy",
         "gradient": "",
         "chroma": true,
         "animated": true,
         "speed": 1.3
     },
-    "stormt_t": {
+    "catgirlstormyy": {
+        "uuid": "0eddfb40-8ab6-4ae6-a34d-5961259e907c",
         "display": "Storm",
         "gradient": "linear-gradient(90deg,rgba(137, 58, 180, 1) 0%, rgba(253, 29, 29, 1) 50%, rgba(252, 176, 69, 1) 100%)",
         "chroma": false,
@@ -49,6 +54,7 @@
         "speed": 1.1
     },
     "vedso": {
+        "uuid": "b5f82f1b-861e-4516-8941-80c13d3ea21a",
         "display": "coziestcat",
         "gradient": "linear-gradient(90deg,rgba(59, 4, 59, 1) 0%, rgba(195, 112, 196, 1) 27%, rgba(254, 196, 255, 1) 51%, rgba(255, 217, 255, 1) 77%, rgba(255, 255, 255, 1) 100%);",
         "chroma": false,
@@ -56,6 +62,7 @@
         "speed": 1.2
     },
     "At0msplitKatana": {
+        "uuid": "a994e4bc-1112-4ca8-89bc-bd187aae85a4",
         "display": "At0m",
         "gradient": "linear-gradient(90deg,rgba(35, 235, 235, 1) 0%, rgba(234, 83, 237, 1) 100%);",
         "chroma": false,
@@ -63,6 +70,7 @@
         "speed": 1.5
     },
     "FoundOstrich": {
+        "uuid": "ab3573dc-9e6e-487d-b694-58123eb259aa",
         "display": "FoundOstrich",
         "gradient": "linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 29%, rgba(0, 0, 0, 1) 36%, rgba(255, 229, 0, 1) 100%);",
         "chroma": false,
@@ -70,6 +78,7 @@
         "speed": 1.5
     },
     "conungede": {
+        "uuid": "efad5dfc-ab14-4b75-a156-8936e00a80ec",
         "display": "conungede",
         "gradient": "",
         "chroma": true,
@@ -77,6 +86,7 @@
         "speed": 1.5
     },
     "MommyYuki": {
+        "uuid": "9dcfeac9-06d4-4ae1-9c3c-a3d8e8215d17",
         "display": "MommyYuki",
         "gradient": "linear-gradient(0deg, rgba(255, 102, 178, 1) 50%, rgba(255, 102, 178, 1) 100%);",
         "chroma": false,
@@ -84,6 +94,7 @@
         "speed": 1.5
     },
     "KittyCatKurumi": {
+        "uuid": "7e35ce85-fce8-4202-8fad-365977b21c85",
         "display": "Yuki's Wife",
         "gradient": "linear-gradient(0deg, rgba(255, 102, 178, 1) 50%, rgba(255, 102, 178, 1) 100%);",
         "chroma": false,
@@ -91,6 +102,7 @@
         "speed": 1.5
     },
     "Recker": {
+        "uuid": "1342f168-b31f-4126-95ae-5e97ba3cb96f",
         "display": "Recker",
         "gradient": "linear-gradient(90deg,rgba(255, 255, 255, 1) 0%, rgba(220, 1, 1, 1) 100%);",
         "chroma": false,

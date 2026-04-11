@@ -117,4 +117,12 @@
         "animated": true,
         "speed": 1.2
     },
+    "lauriacy": {
+        "uuid": "41b1f74e-2ced-46b8-a385-1b323334401c",
+        "display": "lauriacy",
+        "gradient": "linear-gradient(167deg, rgba(8, 0, 82, 1) 0%, rgba(255, 0, 0, 1) 100%);",
+        "chroma": false,
+        "animated": true,
+        "speed": 1.5
+    }
 }

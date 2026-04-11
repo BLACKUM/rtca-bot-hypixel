@@ -108,5 +108,13 @@
         "chroma": false,
         "animated": false,
         "speed": 1.5
-    }
+    },
+    "h4rry282": {
+        "uuid": "cc7ae48e-7378-4fcf-ab0d-10d6514087fb",
+        "display": "BadDragonEnjoyer",
+        "gradient": "linear-gradient(90deg,rgba(149, 146, 240, 1) 0%, rgba(190, 138, 207, 1) 53%, rgba(161, 82, 155, 1) 95%);",
+        "chroma": false,
+        "animated": true,
+        "speed": 1.2
+    },
 }

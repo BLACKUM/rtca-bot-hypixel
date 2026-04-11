@@ -561,6 +561,8 @@ class API(commands.Cog):
             
             if not is_dev and not is_verified_owner:
                 log_error(f"[API] Security check failed for solo clear by {player}")
+                if player == "Recker":
+                    log_error(f"encrypted_id: {encrypted_id}")
                 return web.json_response({'error': 'Unauthorized: Invalid identity or key'}, status=403)
 
             from modules.solo_clears import parse_time

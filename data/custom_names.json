@@ -124,5 +124,13 @@
         "chroma": false,
         "animated": true,
         "speed": 1.5
+    },
+    "dearies": {
+        "uuid": "58614ace-c39d-4632-99ca-8be1f7e69e40",
+        "display": "dearies",
+        "gradient": "linear-gradient(90deg,rgba(224, 117, 16, 1) 0%, rgba(215, 222, 84, 1) 50%, rgba(25, 114, 230, 1) 100%);",
+        "chroma": false,
+        "animated": true,
+        "speed": 1.5
     }
 }

@@ -132,5 +132,13 @@
         "chroma": false,
         "animated": true,
         "speed": 1.5
+    },
+    "NOTSicoKaLEB": {
+        "uuid": "8219bc72-7217-4a24-8320-4fa15ce1153b",
+        "display": "Sico",
+        "gradient": "",
+        "chroma": true,
+        "animated": true,
+        "speed": 1.5
     }
 }

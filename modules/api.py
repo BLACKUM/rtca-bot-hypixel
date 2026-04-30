@@ -81,13 +81,13 @@ class API(commands.Cog):
             profiles_list = []
             
             target_found = False
-            if profile_name and profile_data and "profiles" in profile_data:
+            if profile_name and profile_data and profile_data.get("profiles"):
                 for p in profile_data["profiles"]:
                     if p.get("cute_name", "").lower() == profile_name.lower():
                         target_found = True
                         break
 
-            if profile_data and "profiles" in profile_data:
+            if profile_data and profile_data.get("profiles"):
                 for p in profile_data["profiles"]:
                     is_selected = p.get("selected", False)
                     name = p.get("cute_name")

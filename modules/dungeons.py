@@ -608,7 +608,7 @@ class Dungeons(commands.Cog):
         
         forced_profile = self.bot.daily_manager.data["users"].get(str(interaction.user.id), {}).get("forced_profile")
 
-        profiles = profile_data.get("profiles", [])
+        profiles = profile_data.get("profiles") or []
         selected_profile = (
             next((p for p in profiles if p.get("cute_name", "").lower() == forced_profile.lower()), None)
             if forced_profile else None

@@ -181,6 +181,28 @@ async def test_fetch_plain_dawn_profile(mocker):
     
     data = await api.fetch_plain_dawn_profile("a"*32)
     assert data == {"profiles": [], "_source": "plain_dawn"}
+
+@pytest.mark.asyncio
+async def test_fetch_adjectils_profile_sends_timestamp_header(mocker):
+    mock_session = mocker.MagicMock()
+    mocker.patch("services.api._SESSION", mock_session)
+
+    mock_resp = mocker.AsyncMock()
+    mock_resp.status = 200
+    mock_resp.json.return_value = {"profiles": []}
+
+    cm = mocker.AsyncMock()
+    cm.__aenter__.return_value = mock_resp
+    cm.__aexit__.return_value = None
+    mock_session.get.return_value = cm
+
+    data = await api.fetch_adjectils_profile("a" * 32)
+
+    assert data == {"profiles": [], "_source": "adjectils"}
+    call_kwargs = mock_session.get.call_args.kwargs
+    assert "headers" in call_kwargs
+    assert "X-Timestamp" in call_kwargs["headers"]
+    assert call_kwargs["headers"]["X-Timestamp"].isdigit()
 @pytest.mark.asyncio
 async def test_get_bazaar_prices(mocker):
     mocker.patch("services.api.cache_get", return_value=None)

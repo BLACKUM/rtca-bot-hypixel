@@ -184,11 +184,14 @@ async def fetch_plain_dawn_profile(uuid: str):
         log_error(f"PlainDawn profile request error: {e}")
     return None
 
+ADJECTILS_BASE_URL = "https://adjectilsbackend.adjectivenoun3215.workers.dev"
+
 async def fetch_adjectils_profile(uuid: str):
-    url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/skyblock/profiles?uuid={uuid}"
+    url = f"{ADJECTILS_BASE_URL}/v2/skyblock/profiles?uuid={uuid}"
     log_debug(f"Requesting profile data (adjectilsbackend): {url}")
+    headers = {"X-Timestamp": str(int(time.time() * 1000))}
     try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
+        async with _SESSION.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
                 data = await r.json(loads=json_utils.loads)
                 if data:
@@ -436,9 +439,10 @@ async def get_player_discord(uuid: str) -> Optional[str]:
     if not _SESSION:
         await init_session()
 
-    url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/player?uuid={uuid}"
+    url = f"{ADJECTILS_BASE_URL}/v2/player?uuid={uuid}"
+    headers = {"X-Timestamp": str(int(time.time() * 1000))}
     try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+        async with _SESSION.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as r:
             if r.status != 200:
                 log_error(f"Player request failed ({r.status})")
                 return None

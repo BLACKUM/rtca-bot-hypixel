@@ -14,7 +14,7 @@ class BotConfig:
         self.prices_cache_ttl: int = 259200
         self.irc_channel_id: int = 0
         self.api_priority: List[str] = ["subat0mic", "odtheking", "plain_dawn", "adjectils", "soopy", "skycrypt"]
-        self.owner_ids: List[int] = [377351386637271041, 679725029109399574]
+        self.owner_ids: List[int] = [377351386637271041, 679725029109399574, 827252037380997170]
         self.congrats_gifs: List[str] = [
             "https://c.tenor.com/n5-r2F_JeGMAAAAd/tenor.gif",
             "https://c.tenor.com/xAW8c7Z8-3cAAAAd/tenor.gif",

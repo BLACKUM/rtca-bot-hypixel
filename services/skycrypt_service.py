@@ -23,33 +23,70 @@ async def _get_session():
     return _SESSION
 
 
-async def _get_build_id() -> Optional[str]:
+async def _get_build_info() -> Optional[tuple]:
     cached = await cache_get(BUILD_ID_CACHE_KEY)
-    if cached:
+    if cached and isinstance(cached, (list, tuple)) and len(cached) == 2:
         return cached
 
     session = await _get_session()
-    url = f"{SKYCRYPT_BASE}/stats/BLACKUM"
     try:
         import aiohttp
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+        async with session.get(f"{SKYCRYPT_BASE}/stats/BLACKUM", timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
-                log_error(f"SkyCrypt profile page fetch failed: {resp.status}")
                 return None
             html = await resp.text()
-            match = BUILD_ID_PATTERN.search(html)
-            if match:
-                build_id = match.group(1)
-            else:
-                log_error("Could not extract SkyCrypt build ID from profile page HTML")
+            
+        app_match = re.search(r'/_app/immutable/entry/app\.([a-zA-Z0-9_-]+)\.js', html)
+        if not app_match:
+            return None
+            
+        async with session.get(f"{SKYCRYPT_BASE}{app_match.group(0)}", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status != 200:
                 return None
+            app_js = await resp.text()
+            
+        node4_match = re.search(r'nodes/4\.([a-zA-Z0-9_-]+)\.js', app_js)
+        if not node4_match:
+            return None
+            
+        async with session.get(f"{SKYCRYPT_BASE}/_app/immutable/{node4_match.group(0)}", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status != 200:
+                return None
+            node4_js = await resp.text()
+            
+        chunks = re.findall(r'chunks/([a-zA-Z0-9_-]+)\.js', node4_js)
+        build_id = None
+        rjson_header = "__skrao"
+        
+        for chunk in chunks:
+            async with session.get(f"{SKYCRYPT_BASE}/_app/immutable/chunks/{chunk}.js", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status == 200:
+                    chunk_js = await resp.text()
+                    
+                    if not build_id:
+                        b_match = BUILD_ID_PATTERN.search(chunk_js)
+                        if b_match:
+                            build_id = b_match.group(1)
+                            
+                    candidates = re.findall(r'"(__[a-z0-9_]{4,10})"', chunk_js)
+                    for i in range(len(candidates) - 3):
+                        if candidates[i].startswith("__") and candidates[i+1].startswith("__") and candidates[i+2].startswith("__") and candidates[i+3].startswith("__"):
+                            rjson_header = candidates[i]
+                            break
+                            
+            if build_id and rjson_header != "__skrao":
+                break
+                
+        if build_id:
+            log_debug(f"SkyCrypt discovery: BuildID={build_id}, Header={rjson_header}")
+            info = (build_id, rjson_header)
+            await cache_set(BUILD_ID_CACHE_KEY, info, ttl=BUILD_ID_TTL)
+            return info
+            
     except Exception as e:
         log_error(f"SkyCrypt build ID scraping error: {e}")
-        return None
-
-    log_debug(f"SkyCrypt build ID discovered: {build_id}")
-    await cache_set(BUILD_ID_CACHE_KEY, build_id, ttl=BUILD_ID_TTL)
-    return build_id
+        
+    return None
 
 
 async def get_skycrypt_profile(ign: str, profile_name: Optional[str] = None) -> Optional[tuple]:
@@ -202,9 +239,9 @@ def _make_floor_key(name: str, is_master: bool) -> Optional[str]:
     return None
 
 
-async def _call_dungeon_endpoint(session, build_id: str, uuid_no_dashes: str, profile_id: str) -> Optional[dict]:
+async def _call_dungeon_endpoint(session, build_id: str, rjson_header: str, uuid_no_dashes: str, profile_id: str) -> Optional[dict]:
     import aiohttp
-    payload_data = [{"uuid": 1, "profileId": 2}, uuid_no_dashes, profile_id]
+    payload_data = [[rjson_header, 1], {"profileId": 2, "uuid": 3}, profile_id, uuid_no_dashes]
     payload_b64 = base64.b64encode(json.dumps(payload_data, separators=(",", ":")).encode()).decode()
     url = f"{SKYCRYPT_BASE}/_app/remote/{build_id}/getDungeonsSection?payload={payload_b64}"
     try:
@@ -232,20 +269,22 @@ async def get_dungeon_stats_skycrypt(ign: str, profile_name: Optional[str] = Non
     uuid, profile_id, profile_cute_name = profile_info
     uuid_no_dashes = uuid.replace("-", "")
 
-    build_id = await _get_build_id()
-    if not build_id:
+    build_info = await _get_build_info()
+    if not build_info:
         return None
+    build_id, rjson_header = build_info
 
     session = await _get_session()
-    envelope, status = await _call_dungeon_endpoint(session, build_id, uuid_no_dashes, profile_id)
+    envelope, status = await _call_dungeon_endpoint(session, build_id, rjson_header, uuid_no_dashes, profile_id)
 
     if status == 404:
         log_debug("SkyCrypt build ID stale, invalidating and retrying")
         await cache_set(BUILD_ID_CACHE_KEY, None, ttl=1)
-        build_id = await _get_build_id()
-        if not build_id:
+        build_info = await _get_build_info()
+        if not build_info:
             return None
-        envelope, status = await _call_dungeon_endpoint(session, build_id, uuid_no_dashes, profile_id)
+        build_id, rjson_header = build_info
+        envelope, status = await _call_dungeon_endpoint(session, build_id, rjson_header, uuid_no_dashes, profile_id)
 
     if status != 200 or envelope is None:
         log_error(f"SkyCrypt dungeon fetch failed (status={status}) for {ign}")

@@ -136,6 +136,54 @@ async def fetch_soopy_profile(uuid: str):
     return None
 
 
+async def fetch_subat0mic_profile(uuid: str):
+    url = f"https://subat0mic.click/get/{uuid}"
+    log_debug(f"Requesting profile data (Subat0mic): {url}")
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
+            if r.status == 200:
+                data = await r.json(loads=json_utils.loads)
+                if data:
+                    data["_source"] = "subat0mic"
+                    return data
+            else:
+                log_error(f"Subat0mic profile request failed ({r.status})")
+    except Exception as e:
+        log_error(f"Subat0mic profile request error: {e}")
+    return None
+
+async def fetch_odtheking_profile(uuid: str):
+    url = f"https://api.odtheking.com/hypixel/get/{uuid}"
+    log_debug(f"Requesting profile data (ODTheKing): {url}")
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
+            if r.status == 200:
+                data = await r.json(loads=json_utils.loads)
+                if data:
+                    data["_source"] = "odtheking"
+                    return data
+            else:
+                log_error(f"ODTheKing profile request failed ({r.status})")
+    except Exception as e:
+        log_error(f"ODTheKing profile request error: {e}")
+    return None
+
+async def fetch_plain_dawn_profile(uuid: str):
+    url = f"https://plain-dawn-a5d2.ryaneagers2015.workers.dev/hypixel/skyblock/profiles/{uuid}"
+    log_debug(f"Requesting profile data (PlainDawn): {url}")
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
+            if r.status == 200:
+                data = await r.json(loads=json_utils.loads)
+                if data:
+                    data["_source"] = "plain_dawn"
+                    return data
+            else:
+                log_error(f"PlainDawn profile request failed ({r.status})")
+    except Exception as e:
+        log_error(f"PlainDawn profile request error: {e}")
+    return None
+
 async def fetch_adjectils_profile(uuid: str):
     url = f"https://adjectilsbackend.adjectivenoun3215.workers.dev/v2/skyblock/profiles?uuid={uuid}"
     log_debug(f"Requesting profile data (adjectilsbackend): {url}")
@@ -206,11 +254,23 @@ async def get_profile_data(uuid: str):
     if not _SESSION:
         await init_session()
 
-    result = await fetch_adjectils_profile(uuid)
-    if not result:
-        result = await fetch_soopy_profile(uuid)
-    if not result:
-        result = await fetch_skycrypt_shiiyu_profile(uuid)
+    result = None
+    for api_name in config.api_priority:
+        if api_name == "subat0mic":
+            result = await fetch_subat0mic_profile(uuid)
+        elif api_name == "odtheking":
+            result = await fetch_odtheking_profile(uuid)
+        elif api_name == "plain_dawn":
+            result = await fetch_plain_dawn_profile(uuid)
+        elif api_name == "adjectils":
+            result = await fetch_adjectils_profile(uuid)
+        elif api_name == "soopy":
+            result = await fetch_soopy_profile(uuid)
+        elif api_name == "skycrypt":
+            result = await fetch_skycrypt_shiiyu_profile(uuid)
+            
+        if result:
+            break
 
     if result:
         await cache_set(uuid, result, ttl=config.profile_cache_ttl)

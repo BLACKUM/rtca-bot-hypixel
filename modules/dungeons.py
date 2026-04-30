@@ -35,7 +35,7 @@ class BonusBackButton(discord.ui.Button):
 
 class ChangeBonusesButton(discord.ui.Button):
     def __init__(self, parent_view: 'BonusSelectView'):
-        super().__init__(label="Change Bonuses", style=discord.ButtonStyle.secondary, custom_id="rtca_change_bonuses")
+        super().__init__(label="Change Bonuses", style=discord.ButtonStyle.primary, custom_id="rtca_change_bonuses", row=1)
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
@@ -118,6 +118,8 @@ class ProfileSelect(Select):
         )
         embed = self.parent_view._create_embed(results, runs_total)
         graph_file = await generate_rtca_graph(self.parent_view.dungeon_classes, results, self.parent_view.ign)
+        self.parent_view.show_bonus_button = True
+        self.parent_view.showing_bonus_select = False
         self.parent_view._reset_view()
         try:
             await interaction.edit_original_response(embed=embed, view=self.parent_view, attachments=[graph_file])
@@ -294,7 +296,8 @@ class BonusSelectView(View):
     
     def __init__(self, bot: commands.Bot, dungeon_classes: dict, base_floor: float,
                  initial_bonuses: dict, ign: str, floor: str, xp_per_run: float, current_cata_xp: float,
-                 requester_name: str, profiles_list: list = None, uuid: str = None, profile_data: dict = None):
+                 requester_name: str, profiles_list: list = None, uuid: str = None, profile_data: dict = None,
+                 show_bonus_button: bool = True):
         super().__init__(timeout=300)
         self.bot = bot
         self.dungeon_classes = dungeon_classes
@@ -309,6 +312,7 @@ class BonusSelectView(View):
         self.profiles_list = profiles_list or []
         self.uuid = uuid
         self.profile_data = profile_data
+        self.show_bonus_button = show_bonus_button
         self.showing_bonus_select = False
         self._reset_view()
     
@@ -327,9 +331,10 @@ class BonusSelectView(View):
             self.add_item(self.main_select)
             self.add_item(BonusBackButton(self))
         else:
-            self.add_item(ChangeBonusesButton(self))
             if len(self.profiles_list) >= 2:
                 self.add_item(ProfileSelect(self, self.profiles_list))
+            if self.show_bonus_button:
+                self.add_item(ChangeBonusesButton(self))
     
     def _create_embed(self, results: dict, runs_total: int) -> discord.Embed:
         xp_description = f"Dungeon XP per run: {self.xp_per_run:,.0f}"
@@ -602,11 +607,22 @@ class Dungeons(commands.Cog):
             return
         
         forced_profile = self.bot.daily_manager.data["users"].get(str(interaction.user.id), {}).get("forced_profile")
-        
+
+        profiles = profile_data.get("profiles", [])
+        selected_profile = (
+            next((p for p in profiles if p.get("cute_name", "").lower() == forced_profile.lower()), None)
+            if forced_profile else None
+        ) or next((p for p in profiles if p.get("selected")), profiles[0] if profiles else None)
+        profiles_list = [
+            {"cute_name": p.get("cute_name", ""), "selected": p == selected_profile}
+            for p in profiles
+            if p.get("cute_name")
+        ]
+
         from services.api import _select_member
         member = _select_member(profile_data, uuid, forced_profile)
         if not member:
-            await interaction.followup.send("❌ Failed to select a SkyBlock profile.")
+            await interaction.followup.send("\u274c Failed to select a SkyBlock profile.")
             return
 
         dungeons = member.get("dungeons", {})
@@ -626,7 +642,19 @@ class Dungeons(commands.Cog):
             }
 
         if not dungeon_classes:
-            await interaction.followup.send("❌ This player has no dungeon data.")
+            embed = discord.Embed(
+                description=f"\u274c **{ign}** has no dungeon data on this profile.",
+                color=0xFF4444
+            )
+            embed.set_footer(text=f"Requested by {interaction.user.display_name}")
+            view = BonusSelectView(
+                self.bot, {}, base_floor, {}, ign, floor, 0, 0,
+                interaction.user.display_name,
+                profiles_list=profiles_list, uuid=uuid, profile_data=profile_data,
+                show_bonus_button=False
+            )
+            await interaction.followup.send(embed=embed, view=view)
+            log_info(f"No dungeon data for {ign}, showing profile selector")
             return
         
         player_data = member.get("player_data", {})
@@ -669,14 +697,20 @@ class Dungeons(commands.Cog):
             import random
 
             gif = random.choice(config.congrats_gifs)
-            msg = f"🎉 **Congratulations {ign}, you already hit Class Average 50!** 🎉\n> You don't need this simulation anymore. Go touch some grass! 🌱"
+            msg = f"\U0001f389 **Congratulations {ign}, you already hit Class Average 50!** \U0001f389\n> You don't need this simulation anymore. Go touch some grass! \U0001f331"
 
             embed = discord.Embed(description=msg, color=0xFFD700)
             embed.set_image(url=gif)
             embed.set_footer(text=f"Requested by {interaction.user.display_name}")
 
-            await interaction.followup.send(embed=embed)
-            log_info(f"✅ {ign} has every class at {config.target_level}. Sent congrats message. GIF: {gif}")
+            view = BonusSelectView(
+                self.bot, dungeon_classes, base_floor, {}, ign, floor, 0, 0,
+                interaction.user.display_name,
+                profiles_list=profiles_list, uuid=uuid, profile_data=profile_data,
+                show_bonus_button=False
+            )
+            await interaction.followup.send(embed=embed, view=view)
+            log_info(f"\u2705 {ign} has every class at {config.target_level}. Sent congrats message. GIF: {gif}")
             return
 
         ring = bonuses.get("ring", default_bonuses["ring"])
@@ -693,19 +727,7 @@ class Dungeons(commands.Cog):
         else:
             current_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
         
-        profiles = profile_data.get("profiles", [])
-        selected_profile = (
-            next((p for p in profiles if p.get("cute_name", "").lower() == forced_profile.lower()), None)
-            if forced_profile else None
-        ) or next((p for p in profiles if p.get("selected")), profiles[0] if profiles else None)
-        profiles_list = [
-            {"cute_name": p.get("cute_name", ""), "selected": p == selected_profile}
-            for p in profiles
-            if p.get("cute_name")
-        ]
-
         runs_total, results = await simulate_async(dungeon_classes, base_floor, bonuses)
-        
         view = BonusSelectView(
             self.bot, dungeon_classes, base_floor, bonuses, ign, floor,
             dungeon_xp, current_cata_xp, interaction.user.display_name,

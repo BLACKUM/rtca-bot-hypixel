@@ -119,6 +119,17 @@ async def get_profile_data(uuid: str):
         log_error(f"Invalid UUID format: {uuid}")
         return None
 
+COOLDOWN_FIRST_429 = 5
+COOLDOWN_SUBSEQUENT_429 = 60
+COOLDOWN_SERVER_ERROR = 30
+
+SOOPY_BASE_URL = "https://soopy.dev/api/v2/player_skyblock"
+SUBAT0MIC_BASE_URL = "https://subat0mic.click/get"
+ODTHEKING_BASE_URL = "https://api.odtheking.com/hypixel/get"
+PLAIN_DAWN_BASE_URL = "https://plain-dawn-a5d2.ryaneagers2015.workers.dev/hypixel/skyblock/profiles"
+ADJECTILS_BASE_URL = "https://adjectilsbackend.adjectivenoun3215.workers.dev"
+SHIIYU_BASE_URL = "https://sky.shiiyu.moe/api/stats"
+
 class _ApiCooldownTracker:
     def __init__(self):
         self._cooldowns: dict[str, float] = {}
@@ -132,9 +143,9 @@ class _ApiCooldownTracker:
         fails = self._consecutive_failures[api_name]
         
         if status == 429:
-             duration = 5 if fails == 1 else 60
+             duration = COOLDOWN_FIRST_429 if fails == 1 else COOLDOWN_SUBSEQUENT_429
         else:
-             duration = 30
+             duration = COOLDOWN_SERVER_ERROR
              
         duration = max(duration, retry_after)
         self._cooldowns[api_name] = time.time() + duration
@@ -147,7 +158,7 @@ class _ApiCooldownTracker:
 _api_cooldown = _ApiCooldownTracker()
 
 async def fetch_soopy_profile(uuid: str):
-    url = f"https://soopy.dev/api/v2/player_skyblock/{uuid}"
+    url = f"{SOOPY_BASE_URL}/{uuid}"
     log_debug(f"Requesting profile data (soopy.dev): {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
@@ -169,7 +180,7 @@ async def fetch_soopy_profile(uuid: str):
     return None
 
 async def fetch_subat0mic_profile(uuid: str):
-    url = f"https://subat0mic.click/get/{uuid}"
+    url = f"{SUBAT0MIC_BASE_URL}/{uuid}"
     log_debug(f"Requesting profile data (Subat0mic): {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
@@ -190,7 +201,7 @@ async def fetch_subat0mic_profile(uuid: str):
         log_error(f"Subat0mic profile request error: {e}")
     return None
 async def fetch_odtheking_profile(uuid: str):
-    url = f"https://api.odtheking.com/hypixel/get/{uuid}"
+    url = f"{ODTHEKING_BASE_URL}/{uuid}"
     log_debug(f"Requesting profile data (ODTheKing): {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
@@ -211,7 +222,7 @@ async def fetch_odtheking_profile(uuid: str):
         log_error(f"ODTheKing profile request error: {e}")
     return None
 async def fetch_plain_dawn_profile(uuid: str):
-    url = f"https://plain-dawn-a5d2.ryaneagers2015.workers.dev/hypixel/skyblock/profiles/{uuid}"
+    url = f"{PLAIN_DAWN_BASE_URL}/{uuid}"
     log_debug(f"Requesting profile data (PlainDawn): {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
@@ -231,8 +242,6 @@ async def fetch_plain_dawn_profile(uuid: str):
         _api_cooldown.record_failure("plain_dawn", 500)
         log_error(f"PlainDawn profile request error: {e}")
     return None
-ADJECTILS_BASE_URL = "https://adjectilsbackend.adjectivenoun3215.workers.dev"
-
 async def fetch_adjectils_profile(uuid: str):
     url = f"{ADJECTILS_BASE_URL}/v2/skyblock/profiles?uuid={uuid}"
     log_debug(f"Requesting profile data (adjectilsbackend): {url}")
@@ -263,7 +272,7 @@ async def fetch_skycrypt_shiiyu_profile(uuid: str):
     if not ign:
         return None
     
-    url = f"https://sky.shiiyu.moe/api/stats/{ign}"
+    url = f"{SHIIYU_BASE_URL}/{ign}"
     log_debug(f"Requesting profile data (sky.shiiyu.moe): {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:

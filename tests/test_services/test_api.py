@@ -55,7 +55,7 @@ async def test_get_profile_data(mocker):
     mock_session.get.return_value = cm
     
     data = await api.get_profile_data("a"*32) # 32 chars
-    assert data == {"profiles": [], "_source": "subat0mic"}
+    assert data == {"profiles": [], "_source": "plain_dawn"}
 
 @pytest.mark.asyncio
 async def test_get_profile_data_priority(mocker):
@@ -95,31 +95,33 @@ async def test_get_profile_data_success_stop(mocker):
     mock_plain_dawn = mocker.patch("services.api.fetch_plain_dawn_profile", return_value={"_source": "plain_dawn"})
     
     from core.config import config
-    config.api_priority = ["subat0mic", "odtheking", "plain_dawn", "adjectils", "soopy", "skycrypt"]
+    config.api_priority = ["plain_dawn", "subat0mic", "odtheking", "adjectils", "soopy", "skycrypt"]
     
     result = await api.get_profile_data("a"*32)
-    assert result["_source"] == "subat0mic"
-    assert mock_subat0mic.called
+    assert result["_source"] == "plain_dawn"
+    assert mock_plain_dawn.called
+    assert not mock_subat0mic.called
     assert not mock_odtheking.called
-    assert not mock_plain_dawn.called
     assert not mock_adjectils.called
     assert not mock_soopy.called
     assert not mock_shiiyu.called
     
-    mock_subat0mic.reset_mock()
-    mock_subat0mic.return_value = None
-    
-    result = await api.get_profile_data("a"*32)
-    assert result["_source"] == "odtheking"
-    assert mock_subat0mic.called
-    assert mock_odtheking.called
-    assert not mock_plain_dawn.called
-    assert not mock_adjectils.called
-    
-    mock_odtheking.reset_mock()
-    mock_odtheking.return_value = None
     mock_plain_dawn.reset_mock()
     mock_plain_dawn.return_value = None
+    
+    result = await api.get_profile_data("a"*32)
+    assert result["_source"] == "subat0mic"
+    assert mock_plain_dawn.called
+    assert mock_subat0mic.called
+    assert not mock_odtheking.called
+    assert not mock_adjectils.called
+    
+    mock_plain_dawn.reset_mock()
+    mock_plain_dawn.return_value = None
+    mock_subat0mic.reset_mock()
+    mock_subat0mic.return_value = None
+    mock_odtheking.reset_mock()
+    mock_odtheking.return_value = None
     mock_adjectils.reset_mock()
     mock_adjectils.return_value = None
     
@@ -364,4 +366,28 @@ async def test_get_dungeon_stats_ignores_total(mocker):
     
     total_runs = sum(f["runs"] for f in stats["floors"].values())
     assert total_runs == 15
+
+def test_api_cooldown_escalation(mocker):
+    api._api_cooldown._cooldowns = {}
+    api._api_cooldown._consecutive_failures = {}
+
+    mock_time = mocker.patch("services.api.time.time", return_value=100.0)
+
+    api._api_cooldown.record_failure("test_api", 429, retry_after=1)
+    assert api._api_cooldown._cooldowns["test_api"] == 105.0
+    assert api._api_cooldown.is_cooling_down("test_api") is True
+
+    mock_time.return_value = 106.0
+    assert api._api_cooldown.is_cooling_down("test_api") is False
+
+    api._api_cooldown.record_failure("test_api", 429, retry_after=1)
+    assert api._api_cooldown._cooldowns["test_api"] == 166.0
+    assert api._api_cooldown.is_cooling_down("test_api") is True
+
+    api._api_cooldown.record_success("test_api")
+    assert "test_api" not in api._api_cooldown._consecutive_failures
+
+    mock_time.return_value = 200.0
+    api._api_cooldown.record_failure("test_api", 500)
+    assert api._api_cooldown._cooldowns["test_api"] == 230.0
 

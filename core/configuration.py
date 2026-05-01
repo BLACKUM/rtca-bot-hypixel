@@ -13,7 +13,7 @@ class BotConfig:
         self.profile_cache_ttl: int = 60
         self.prices_cache_ttl: int = 259200
         self.irc_channel_id: int = 0
-        self.api_priority: List[str] = ["subat0mic", "odtheking", "plain_dawn", "adjectils", "soopy", "skycrypt"]
+        self.api_priority: List[str] = ["plain_dawn", "subat0mic", "odtheking", "adjectils", "soopy", "skycrypt"]
         self.owner_ids: List[int] = [377351386637271041, 679725029109399574, 827252037380997170]
         self.congrats_gifs: List[str] = [
             "https://c.tenor.com/n5-r2F_JeGMAAAAd/tenor.gif",
@@ -119,7 +119,7 @@ class BotConfig:
         if "api_priority" in data:
             self.api_priority = data["api_priority"]
         elif "primary_api" in data:
-            self.api_priority = [data["primary_api"]] + [api for api in ["subat0mic", "odtheking", "plain_dawn", "adjectils", "soopy", "skycrypt"] if api != data["primary_api"]]
+            self.api_priority = [data["primary_api"]] + [api for api in ["plain_dawn", "subat0mic", "odtheking", "adjectils", "soopy", "skycrypt"] if api != data["primary_api"]]
         if "owner_ids" in data:
             self.owner_ids = data["owner_ids"]
         if "congrats_gifs" in data:

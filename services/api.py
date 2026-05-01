@@ -119,22 +119,54 @@ async def get_profile_data(uuid: str):
         log_error(f"Invalid UUID format: {uuid}")
         return None
 
+class _ApiCooldownTracker:
+    def __init__(self):
+        self._cooldowns: dict[str, float] = {}
+        self._consecutive_failures: dict[str, int] = {}
+
+    def is_cooling_down(self, api_name: str) -> bool:
+        return time.time() < self._cooldowns.get(api_name, 0.0)
+
+    def record_failure(self, api_name: str, status: int, retry_after: int = 0):
+        self._consecutive_failures[api_name] = self._consecutive_failures.get(api_name, 0) + 1
+        fails = self._consecutive_failures[api_name]
+        
+        if status == 429:
+             duration = 5 if fails == 1 else 60
+        else:
+             duration = 30
+             
+        duration = max(duration, retry_after)
+        self._cooldowns[api_name] = time.time() + duration
+        log_error(f"API '{api_name}' failed ({status}). On cooldown for {duration}s (Failure #{fails})")
+
+    def record_success(self, api_name: str):
+        if api_name in self._consecutive_failures:
+            del self._consecutive_failures[api_name]
+
+_api_cooldown = _ApiCooldownTracker()
+
 async def fetch_soopy_profile(uuid: str):
     url = f"https://soopy.dev/api/v2/player_skyblock/{uuid}"
     log_debug(f"Requesting profile data (soopy.dev): {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
+                _api_cooldown.record_success("soopy")
                 data = await r.json(loads=json_utils.loads)
                 if data.get("success") and data.get("data"):
                     return _normalize_soopy(data["data"], uuid)
                 log_error(f"soopy.dev returned success=false for {uuid}")
             else:
-                log_error(f"soopy.dev profile request failed ({r.status})")
+                retry_after = int(r.headers.get("Retry-After", 0))
+                _api_cooldown.record_failure("soopy", r.status, retry_after)
+    except asyncio.TimeoutError:
+        _api_cooldown.record_failure("soopy", 408)
+        log_error("soopy.dev profile request timed out")
     except Exception as e:
+        _api_cooldown.record_failure("soopy", 500)
         log_error(f"soopy.dev profile request error: {e}")
     return None
-
 
 async def fetch_subat0mic_profile(uuid: str):
     url = f"https://subat0mic.click/get/{uuid}"
@@ -142,48 +174,63 @@ async def fetch_subat0mic_profile(uuid: str):
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
+                _api_cooldown.record_success("subat0mic")
                 data = await r.json(loads=json_utils.loads)
                 if data:
                     data["_source"] = "subat0mic"
                     return data
             else:
-                log_error(f"Subat0mic profile request failed ({r.status})")
+                retry_after = int(r.headers.get("Retry-After", 0))
+                _api_cooldown.record_failure("subat0mic", r.status, retry_after)
+    except asyncio.TimeoutError:
+        _api_cooldown.record_failure("subat0mic", 408)
+        log_error("Subat0mic profile request timed out")
     except Exception as e:
+        _api_cooldown.record_failure("subat0mic", 500)
         log_error(f"Subat0mic profile request error: {e}")
     return None
-
 async def fetch_odtheking_profile(uuid: str):
     url = f"https://api.odtheking.com/hypixel/get/{uuid}"
     log_debug(f"Requesting profile data (ODTheKing): {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
+                _api_cooldown.record_success("odtheking")
                 data = await r.json(loads=json_utils.loads)
                 if data:
                     data["_source"] = "odtheking"
                     return data
             else:
-                log_error(f"ODTheKing profile request failed ({r.status})")
+                retry_after = int(r.headers.get("Retry-After", 0))
+                _api_cooldown.record_failure("odtheking", r.status, retry_after)
+    except asyncio.TimeoutError:
+        _api_cooldown.record_failure("odtheking", 408)
+        log_error("ODTheKing profile request timed out")
     except Exception as e:
+        _api_cooldown.record_failure("odtheking", 500)
         log_error(f"ODTheKing profile request error: {e}")
     return None
-
 async def fetch_plain_dawn_profile(uuid: str):
     url = f"https://plain-dawn-a5d2.ryaneagers2015.workers.dev/hypixel/skyblock/profiles/{uuid}"
     log_debug(f"Requesting profile data (PlainDawn): {url}")
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
+                _api_cooldown.record_success("plain_dawn")
                 data = await r.json(loads=json_utils.loads)
                 if data:
                     data["_source"] = "plain_dawn"
                     return data
             else:
-                log_error(f"PlainDawn profile request failed ({r.status})")
+                retry_after = int(r.headers.get("Retry-After", 0))
+                _api_cooldown.record_failure("plain_dawn", r.status, retry_after)
+    except asyncio.TimeoutError:
+        _api_cooldown.record_failure("plain_dawn", 408)
+        log_error("PlainDawn profile request timed out")
     except Exception as e:
+        _api_cooldown.record_failure("plain_dawn", 500)
         log_error(f"PlainDawn profile request error: {e}")
     return None
-
 ADJECTILS_BASE_URL = "https://adjectilsbackend.adjectivenoun3215.workers.dev"
 
 async def fetch_adjectils_profile(uuid: str):
@@ -193,19 +240,19 @@ async def fetch_adjectils_profile(uuid: str):
     try:
         async with _SESSION.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
+                _api_cooldown.record_success("adjectils")
                 data = await r.json(loads=json_utils.loads)
                 if data:
                     data["_source"] = "adjectils"
                     return data
             else:
-                try:
-                    text = await r.text()
-                    log_error(f"Adjectils profile request failed ({r.status}): {text[:200]}")
-                except Exception:
-                    log_error(f"Adjectils profile request failed ({r.status})")
+                retry_after = int(r.headers.get("Retry-After", 0))
+                _api_cooldown.record_failure("adjectils", r.status, retry_after)
     except asyncio.TimeoutError:
+        _api_cooldown.record_failure("adjectils", 408)
         log_error("Adjectils profile request timed out (15s)")
     except Exception as e:
+        _api_cooldown.record_failure("adjectils", 500)
         log_error(f"Adjectils profile request error: {e}")
     return None
 
@@ -221,13 +268,19 @@ async def fetch_skycrypt_shiiyu_profile(uuid: str):
     try:
         async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
+                _api_cooldown.record_success("skycrypt")
                 data = await r.json(content_type=None)
                 if data and "profiles" in data:
                     data["_source"] = "skycrypt"
                     return data
             else:
-                log_error(f"sky.shiiyu.moe profile request failed ({r.status})")
+                retry_after = int(r.headers.get("Retry-After", 0))
+                _api_cooldown.record_failure("skycrypt", r.status, retry_after)
+    except asyncio.TimeoutError:
+        _api_cooldown.record_failure("skycrypt", 408)
+        log_error("sky.shiiyu.moe profile request timed out")
     except Exception as e:
+        _api_cooldown.record_failure("skycrypt", 500)
         log_error(f"sky.shiiyu.moe profile request error: {e}")
     return None
 
@@ -259,6 +312,10 @@ async def get_profile_data(uuid: str):
 
     result = None
     for api_name in config.api_priority:
+        if _api_cooldown.is_cooling_down(api_name):
+            log_debug(f"Skipping API '{api_name}' (on cooldown)")
+            continue
+
         if api_name == "subat0mic":
             result = await fetch_subat0mic_profile(uuid)
         elif api_name == "odtheking":

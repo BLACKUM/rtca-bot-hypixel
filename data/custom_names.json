@@ -140,5 +140,13 @@
         "chroma": true,
         "animated": true,
         "speed": 1.5
+    },
+    "Dvcaf": {
+        "uuid": "a86e9b23-63e9-42de-8a88-93ef07871f84",
+        "display": "Dvcaf",
+        "gradient": "linear-gradient(90deg, rgba(159, 27, 166, 1) 0%, rgba(224, 88, 211, 1) 50%, rgba(236, 142, 245, 1) 100%);",
+        "chroma": false,
+        "animated": true,
+        "speed": 1.5
     }
 }

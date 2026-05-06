@@ -7,6 +7,11 @@ except ImportError:
     )
 
 try:
+    from core.secrets import SOLO_CLEAR_WEBHOOK_URL
+except ImportError:
+    SOLO_CLEAR_WEBHOOK_URL = ""
+
+try:
     from core.github_secrets import GITHUB_BACKUP_REPO, GITHUB_BACKUP_TOKEN
 except ImportError:
     GITHUB_BACKUP_REPO = ""

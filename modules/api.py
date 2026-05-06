@@ -596,20 +596,20 @@ class API(commands.Cog):
             
             import discord
             try:
-                from core.secrets import ADMIN_CHANNEL_ID
+                from core.secrets import SOLO_CLEAR_CHANNEL_ID
             except ImportError:
-                ADMIN_CHANNEL_ID = None
-                
-            if ADMIN_CHANNEL_ID:
-                admin_ch = self.bot.get_channel(ADMIN_CHANNEL_ID)
-                if admin_ch:
+                SOLO_CLEAR_CHANNEL_ID = None
+
+            if SOLO_CLEAR_CHANNEL_ID:
+                solo_ch = self.bot.get_channel(SOLO_CLEAR_CHANNEL_ID)
+                if solo_ch:
                     embed = discord.Embed(title="New Auto-Verified API Solo Clear", color=0x00ff00)
                     embed.add_field(name="Player", value=f"`{player}`", inline=True)
                     embed.add_field(name="Floor", value=floor, inline=True)
                     embed.add_field(name="Time", value=time_str, inline=True)
                     embed.add_field(name="Stats", value=f"Secrets: {secrets}\nPuzzles: {len(puzzles)}\nPrince: {'✅' if prince else '❌'}\nMimic: {'✅' if mimic else '❌'}", inline=False)
                     embed.add_field(name="Proof", value=proof, inline=False)
-                    await admin_ch.send(embed=embed)
+                    await solo_ch.send(embed=embed)
 
             return web.json_response({'status': 'success', 'message': msg})
         except Exception as e:

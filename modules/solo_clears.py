@@ -5,9 +5,9 @@ from discord.ui import View, Button, Modal, TextInput, Select
 from core.logger import log_info, log_error
 
 try:
-    from core.secrets import ADMIN_CHANNEL_ID
+    from core.secrets import SOLO_CLEAR_CHANNEL_ID
 except ImportError:
-    ADMIN_CHANNEL_ID = None
+    SOLO_CLEAR_CHANNEL_ID = None
 import time
 
 def parse_time(time_str: str) -> int:
@@ -117,10 +117,10 @@ class SubmitModal(Modal):
         embed.add_field(name="Proof / Details", value=proof_val, inline=False)
         
         target_channel = interaction.channel
-        if ADMIN_CHANNEL_ID:
-            admin_ch = interaction.client.get_channel(ADMIN_CHANNEL_ID)
-            if admin_ch:
-                target_channel = admin_ch
+        if SOLO_CLEAR_CHANNEL_ID:
+            solo_ch = interaction.client.get_channel(SOLO_CLEAR_CHANNEL_ID)
+            if solo_ch:
+                target_channel = solo_ch
 
         await target_channel.send(embed=embed, view=view)
         await interaction.followup.send(f"✅ {msg}")

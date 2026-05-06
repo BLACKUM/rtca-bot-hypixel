@@ -1,7 +1,7 @@
 from aiohttp import web
 from discord.ext import commands
 from core.logger import log_info, log_error
-from services.rate_limiter import rate_limiter
+from services.rate_limiter import rate_limiter, solo_clear_limiter, get_client_ip
 import os
 
 class API(commands.Cog):
@@ -535,6 +535,21 @@ class API(commands.Cog):
 
     async def handle_solo_clear(self, request):
         try:
+            ip = get_client_ip(request)
+            if ip != "127.0.0.1":
+                allowed, retry_after = solo_clear_limiter.check(ip)
+                if not allowed:
+                    log_error(f"[API] solo_clear rate limit exceeded for IP: {ip} (retry in {retry_after}s)")
+                    return web.json_response(
+                        {
+                            "error": "Too Many Requests",
+                            "message": f"You can only submit 1 solo clear per minute. Try again in {retry_after} seconds.",
+                            "retry_after": retry_after,
+                        },
+                        status=429,
+                        headers={"Retry-After": str(retry_after)},
+                    )
+
             data = await request.json()
             player = data.get('player')
             floor = data.get('floor')

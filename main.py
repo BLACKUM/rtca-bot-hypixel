@@ -9,6 +9,7 @@ from services.solo_manager import SoloManager
 from services.api import get_dungeon_xp, init_session, close_session
 from services.irc_handler import init_irc_handler
 from services.name_manager import name_manager
+from services.ban_manager import ban_manager
 from services.github_manager import GithubManager
 from core.cache import initialize as init_cache, shutdown as shutdown_cache
 import asyncio
@@ -26,6 +27,7 @@ class RTCABot(commands.Bot):
         await self.recent_manager.initialize()
         await self.solo_manager.initialize()
         await name_manager.initialize()
+        await ban_manager.initialize()
         await self.irc_handler.initialize()
         await self.daily_manager.sanitize_data()
 

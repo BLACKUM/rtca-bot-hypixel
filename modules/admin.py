@@ -5,6 +5,8 @@ from discord.ui import View, Select, Modal, TextInput, Button
 from core.config import config
 from core.logger import log_info, log_error, get_latest_log_file
 from services.api import get_uuid
+from services.ban_manager import ban_manager
+from services.request_log import request_log
 from modules.dungeons import DefaultSelectView
 import os
 import sys
@@ -562,6 +564,197 @@ class SoloClearsAdminView(View):
     async def remove_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
          await interaction.response.send_modal(RemoveClearFloorModal(self.bot))
 
+class IpBanModal(Modal):
+    def __init__(self):
+        super().__init__(title="Ban IP from API")
+        self.ip_input = TextInput(
+            label="IP Address",
+            placeholder="e.g. 1.2.3.4",
+            required=True,
+            max_length=64,
+        )
+        self.reason_input = TextInput(
+            label="Reason",
+            placeholder="e.g. Abusing API, spamming /v1/solo_clear",
+            required=True,
+            style=discord.TextStyle.paragraph,
+            max_length=500,
+        )
+        self.add_item(self.ip_input)
+        self.add_item(self.reason_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        ip = self.ip_input.value.strip()
+        reason = self.reason_input.value.strip()
+
+        if not ip:
+            await interaction.response.send_message("❌ IP cannot be empty.", ephemeral=True)
+            return
+
+        ok = await ban_manager.ban(ip, reason, interaction.user.id)
+        if not ok:
+            await interaction.response.send_message("❌ Failed to ban IP.", ephemeral=True)
+            return
+
+        await interaction.response.send_message(
+            f"🚫 Banned `{ip}`\n**Reason:** {reason}",
+            ephemeral=True,
+        )
+
+
+class IpUnbanModal(Modal):
+    def __init__(self):
+        super().__init__(title="Unban IP")
+        self.ip_input = TextInput(
+            label="IP Address",
+            placeholder="e.g. 1.2.3.4",
+            required=True,
+            max_length=64,
+        )
+        self.add_item(self.ip_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        ip = self.ip_input.value.strip()
+        ok = await ban_manager.unban(ip)
+        if ok:
+            await interaction.response.send_message(f"✅ Unbanned `{ip}`.", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"❌ `{ip}` is not banned.", ephemeral=True)
+
+
+class IpBansView(View):
+    def __init__(self, bot):
+        super().__init__(timeout=180)
+        self.bot = bot
+
+    @discord.ui.button(label="Ban IP", style=discord.ButtonStyle.danger, emoji="🚫")
+    async def ban_ip(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(IpBanModal())
+
+    @discord.ui.button(label="Unban IP", style=discord.ButtonStyle.success, emoji="✅")
+    async def unban_ip(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(IpUnbanModal())
+
+    @discord.ui.button(label="List Bans", style=discord.ButtonStyle.secondary, emoji="📜")
+    async def list_bans(self, interaction: discord.Interaction, button: discord.ui.Button):
+        bans = ban_manager.get_all()
+        if not bans:
+            await interaction.response.send_message("No banned IPs.", ephemeral=True)
+            return
+
+        lines = []
+        for ip, entry in bans.items():
+            reason = entry.get("reason", "No reason")
+            banned_by = entry.get("banned_by", "?")
+            ts = entry.get("banned_at", 0)
+            when = f"<t:{ts}:R>" if ts else "unknown"
+            lines.append(f"`{ip}` — {reason}\n └ by <@{banned_by}> {when}")
+
+        chunks = [lines[i:i+10] for i in range(0, len(lines), 10)]
+        embeds = []
+        for i, chunk in enumerate(chunks):
+            embed = discord.Embed(
+                title=f"Banned IPs ({len(bans)}) - Page {i+1}/{len(chunks)}",
+                color=0xE74C3C,
+            )
+            embed.description = "\n\n".join(chunk)
+            embeds.append(embed)
+
+        view = EmbedPaginatorView(embeds)
+        await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
+
+
+def _format_log_line(entry: dict) -> str:
+    status = entry.get("status", 0)
+    if status == 0:
+        status_emoji = "❔"
+    elif 200 <= status < 300:
+        status_emoji = "✅"
+    elif status == 429:
+        status_emoji = "🐢"
+    elif status == 403:
+        status_emoji = "🚫"
+    elif 400 <= status < 500:
+        status_emoji = "⚠️"
+    else:
+        status_emoji = "❌"
+
+    path = entry.get("path", "")
+    query = entry.get("query", "")
+    target = f"{path}?{query}" if query else path
+    if len(target) > 80:
+        target = target[:77] + "..."
+
+    ts = entry.get("ts", 0)
+    when = f"<t:{ts}:T>" if ts else "?"
+    return (
+        f"{status_emoji} `{status}` {when} **{entry.get('method', '?')}** `{target}`\n"
+        f" └ from `{entry.get('ip', '?')}`"
+    )
+
+
+def _build_log_embeds(entries: list, title_prefix: str) -> list:
+    if not entries:
+        return []
+    chunks = [entries[i:i+10] for i in range(0, len(entries), 10)]
+    embeds = []
+    for i, chunk in enumerate(chunks):
+        embed = discord.Embed(
+            title=f"{title_prefix} ({len(entries)}) - Page {i+1}/{len(chunks)}",
+            color=0x3498DB,
+        )
+        embed.description = "\n\n".join(_format_log_line(e) for e in chunk)
+        embeds.append(embed)
+    return embeds
+
+
+class RequestLogFilterModal(Modal):
+    def __init__(self):
+        super().__init__(title="Filter API Log by IP")
+        self.ip_input = TextInput(
+            label="IP Address",
+            placeholder="e.g. 1.2.3.4",
+            required=True,
+            max_length=64,
+        )
+        self.add_item(self.ip_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        ip = self.ip_input.value.strip()
+        entries = request_log.get_recent(ip_filter=ip)
+        if not entries:
+            await interaction.response.send_message(f"No requests logged from `{ip}`.", ephemeral=True)
+            return
+        embeds = _build_log_embeds(entries, f"API Requests from {ip}")
+        view = EmbedPaginatorView(embeds)
+        await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
+
+
+class RequestLogView(View):
+    def __init__(self, bot):
+        super().__init__(timeout=180)
+        self.bot = bot
+
+    @discord.ui.button(label="View Recent", style=discord.ButtonStyle.primary, emoji="📜")
+    async def view_recent(self, interaction: discord.Interaction, button: discord.ui.Button):
+        entries = request_log.get_recent()
+        if not entries:
+            await interaction.response.send_message("No API requests logged yet.", ephemeral=True)
+            return
+        embeds = _build_log_embeds(entries, "Recent API Requests")
+        view = EmbedPaginatorView(embeds)
+        await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
+
+    @discord.ui.button(label="Filter by IP", style=discord.ButtonStyle.secondary, emoji="🔍")
+    async def filter_by_ip(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(RequestLogFilterModal())
+
+    @discord.ui.button(label="Clear Log", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def clear_log(self, interaction: discord.Interaction, button: discord.ui.Button):
+        request_log.clear()
+        await interaction.response.send_message("✅ API request log cleared.", ephemeral=True)
+
+
 class AdminView(View):
     def __init__(self, bot):
         super().__init__(timeout=None)
@@ -601,6 +794,14 @@ class AdminView(View):
     @discord.ui.button(label="Solo Clears", style=discord.ButtonStyle.primary, emoji="⚔️", row=2)
     async def solo_clears(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("⚔️ **Solo Clears Admin**", view=SoloClearsAdminView(self.bot), ephemeral=True)
+
+    @discord.ui.button(label="IP Bans", style=discord.ButtonStyle.danger, emoji="🚫", row=2)
+    async def ip_bans(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🚫 **API IP Ban Management**", view=IpBansView(self.bot), ephemeral=True)
+
+    @discord.ui.button(label="API Logs", style=discord.ButtonStyle.secondary, emoji="📡", row=2)
+    async def api_logs(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("📡 **API Request Log**", view=RequestLogView(self.bot), ephemeral=True)
 
     @discord.ui.button(label="Update & Restart", style=discord.ButtonStyle.danger, emoji="🚀", row=2)
     async def update_restart(self, interaction: discord.Interaction, button: discord.ui.Button):

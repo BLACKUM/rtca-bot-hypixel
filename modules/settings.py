@@ -4,6 +4,7 @@ from discord.ext import commands
 from services.api import get_uuid, get_profile_data, get_player_discord
 from services.profile_parser import parse_profile_stats, format_number
 from core.config import config
+from core.ui import AuthorView
 from typing import List, Optional
 
 
@@ -81,7 +82,7 @@ class TrackProfileButton(discord.ui.Button):
         await interaction.edit_original_response(embed=embed, view=view)
 
 
-class ProfileSelectView(discord.ui.View):
+class ProfileSelectView(AuthorView):
     def __init__(self, bot: commands.Bot, uuid: str, ign: str, profile_data: dict, forced_profile: Optional[str], selected_profile: Optional[str] = None):
         super().__init__(timeout=300)
         self.bot = bot
@@ -261,8 +262,9 @@ class Settings(commands.Cog):
                     forced_profile = selected_in_game
         
         view = ProfileSelectView(self.bot, uuid, ign, data, forced_profile)
+        view.author_id = interaction.user.id
         embed = view.create_embed(view.selected_profile)
-        
+
         await interaction.followup.send(embed=embed, view=view)
 
 

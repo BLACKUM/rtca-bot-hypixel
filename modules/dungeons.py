@@ -7,6 +7,7 @@ import math
 from core.config import config
 from core.game_data import FLOOR_XP_MAP, CLASS_ICONS
 from core.logger import log_info, log_debug, log_error
+from core.ui import AuthorView
 from services.api import get_uuid, get_profile_data, get_dungeon_stats, _select_member
 from services.simulation_logic import simulate_async
 from services.xp_calculations import calculate_dungeon_xp_per_run, get_dungeon_level
@@ -292,7 +293,7 @@ def _create_option_list(option: str, current_val: float) -> list[discord.SelectO
         ]
     return None
 
-class BonusSelectView(View):
+class BonusSelectView(AuthorView):
     
     def __init__(self, bot: commands.Bot, dungeon_classes: dict, base_floor: float,
                  initial_bonuses: dict, ign: str, floor: str, xp_per_run: float, current_cata_xp: float,
@@ -499,7 +500,7 @@ class ChangeDefaultsButton(discord.ui.Button):
         await interaction.response.edit_message(view=self.parent_view)
 
 
-class DefaultSelectView(View):
+class DefaultSelectView(AuthorView):
     
     def __init__(self, bot: commands.Bot):
         super().__init__(timeout=300)
@@ -653,6 +654,7 @@ class Dungeons(commands.Cog):
                 profiles_list=profiles_list, uuid=uuid, profile_data=profile_data,
                 show_bonus_button=False
             )
+            view.author_id = interaction.user.id
             await interaction.followup.send(embed=embed, view=view)
             log_info(f"No dungeon data for {ign}, showing profile selector")
             return
@@ -709,6 +711,7 @@ class Dungeons(commands.Cog):
                 profiles_list=profiles_list, uuid=uuid, profile_data=profile_data,
                 show_bonus_button=False
             )
+            view.author_id = interaction.user.id
             await interaction.followup.send(embed=embed, view=view)
             log_info(f"\u2705 {ign} has every class at {config.target_level}. Sent congrats message. GIF: {gif}")
             return
@@ -733,7 +736,8 @@ class Dungeons(commands.Cog):
             dungeon_xp, current_cata_xp, interaction.user.display_name,
             profiles_list=profiles_list, uuid=uuid, profile_data=profile_data
         )
-        
+        view.author_id = interaction.user.id
+
         embed = view._create_embed(results, runs_total)
         
         graph_file = await generate_rtca_graph(dungeon_classes, results, ign)

@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import View, Button, Modal, TextInput, Select
 from core.logger import log_info, log_error
+from core.ui import AuthorView
 
 try:
     from core.secrets import SOLO_CLEAR_CHANNEL_ID
@@ -30,7 +31,7 @@ def format_time(ms: int) -> str:
     m, s = divmod(s, 60)
     return f"{m:02d}:{s:02d}.{ms_rem:03d}"
 
-class VerifyView(View):
+class VerifyView(AuthorView):
     def __init__(self, bot, floor, uuid):
         super().__init__(timeout=None)
         self.bot = bot
@@ -147,7 +148,7 @@ class RunSelect(Select):
         self._lb_view.inspect_uuid = uuid
         await self._lb_view.update_message(interaction)
 
-class LeaderboardView(View):
+class LeaderboardView(AuthorView):
     def __init__(self, bot, floor, category="all"):
         super().__init__(timeout=None)
         self.bot = bot
@@ -286,6 +287,7 @@ class SoloClears(commands.Cog):
     async def solo_leaderboard_cmd(self, interaction: discord.Interaction, floor: str = "F7"):
         floor = floor.upper()
         view = LeaderboardView(self.bot, floor, category="all")
+        view.author_id = interaction.user.id
         embed = view.build_embed()
         await interaction.response.send_message(embed=embed, view=view)
 

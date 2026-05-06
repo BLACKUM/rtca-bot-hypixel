@@ -4,6 +4,7 @@ from discord.ext import commands
 from discord.ui import View, Select, Modal, TextInput, Button
 from core.config import config
 from core.logger import log_info, log_error, get_latest_log_file
+from core.ui import AuthorView
 from services.api import get_uuid
 from services.ban_manager import ban_manager
 from services.request_log import request_log
@@ -15,7 +16,7 @@ import asyncio
 import platform
 import psutil
 
-class EmbedPaginatorView(View):
+class EmbedPaginatorView(AuthorView):
     def __init__(self, embeds):
         super().__init__(timeout=180)
         self.embeds = embeds
@@ -193,13 +194,15 @@ class ConfigSelect(Select):
         from core import config
         
         if key == "congrats_gifs":
-             await interaction.response.send_message("🎉 **Manage Congratulation GIFs**", view=GifManageView(self.bot), ephemeral=True)
+             gif_view = GifManageView(self.bot)
+             gif_view.author_id = getattr(self.view, "author_id", None)
+             await interaction.response.send_message("🎉 **Manage Congratulation GIFs**", view=gif_view, ephemeral=True)
              return
 
         current_val = getattr(config, key, "Unknown")
         await interaction.response.send_modal(ConfigEditModal(key, current_val))
 
-class GifManageView(View):
+class GifManageView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=None)
         self.bot = bot
@@ -235,8 +238,9 @@ class GifManageView(View):
             embed = discord.Embed(title=f"Configured GIFs ({len(gifs)}) - Page {i+1}/{len(chunks)}", color=0x9b59b6)
             embed.description = "\n".join(chunk)
             embeds.append(embed)
-            
+
         view = EmbedPaginatorView(embeds)
+        view.author_id = self.author_id
         await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
 
 
@@ -373,7 +377,7 @@ class SystemSelect(Select):
              await interaction.followup.send(embed=embed)
 
 
-class LeaderboardAdminView(View):
+class LeaderboardAdminView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=180)
         self.bot = bot
@@ -393,7 +397,7 @@ class LeaderboardAdminView(View):
              log_error(f"Admin force update failed: {e}")
              await interaction.followup.send("❌ Error during update.")
 
-class DataAdminView(View):
+class DataAdminView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=180)
         self.bot = bot
@@ -490,23 +494,17 @@ class RemoveClearSelect(discord.ui.Select):
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             await interaction.followup.send(f"❌ ERROR:\n```py\n{tb[-1500:]}\n```")
 
-class RemoveClearView(View):
+class RemoveClearView(AuthorView):
     def __init__(self, bot, runs, floor):
         super().__init__(timeout=180)
         self.bot = bot
         self.add_item(RemoveClearSelect(bot, runs, floor))
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        from core.config import config
-        if interaction.user.id not in config.owner_ids:
-            await interaction.response.send_message("❌ This admin menu is restricted.", ephemeral=True)
-            return False
-        return True
-
 class RemoveClearFloorModal(Modal):
-    def __init__(self, bot):
+    def __init__(self, bot, author_id=None):
         super().__init__(title="Select Floor to Remove Clear")
         self.bot = bot
+        self.author_id = author_id
         self.floor = TextInput(label="Floor (e.g. M7)", required=True)
         self.add_item(self.floor)
 
@@ -516,8 +514,10 @@ class RemoveClearFloorModal(Modal):
         if not runs:
             await interaction.response.send_message(f"❌ No clears found for {floor}.", ephemeral=True)
             return
-        
-        await interaction.response.send_message(f"Select a clear to remove from **{floor}**:", view=RemoveClearView(self.bot, runs, floor), ephemeral=False)
+
+        view = RemoveClearView(self.bot, runs, floor)
+        view.author_id = self.author_id
+        await interaction.response.send_message(f"Select a clear to remove from **{floor}**:", view=view, ephemeral=False)
 
 class ForceAddSoloClearModal(Modal):
     def __init__(self, bot):
@@ -551,7 +551,7 @@ class ForceAddSoloClearModal(Modal):
         )
         await interaction.followup.send(f"{'✅' if success else '❌'} {msg}")
 
-class SoloClearsAdminView(View):
+class SoloClearsAdminView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=180)
         self.bot = bot
@@ -562,7 +562,7 @@ class SoloClearsAdminView(View):
 
     @discord.ui.button(label="Remove Clear", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def remove_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
-         await interaction.response.send_modal(RemoveClearFloorModal(self.bot))
+         await interaction.response.send_modal(RemoveClearFloorModal(self.bot, author_id=self.author_id))
 
 class IpBanModal(Modal):
     def __init__(self):
@@ -622,7 +622,7 @@ class IpUnbanModal(Modal):
             await interaction.response.send_message(f"❌ `{ip}` is not banned.", ephemeral=True)
 
 
-class IpBansView(View):
+class IpBansView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=180)
         self.bot = bot
@@ -661,6 +661,7 @@ class IpBansView(View):
             embeds.append(embed)
 
         view = EmbedPaginatorView(embeds)
+        view.author_id = self.author_id
         await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
 
 
@@ -709,8 +710,9 @@ def _build_log_embeds(entries: list, title_prefix: str) -> list:
 
 
 class RequestLogFilterModal(Modal):
-    def __init__(self):
+    def __init__(self, author_id=None):
         super().__init__(title="Filter API Log by IP")
+        self.author_id = author_id
         self.ip_input = TextInput(
             label="IP Address",
             placeholder="e.g. 1.2.3.4",
@@ -727,10 +729,11 @@ class RequestLogFilterModal(Modal):
             return
         embeds = _build_log_embeds(entries, f"API Requests from {ip}")
         view = EmbedPaginatorView(embeds)
+        view.author_id = self.author_id
         await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
 
 
-class RequestLogView(View):
+class RequestLogView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=180)
         self.bot = bot
@@ -743,11 +746,12 @@ class RequestLogView(View):
             return
         embeds = _build_log_embeds(entries, "Recent API Requests")
         view = EmbedPaginatorView(embeds)
+        view.author_id = self.author_id
         await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
 
     @discord.ui.button(label="Filter by IP", style=discord.ButtonStyle.secondary, emoji="🔍")
     async def filter_by_ip(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(RequestLogFilterModal())
+        await interaction.response.send_modal(RequestLogFilterModal(author_id=self.author_id))
 
     @discord.ui.button(label="Clear Log", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def clear_log(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -755,7 +759,7 @@ class RequestLogView(View):
         await interaction.response.send_message("✅ API request log cleared.", ephemeral=True)
 
 
-class AdminView(View):
+class AdminView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=None)
         self.bot = bot
@@ -763,17 +767,22 @@ class AdminView(View):
     @discord.ui.button(label="Dungeons", style=discord.ButtonStyle.primary, emoji="🏰", row=0)
     async def dungeons(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = DefaultSelectView(self.bot)
+        view.author_id = self.author_id
         embed = view._create_embed()
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         view.message = await interaction.original_response()
 
     @discord.ui.button(label="Leaderboard", style=discord.ButtonStyle.primary, emoji="🏆", row=0)
     async def leaderboard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🏆 **Leaderboard Admin**", view=LeaderboardAdminView(self.bot), ephemeral=True)
+        view = LeaderboardAdminView(self.bot)
+        view.author_id = self.author_id
+        await interaction.response.send_message("🏆 **Leaderboard Admin**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Data", style=discord.ButtonStyle.secondary, emoji="📁", row=0)
     async def data(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("📁 **Data Management**", view=DataAdminView(self.bot), ephemeral=True)
+        view = DataAdminView(self.bot)
+        view.author_id = self.author_id
+        await interaction.response.send_message("📁 **Data Management**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Force Link", style=discord.ButtonStyle.secondary, emoji="🔗", row=1)
     async def force_link(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -781,27 +790,35 @@ class AdminView(View):
 
     @discord.ui.button(label="Config", style=discord.ButtonStyle.secondary, emoji="⚙️", row=1)
     async def config(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = View()
+        view = AuthorView()
+        view.author_id = self.author_id
         view.add_item(ConfigSelect(self.bot))
         await interaction.response.send_message("⚙️ **Configuration Editor**", view=view, ephemeral=True)
 
     @discord.ui.button(label="System", style=discord.ButtonStyle.secondary, emoji="🖥️", row=1)
     async def system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = View()
+        view = AuthorView()
+        view.author_id = self.author_id
         view.add_item(SystemSelect(self.bot))
         await interaction.response.send_message("🖥️ **System Operations**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Solo Clears", style=discord.ButtonStyle.primary, emoji="⚔️", row=2)
     async def solo_clears(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("⚔️ **Solo Clears Admin**", view=SoloClearsAdminView(self.bot), ephemeral=True)
+        view = SoloClearsAdminView(self.bot)
+        view.author_id = self.author_id
+        await interaction.response.send_message("⚔️ **Solo Clears Admin**", view=view, ephemeral=True)
 
     @discord.ui.button(label="IP Bans", style=discord.ButtonStyle.danger, emoji="🚫", row=2)
     async def ip_bans(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🚫 **API IP Ban Management**", view=IpBansView(self.bot), ephemeral=True)
+        view = IpBansView(self.bot)
+        view.author_id = self.author_id
+        await interaction.response.send_message("🚫 **API IP Ban Management**", view=view, ephemeral=True)
 
     @discord.ui.button(label="API Logs", style=discord.ButtonStyle.secondary, emoji="📡", row=2)
     async def api_logs(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("📡 **API Request Log**", view=RequestLogView(self.bot), ephemeral=True)
+        view = RequestLogView(self.bot)
+        view.author_id = self.author_id
+        await interaction.response.send_message("📡 **API Request Log**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Update & Restart", style=discord.ButtonStyle.danger, emoji="🚀", row=2)
     async def update_restart(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -840,7 +857,9 @@ class Admin(commands.Cog):
             return
             
         embed = discord.Embed(title="🛡️ Admin Panel", description="Select a category via buttons below.", color=0x2b2d31)
-        await interaction.response.send_message(embed=embed, view=AdminView(self.bot), ephemeral=True)
+        view = AdminView(self.bot)
+        view.author_id = interaction.user.id
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Admin(bot))

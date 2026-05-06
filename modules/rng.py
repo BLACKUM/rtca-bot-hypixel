@@ -6,6 +6,7 @@ import time
 from core.config import config
 from core.game_data import RNG_DROPS, DROP_EMOJIS, DROP_IDS, CHEST_COSTS, GLOBAL_DROPS, RNG_CATEGORIES
 from core.logger import log_info, log_debug, log_error
+from core.ui import AuthorView
 from services.api import get_uuid, get_all_prices, get_dungeon_runs, get_prices_expiry
 from services.api import get_uuid, get_all_prices, get_dungeon_runs, get_prices_expiry
 
@@ -204,7 +205,7 @@ class RngActionButton(discord.ui.Button):
         self.parent_view.update_view()
         await interaction.response.edit_message(embed=await self.parent_view.get_embed(), view=self.parent_view)
 
-class RngView(View):
+class RngView(AuthorView):
     def __init__(self, bot, target_user_id, target_user_name, invoker_id, run_counts=None, target_ign=None):
         super().__init__(timeout=300)
         self.bot = bot
@@ -488,6 +489,7 @@ class Rng(commands.Cog):
                 log_debug(f"Fetched run counts for {target_ign}: {run_counts}")
         
         view = RngView(self.bot, target_user.id, target_user.display_name, interaction.user.id, run_counts, target_ign)
+        view.author_id = interaction.user.id
         embed = await view.get_embed()
         
         if interaction.response.is_done():

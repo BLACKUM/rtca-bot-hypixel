@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from core.config import config
 from core.game_data import CLASS_ICONS
 from core.logger import log_info, log_error
+from core.ui import AuthorView
 from services.api import get_uuid, get_dungeon_xp, get_recent_runs
 
 class SearchModal(Modal):
@@ -101,7 +102,7 @@ class RunFloorSelect(discord.ui.Select):
             
         await self._view.update_message(interaction)
 
-class DailyView(View):
+class DailyView(AuthorView):
     def __init__(self, bot, user_id, ign):
         super().__init__(timeout=300)
         self.bot = bot
@@ -459,7 +460,7 @@ class RecentSearchModal(Modal):
         
         await interaction.response.send_message("❌ Please enter an IGN or Page Number.", ephemeral=True)
 
-class RecentView(View):
+class RecentView(AuthorView):
     def __init__(self, bot, ign, data, runs_count):
         super().__init__(timeout=300)
         self.bot = bot
@@ -737,7 +738,7 @@ class RecentSearchModal(Modal):
         self.view.apply_filters()
         await self.view.update_message(interaction)
 
-class RecentView(View):
+class RecentView(AuthorView):
     def __init__(self, bot, ign, data, runs_count):
         super().__init__(timeout=300)
         self.bot = bot
@@ -910,8 +911,9 @@ class Leaderboard(commands.Cog):
             pass
 
         view = DailyView(self.bot, interaction.user.id, ign)
+        view.author_id = interaction.user.id
         embed = view._get_leaderboard_embed("daily")
-        
+
         await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.allowed_installs(guilds=True, users=True)
@@ -940,8 +942,9 @@ class Leaderboard(commands.Cog):
         teammates = self.bot.recent_manager.get_teammates(uuid)
         
         view = RecentView(self.bot, ign, teammates, len(runs) if runs else 0)
+        view.author_id = interaction.user.id
         embed = view.get_embed()
-        
+
         await interaction.followup.send(embed=embed, view=view)
 
 async def setup(bot: commands.Bot):

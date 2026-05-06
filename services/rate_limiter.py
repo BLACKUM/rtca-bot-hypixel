@@ -104,4 +104,5 @@ class EndpointRateLimiter:
 
 
 rate_limiter = RateLimiter(requests_per_minute=60)
-solo_clear_limiter = EndpointRateLimiter(requests_per_window=1, window_seconds=60, name="solo_clear")
+solo_clear_limiter = EndpointRateLimiter(requests_per_window=1, window_seconds=60, name="solo_clear_ip")
+solo_clear_uuid_limiter = EndpointRateLimiter(requests_per_window=1, window_seconds=60, name="solo_clear_uuid")

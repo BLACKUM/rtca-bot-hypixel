@@ -1,7 +1,7 @@
 from aiohttp import web
 from discord.ext import commands
 from core.logger import log_info, log_error
-from services.rate_limiter import rate_limiter, solo_clear_limiter, get_client_ip
+from services.rate_limiter import rate_limiter, solo_clear_limiter, solo_clear_uuid_limiter, get_client_ip
 import os
 
 class API(commands.Cog):
@@ -24,6 +24,7 @@ class API(commands.Cog):
         self.app.router.add_get('/v1/irc', self.handle_irc)
         self.app.router.add_post('/v1/solo_clear', self.handle_solo_clear)
         self.app.router.add_get('/v1/solo_leaderboard', self.handle_solo_leaderboard)
+        self.app.router.add_post('/v1/auth/verify', self.handle_auth_verify)
         
         self.runner = None
         self.site = None
@@ -533,6 +534,24 @@ class API(commands.Cog):
             return web.json_response({'error': 'IRC Handler not initialized'}, status=503)
         return await handler.handle_websocket(request)
 
+    async def handle_auth_verify(self, request):
+        try:
+            data = await request.json()
+            ign = str(data.get('ign', ''))
+            server_id = str(data.get('server_id', ''))
+            expected_uuid = data.get('uuid') or None
+
+            if not ign or not server_id:
+                return web.json_response({'error': 'Missing ign or server_id'}, status=400)
+
+            from services.mojang_auth import verify_session
+            ok = await verify_session(ign, server_id, expected_uuid=expected_uuid)
+            log_info(f"[API] /v1/auth/verify for {ign}: {ok}")
+            return web.json_response({'ok': ok})
+        except Exception as e:
+            log_error(f"[API] Error in /v1/auth/verify: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
     async def handle_solo_clear(self, request):
         try:
             ip = get_client_ip(request)
@@ -551,30 +570,56 @@ class API(commands.Cog):
                     )
 
             data = await request.json()
-            player = data.get('player')
-            floor = data.get('floor')
-            time_str = data.get('time')
-            secrets = data.get('secrets', 0)
-            puzzles = data.get('puzzles', [])
-            prince = data.get('prince', False)
-            mimic = data.get('mimic', False)
+            from services.solo_evidence import SoloClearEvidence, validate as validate_evidence
+            evidence = SoloClearEvidence.from_request(data)
+
+            player = evidence.player
+            floor = evidence.floor
+            time_str = evidence.time
+            secrets = evidence.secrets
+            puzzles = evidence.puzzles
+            prince = evidence.prince
+            mimic = evidence.mimic
 
             if not player or not floor or not time_str:
                 return web.json_response({'error': 'Missing required fields (player, floor, time)'}, status=400)
+
+            is_mojang_verified = False
+            if evidence.mojang_server_id:
+                from services.mojang_auth import verify_session
+                is_mojang_verified = await verify_session(
+                    player, evidence.mojang_server_id, expected_uuid=evidence.uuid or None
+                )
+                if not is_mojang_verified:
+                    log_error(f"[API] Mojang session verification failed for {player}")
 
             from services.api import get_uuid
             uuid = await get_uuid(player)
             if not uuid:
                 return web.json_response({'error': 'Player not found'}, status=404)
 
+            if ip != "127.0.0.1":
+                allowed, retry_after = solo_clear_uuid_limiter.check(str(uuid))
+                if not allowed:
+                    log_error(f"[API] solo_clear rate limit exceeded for UUID: {uuid} ({player}, retry in {retry_after}s)")
+                    return web.json_response(
+                        {
+                            "error": "Too Many Requests",
+                            "message": f"You can only submit 1 solo clear per minute per account. Try again in {retry_after} seconds.",
+                            "retry_after": retry_after,
+                        },
+                        status=429,
+                        headers={"Retry-After": str(retry_after)},
+                    )
+
             dev_key = request.headers.get('X-Developer-Key', '')
             encrypted_id = request.headers.get('X-Encrypted-Identity', '')
-            
+
             from services.security import check_developer_key, verify_identity
             is_dev = check_developer_key(dev_key)
             is_verified_owner = verify_identity(encrypted_id, str(uuid))
-            
-            if not is_dev and not is_verified_owner:
+
+            if not is_dev and not is_verified_owner and not is_mojang_verified:
                 log_error(f"[API] Security check failed for solo clear by {player}")
                 return web.json_response({'error': 'Unauthorized: Invalid identity or key'}, status=403)
 
@@ -583,11 +628,20 @@ class API(commands.Cog):
             if time_ms <= 0:
                 return web.json_response({'error': 'Invalid time format'}, status=400)
 
+            if evidence.has_extended_evidence():
+                vresult = validate_evidence(evidence, time_ms)
+                if vresult.failures:
+                    log_error(f"[API] Evidence validation failures for {player}: {vresult.failures}")
+                if vresult.warnings:
+                    log_info(f"[API] Evidence validation warnings for {player}: {vresult.warnings}")
+                if vresult.is_outlier:
+                    log_info(f"[API] Submission flagged as outlier for {player} (still auto-verified during warn-only rollout)")
+
             proof = "Auto-submitted via BlackAddons Mod API"
             discord_id = self.bot.daily_manager.get_user_id_by_ign(player) or uuid
 
             success, msg = await self.bot.solo_manager.submit_run(
-                floor, player, uuid, time_ms, proof, discord_id, 
+                floor, player, uuid, time_ms, proof, discord_id,
                 secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic, auto_verify=True
             )
 
@@ -609,7 +663,20 @@ class API(commands.Cog):
                     embed.add_field(name="Time", value=time_str, inline=True)
                     embed.add_field(name="Stats", value=f"Secrets: {secrets}\nPuzzles: {len(puzzles)}\nPrince: {'✅' if prince else '❌'}\nMimic: {'✅' if mimic else '❌'}", inline=False)
                     embed.add_field(name="Proof", value=proof, inline=False)
-                    await solo_ch.send(embed=embed)
+
+                    map_file = None
+                    if evidence.map_data:
+                        try:
+                            from services.map_renderer import render_map
+                            import io as _io
+                            png = render_map(evidence.map_data)
+                            if png:
+                                map_file = discord.File(_io.BytesIO(png), filename="minimap.png")
+                                embed.set_image(url="attachment://minimap.png")
+                        except Exception as map_err:
+                            log_error(f"[API] map render failed: {map_err}")
+
+                    await solo_ch.send(embed=embed, file=map_file) if map_file else await solo_ch.send(embed=embed)
 
             return web.json_response({'status': 'success', 'message': msg})
         except Exception as e:

@@ -4,6 +4,9 @@ from discord.ext import commands
 from discord.ui import View, Button, Modal, TextInput, Select
 from core.logger import log_info, log_error
 from core.ui import AuthorView
+import math
+
+PAGE_SIZE = 10
 
 try:
     from core.secrets import SOLO_CLEAR_CHANNEL_ID
@@ -126,11 +129,50 @@ class SubmitModal(Modal):
         await target_channel.send(embed=embed, view=view)
         await interaction.followup.send(f"✅ {msg}")
 
+class SoloSearchModal(Modal):
+    def __init__(self, view):
+        super().__init__(title="Search Solo Leaderboard")
+        self.view = view
+        self.ign_input = TextInput(label="IGN", placeholder="Enter IGN to find...", required=False, max_length=16)
+        self.page_input = TextInput(label="Page Number", placeholder="Enter page number...", required=False, max_length=5)
+        self.add_item(self.ign_input)
+        self.add_item(self.page_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        ign_val = self.ign_input.value.strip()
+        page_val = self.page_input.value.strip()
+
+        if page_val:
+            try:
+                page_num = int(page_val)
+                if 1 <= page_num <= self.view.total_pages:
+                    self.view.page = page_num
+                    await self.view.update_message(interaction)
+                else:
+                    await interaction.response.send_message(f"❌ Page must be between 1 and {self.view.total_pages}.", ephemeral=True)
+            except ValueError:
+                await interaction.response.send_message("❌ Invalid page number.", ephemeral=True)
+            return
+
+        if ign_val:
+            data = self.view.bot.solo_manager.get_leaderboard(self.view.floor, self.view.category)
+            target = ign_val.lower()
+            found_index = next((i for i, r in enumerate(data) if r.get("ign", "").lower() == target), -1)
+            if found_index >= 0:
+                self.view.page = (found_index // PAGE_SIZE) + 1
+                await self.view.update_message(interaction)
+            else:
+                await interaction.response.send_message(f"❌ '{ign_val}' not found in this leaderboard.", ephemeral=True)
+            return
+
+        await interaction.response.send_message("❌ Please enter an IGN or page number.", ephemeral=True)
+
+
 class RunSelect(Select):
-    def __init__(self, view, runs):
+    def __init__(self, view, runs, start_rank=1):
         self._lb_view = view
         options = []
-        for i, run in enumerate(runs[:25], 1):
+        for i, run in enumerate(runs[:25], start_rank):
             ign = run.get('ign', 'Unknown')
             time_str = format_time(run.get('time_ms', 0))
             emoji = "✅" if run.get("verified") else "⏱️"
@@ -149,12 +191,15 @@ class RunSelect(Select):
         await self._lb_view.update_message(interaction)
 
 class LeaderboardView(AuthorView):
-    def __init__(self, bot, floor, category="all"):
+    def __init__(self, bot, floor, category="all", ign=None):
         super().__init__(timeout=None)
         self.bot = bot
         self.floor = floor
         self.category = category
+        self.ign = ign
         self.inspect_uuid = None
+        self.page = 1
+        self.total_pages = 1
         self.update_components()
 
     def update_components(self):
@@ -164,22 +209,37 @@ class LeaderboardView(AuthorView):
             btn = discord.ui.Button(label="⬅ Back to Leaderboard", style=discord.ButtonStyle.secondary, custom_id="lb_back")
             btn.callback = self.btn_back
             self.add_item(btn)
-        else:
-            cat_ver = discord.ui.Button(label="Verified", style=discord.ButtonStyle.primary if self.category == "verified" else discord.ButtonStyle.secondary, custom_id="lb_cat_verified")
-            cat_unver = discord.ui.Button(label="Unverified", style=discord.ButtonStyle.primary if self.category == "unverified" else discord.ButtonStyle.secondary, custom_id="lb_cat_unverified")
-            cat_all = discord.ui.Button(label="All", style=discord.ButtonStyle.primary if self.category == "all" else discord.ButtonStyle.secondary, custom_id="lb_cat_all")
-            
-            cat_ver.callback = self.btn_verified
-            cat_unver.callback = self.btn_unverified
-            cat_all.callback = self.btn_all
-            
-            self.add_item(cat_ver)
-            self.add_item(cat_unver)
-            self.add_item(cat_all)
+            return
 
-            runs = self.bot.solo_manager.get_leaderboard(self.floor, self.category)
-            if runs:
-                self.add_item(RunSelect(self, runs[:10]))
+        cat_ver = discord.ui.Button(label="Verified", style=discord.ButtonStyle.primary if self.category == "verified" else discord.ButtonStyle.secondary, row=0, custom_id="lb_cat_verified")
+        cat_unver = discord.ui.Button(label="Unverified", style=discord.ButtonStyle.primary if self.category == "unverified" else discord.ButtonStyle.secondary, row=0, custom_id="lb_cat_unverified")
+        cat_all = discord.ui.Button(label="All", style=discord.ButtonStyle.primary if self.category == "all" else discord.ButtonStyle.secondary, row=0, custom_id="lb_cat_all")
+        cat_ver.callback = self.btn_verified
+        cat_unver.callback = self.btn_unverified
+        cat_all.callback = self.btn_all
+        self.add_item(cat_ver)
+        self.add_item(cat_unver)
+        self.add_item(cat_all)
+
+        prev_b = discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, row=1, custom_id="lb_prev", disabled=self.page <= 1)
+        search_b = discord.ui.Button(emoji="🔍", style=discord.ButtonStyle.secondary, row=1, custom_id="lb_search")
+        next_b = discord.ui.Button(emoji="➡️", style=discord.ButtonStyle.secondary, row=1, custom_id="lb_next", disabled=self.page >= self.total_pages)
+        showme_b = discord.ui.Button(label="📍 Show Me", style=discord.ButtonStyle.primary, row=1, custom_id="lb_showme")
+        prev_b.callback = self.prev_btn
+        search_b.callback = self.search_btn
+        next_b.callback = self.next_btn
+        showme_b.callback = self.show_me_btn
+        self.add_item(prev_b)
+        self.add_item(search_b)
+        self.add_item(next_b)
+        self.add_item(showme_b)
+
+        runs = self.bot.solo_manager.get_leaderboard(self.floor, self.category)
+        if runs:
+            start = (self.page - 1) * PAGE_SIZE
+            page_runs = runs[start:start + PAGE_SIZE]
+            if page_runs:
+                self.add_item(RunSelect(self, page_runs, start_rank=start + 1))
 
     def build_embed(self):
         runs = self.bot.solo_manager.get_leaderboard(self.floor, self.category)
@@ -227,31 +287,51 @@ class LeaderboardView(AuthorView):
 
         embed = discord.Embed(title=f"Solo Leaderboard - {self.floor} ({self.category.title()})", color=0x3498db)
         if not runs:
+            self.total_pages = 1
+            self.page = 1
             embed.description = "No clears found for this category."
-        else:
-            desc = ""
-            for i, run in enumerate(runs[:10], 1):
-                medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"**{i}.**"
-                ign = run.get("ign", "Unknown")
-                
-                user_id = self.bot.daily_manager.get_user_id_by_ign(ign)
-                if ign.upper() == "BLACKUM":
-                    display_name = "<@679725029109399574>"
-                elif user_id:
-                    display_name = f"<@{user_id}>"
-                else:
-                    display_name = f"**{ign}**"
+            embed.set_footer(text=f"Page 1/1 • Your IGN: {self.ign or '—'}")
+            return embed
 
-                time_str = format_time(run.get("time_ms", 0))
-                ts = run.get("date_achieved", 0)
-                ver_emoji = "✅" if run.get("verified") else "⏱️"
-                desc += f"{medal} {display_name} • `{time_str}` • {ver_emoji} <t:{ts}:R>\n"
-            embed.description = desc
+        self.total_pages = max(1, math.ceil(len(runs) / PAGE_SIZE))
+        if self.page > self.total_pages: self.page = self.total_pages
+        if self.page < 1: self.page = 1
+
+        start = (self.page - 1) * PAGE_SIZE
+        end = start + PAGE_SIZE
+        page_runs = runs[start:end]
+
+        desc = ""
+        for i, run in enumerate(page_runs, start + 1):
+            medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"**#{i}**"
+            ign = run.get("ign", "Unknown")
+
+            user_id = self.bot.daily_manager.get_user_id_by_ign(ign)
+            if ign.upper() == "BLACKUM":
+                display_name = "<@679725029109399574>"
+            elif user_id:
+                display_name = f"<@{user_id}>"
+            else:
+                display_name = f"**{ign}**"
+
+            time_str = format_time(run.get("time_ms", 0))
+            ts = run.get("date_achieved", 0)
+            ver_emoji = "✅" if run.get("verified") else "⏱️"
+            line = f"{medal} {display_name} • `{time_str}` • {ver_emoji} <t:{ts}:R>"
+            if self.ign and ign.lower() == self.ign.lower():
+                line = f"{line} ← you"
+            desc += line + "\n"
+        embed.description = desc
+        embed.set_footer(text=f"Page {self.page}/{self.total_pages} • Your IGN: {self.ign or '—'}")
         return embed
 
     async def update_message(self, interaction: discord.Interaction):
+        embed = self.build_embed()
         self.update_components()
-        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+        if interaction.response.is_done():
+            await interaction.edit_original_response(embed=embed, view=self)
+        else:
+            await interaction.response.edit_message(embed=embed, view=self)
 
     async def btn_back(self, interaction: discord.Interaction):
         self.inspect_uuid = None
@@ -260,16 +340,48 @@ class LeaderboardView(AuthorView):
     async def btn_verified(self, interaction: discord.Interaction):
         self.category = "verified"
         self.inspect_uuid = None
+        self.page = 1
         await self.update_message(interaction)
 
     async def btn_unverified(self, interaction: discord.Interaction):
         self.category = "unverified"
         self.inspect_uuid = None
+        self.page = 1
         await self.update_message(interaction)
 
     async def btn_all(self, interaction: discord.Interaction):
         self.category = "all"
         self.inspect_uuid = None
+        self.page = 1
+        await self.update_message(interaction)
+
+    async def prev_btn(self, interaction: discord.Interaction):
+        self.page = max(1, self.page - 1)
+        await self.update_message(interaction)
+
+    async def next_btn(self, interaction: discord.Interaction):
+        self.page = min(self.total_pages, self.page + 1)
+        await self.update_message(interaction)
+
+    async def search_btn(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(SoloSearchModal(self))
+
+    async def show_me_btn(self, interaction: discord.Interaction):
+        ign = self.ign
+        if not ign:
+            ign = self.bot.link_manager.get_link(interaction.user.id)
+            if not ign:
+                await interaction.response.send_message("❌ Link your account first with `/link <ign>`.", ephemeral=True)
+                return
+            self.ign = ign
+
+        runs = self.bot.solo_manager.get_leaderboard(self.floor, self.category)
+        target = ign.lower()
+        found_index = next((i for i, r in enumerate(runs) if r.get("ign", "").lower() == target), -1)
+        if found_index < 0:
+            await interaction.response.send_message("❌ You are not on this leaderboard yet.", ephemeral=True)
+            return
+        self.page = (found_index // PAGE_SIZE) + 1
         await self.update_message(interaction)
 
 class SoloClears(commands.Cog):
@@ -286,9 +398,15 @@ class SoloClears(commands.Cog):
     @app_commands.describe(floor="The dungeon floor (default is F7)")
     async def solo_leaderboard_cmd(self, interaction: discord.Interaction, floor: str = "F7"):
         floor = floor.upper()
-        view = LeaderboardView(self.bot, floor, category="all")
+        ign = None
+        try:
+            ign = self.bot.link_manager.get_link(interaction.user.id)
+        except Exception:
+            pass
+        view = LeaderboardView(self.bot, floor, category="all", ign=ign)
         view.author_id = interaction.user.id
         embed = view.build_embed()
+        view.update_components()
         await interaction.response.send_message(embed=embed, view=view)
 
 async def setup(bot):

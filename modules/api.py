@@ -245,14 +245,26 @@ class API(commands.Cog):
         try:
             data = await request.json()
             player = data.get('player')
-            action = data.get('action')
+            action = data.get('action', 'increment')
             category = data.get('category')
             item = data.get('item')
             
-            if not player or not action or not category or not item:
-                return web.json_response({'error': 'Missing required fields'}, status=400)
+            if not player or not item:
+                return web.json_response({'error': 'Missing required fields (player, item)'}, status=400)
 
-            log_info(f"[API] Received RNG update: {data}")
+            if not category:
+                from core.game_data import RNG_DROPS, GLOBAL_DROPS
+                for cat, items in RNG_DROPS.items():
+                    if item in items:
+                        category = cat
+                        break
+                if not category and item in GLOBAL_DROPS:
+                    category = "Global"
+            
+            if not category:
+                category = "Unknown"
+
+            log_info(f"[API] Received RNG update: player={player}, action={action}, category={category}, item={item}")
             
             from services.api import get_uuid
             

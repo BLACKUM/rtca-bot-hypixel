@@ -652,9 +652,13 @@ class API(commands.Cog):
             proof = "Auto-submitted via BlackAddons Mod API"
             discord_id = self.bot.daily_manager.get_user_id_by_ign(player) or uuid
 
+            score_total = evidence.score_components.total if evidence.score_components else 0
+
             success, msg = await self.bot.solo_manager.submit_run(
                 floor, player, uuid, time_ms, proof, discord_id,
-                secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic, auto_verify=True
+                secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic,
+                score=score_total, deaths=evidence.deaths, crypts=evidence.crypts,
+                auto_verify=True
             )
 
             if not success:

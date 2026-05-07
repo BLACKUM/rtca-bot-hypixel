@@ -50,6 +50,8 @@ class SoloClearEvidence:
     floor: str = ""
     time: str = ""
     secrets: int = 0
+    deaths: int = 0
+    crypts: int = 0
     puzzles: List[str] = field(default_factory=list)
     prince: bool = False
     mimic: bool = False
@@ -73,6 +75,8 @@ class SoloClearEvidence:
             floor=str(body.get("floor", "")),
             time=str(body.get("time", "")),
             secrets=int(body.get("secrets", 0) or 0),
+            deaths=int(body.get("deaths", 0) or 0),
+            crypts=int(body.get("crypts", 0) or 0),
             puzzles=list(body.get("puzzles", []) or []),
             prince=bool(body.get("prince", False)),
             mimic=bool(body.get("mimic", False)),

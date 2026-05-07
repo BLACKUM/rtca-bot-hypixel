@@ -394,7 +394,7 @@ class SoloClears(commands.Cog):
         floor = floor.upper()
         await interaction.response.send_modal(SubmitModal(self.bot, floor))
 
-    @app_commands.command(name="solo_leaderboard", description="View the solo clears leaderboard.")
+    @app_commands.command(name="solo_clears", description="View the solo clears leaderboard.")
     @app_commands.describe(floor="The dungeon floor (default is F7)")
     async def solo_leaderboard_cmd(self, interaction: discord.Interaction, floor: str = "F7"):
         floor = floor.upper()

@@ -632,9 +632,9 @@ class API(commands.Cog):
             is_dev = check_developer_key(dev_key)
             is_verified_owner = verify_identity(encrypted_id, str(uuid))
 
-            if not is_dev and not is_verified_owner and not is_mojang_verified:
-                log_error(f"[API] Security check failed for solo clear by {player}")
-                return web.json_response({'error': 'Unauthorized: Invalid identity or key'}, status=403)
+            auto_verify = is_dev or is_verified_owner or is_mojang_verified
+            if not auto_verify:
+                log_info(f"[API] Solo clear from {player} could not be auto-verified — saving as unverified for admin review")
 
             from modules.solo_clears import parse_time
             time_ms = parse_time(time_str)
@@ -662,7 +662,7 @@ class API(commands.Cog):
             elif is_dev:
                 verify_method = "dev_key"
             else:
-                verify_method = "unknown"
+                verify_method = "none"
 
             verification_meta = {
                 "method": verify_method,
@@ -689,7 +689,7 @@ class API(commands.Cog):
                 floor, player, uuid, time_ms, proof, discord_id,
                 secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic,
                 score=score_total, deaths=evidence.deaths, crypts=evidence.crypts,
-                auto_verify=True,
+                auto_verify=auto_verify,
                 evidence=evidence_meta, verification=verification_meta,
             )
 
@@ -705,11 +705,19 @@ class API(commands.Cog):
             if SOLO_CLEAR_CHANNEL_ID:
                 solo_ch = self.bot.get_channel(SOLO_CLEAR_CHANNEL_ID)
                 if solo_ch:
-                    embed = discord.Embed(title="New Auto-Verified API Solo Clear", color=0x00ff00)
+                    if auto_verify:
+                        title = "New Auto-Verified API Solo Clear"
+                        color = 0x00ff00
+                    else:
+                        title = "Unverified API Solo Clear"
+                        color = 0xffa500
+
+                    embed = discord.Embed(title=title, color=color)
                     embed.add_field(name="Player", value=f"`{player}`", inline=True)
                     embed.add_field(name="Floor", value=floor, inline=True)
                     embed.add_field(name="Time", value=time_str, inline=True)
                     embed.add_field(name="Stats", value=f"Secrets: {secrets}\nPuzzles: {len(puzzles)}\nPrince: {'✅' if prince else '❌'}\nMimic: {'✅' if mimic else '❌'}", inline=False)
+                    embed.add_field(name="Verification", value=f"`{verify_method}`", inline=True)
                     embed.add_field(name="Proof", value=proof, inline=False)
 
                     map_file = None
@@ -724,7 +732,17 @@ class API(commands.Cog):
                         except Exception as map_err:
                             log_error(f"[API] map render failed: {map_err}")
 
-                    await solo_ch.send(embed=embed, file=map_file) if map_file else await solo_ch.send(embed=embed)
+                    view = None
+                    if not auto_verify:
+                        from modules.solo_clears import VerifyView
+                        view = VerifyView(self.bot, floor, str(uuid))
+
+                    send_kwargs = {"embed": embed}
+                    if map_file is not None:
+                        send_kwargs["file"] = map_file
+                    if view is not None:
+                        send_kwargs["view"] = view
+                    await solo_ch.send(**send_kwargs)
 
             return web.json_response({'status': 'success', 'message': msg})
         except Exception as e:

@@ -717,7 +717,6 @@ class API(commands.Cog):
                     embed.add_field(name="Floor", value=floor, inline=True)
                     embed.add_field(name="Time", value=time_str, inline=True)
                     embed.add_field(name="Stats", value=f"Secrets: {secrets}\nPuzzles: {len(puzzles)}\nPrince: {'✅' if prince else '❌'}\nMimic: {'✅' if mimic else '❌'}", inline=False)
-                    embed.add_field(name="Verification", value=f"`{verify_method}`", inline=True)
                     embed.add_field(name="Proof", value=proof, inline=False)
 
                     map_file = None

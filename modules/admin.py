@@ -669,7 +669,7 @@ def _format_log_line(entry: dict) -> str:
     status = entry.get("status", 0)
     if status == 0:
         status_emoji = "❔"
-    elif 200 <= status < 300:
+    elif 200 <= status < 300 or status == 101:
         status_emoji = "✅"
     elif status == 429:
         status_emoji = "🐢"

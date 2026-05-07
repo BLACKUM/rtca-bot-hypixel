@@ -3,6 +3,7 @@ from discord.ext import commands
 from core.logger import log_info, log_error
 from services.rate_limiter import rate_limiter, solo_clear_limiter, solo_clear_uuid_limiter, get_client_ip
 import os
+import time as _time
 
 class API(commands.Cog):
     def __init__(self, bot):
@@ -654,11 +655,42 @@ class API(commands.Cog):
 
             score_total = evidence.score_components.total if evidence.score_components else 0
 
+            if is_mojang_verified:
+                verify_method = "mojang"
+            elif is_verified_owner:
+                verify_method = "verified_identity"
+            elif is_dev:
+                verify_method = "dev_key"
+            else:
+                verify_method = "unknown"
+
+            verification_meta = {
+                "method": verify_method,
+                "mojang_verified": is_mojang_verified,
+                "is_dev_key": is_dev,
+                "is_verified_owner": is_verified_owner,
+                "verified_at": int(_time.time()),
+            }
+
+            evidence_meta = {
+                "scoreboard_lines": evidence.scoreboard_lines,
+                "tablist_lines": evidence.tablist_lines,
+                "score_components": evidence.score_components.to_dict() if evidence.score_components else None,
+                "dungeon_enter_tick": evidence.dungeon_enter_tick,
+                "clear_trigger_tick": evidence.clear_trigger_tick,
+                "client_clock_enter": evidence.client_clock_enter,
+                "client_clock_clear": evidence.client_clock_clear,
+                "mojang_server_id": evidence.mojang_server_id,
+                "map_data": evidence.map_data,
+                "needs_verification": evidence.needs_verification,
+            }
+
             success, msg = await self.bot.solo_manager.submit_run(
                 floor, player, uuid, time_ms, proof, discord_id,
                 secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic,
                 score=score_total, deaths=evidence.deaths, crypts=evidence.crypts,
-                auto_verify=True
+                auto_verify=True,
+                evidence=evidence_meta, verification=verification_meta,
             )
 
             if not success:

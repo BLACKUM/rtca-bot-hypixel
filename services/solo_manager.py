@@ -36,9 +36,10 @@ class SoloManager:
         except Exception as e:
             log_error(f"Failed to save solo clears data: {e}")
 
-    async def submit_run(self, floor, ign, uuid, time_ms, proof_text, discord_id, 
+    async def submit_run(self, floor, ign, uuid, time_ms, proof_text, discord_id,
                          secrets=0, puzzles=None, prince=False, mimic=False,
-                         score=0, deaths=0, crypts=0, auto_verify=False):
+                         score=0, deaths=0, crypts=0, auto_verify=False,
+                         evidence=None, verification=None):
         floor = floor.upper()
         if floor not in self.data:
             self.data[floor] = {}
@@ -47,7 +48,7 @@ class SoloManager:
         if existing_run and existing_run.get("time_ms", float('inf')) <= time_ms:
             return False, "You already have a faster or equal time recorded."
 
-        self.data[floor][uuid] = {
+        record = {
             "ign": ign,
             "time_ms": time_ms,
             "date_achieved": int(time.time()),
@@ -60,11 +61,16 @@ class SoloManager:
             "mimic": mimic,
             "score": score,
             "deaths": deaths,
-            "crypts": crypts
+            "crypts": crypts,
         }
+        if verification is not None:
+            record["verification"] = verification
+        if evidence is not None:
+            record["evidence"] = evidence
 
+        self.data[floor][uuid] = record
         await self._save_data()
-        
+
         if auto_verify:
             return True, "Run added to leaderboards."
         return True, "Run submitted successfully and is pending verification."

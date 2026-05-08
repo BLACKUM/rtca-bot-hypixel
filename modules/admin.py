@@ -799,17 +799,30 @@ class SoloFloorPickerSelect(discord.ui.Select):
         super().__init__(placeholder="Pick a floor…", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        fl = self.values[0]
-        if fl == "__none__":
-            await interaction.response.send_message("No clears recorded yet.", ephemeral=True)
-            return
-        runs = self._parent.bot.solo_manager.get_leaderboard(fl, "all")
-        if not runs:
-            await interaction.response.send_message(f"No clears on {fl}.", ephemeral=True)
-            return
-        await interaction.response.defer()
-        view = SoloRunPickerView(self._parent.bot, fl, runs, author_id=self._parent.author_id)
-        await interaction.edit_original_response(content=f"Select a run on **{fl}**:", embed=None, view=view, attachments=[])
+        try:
+            fl = self.values[0]
+            if fl == "__none__":
+                await interaction.response.send_message("No clears recorded yet.", ephemeral=True)
+                return
+            runs = self._parent.bot.solo_manager.get_leaderboard(fl, "all")
+            if not runs:
+                await interaction.response.send_message(f"No clears on {fl}.", ephemeral=True)
+                return
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+            view = SoloRunPickerView(self._parent.bot, fl, runs, author_id=self._parent.author_id)
+            await interaction.edit_original_response(content=f"Select a run on **{fl}**:", embed=None, view=view, attachments=[])
+        except Exception as e:
+            import traceback
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            log_error(f"[SoloAdmin] floor picker failed: {tb}")
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(f"❌ Error:\n```py\n{tb[-1500:]}\n```", ephemeral=True)
+                else:
+                    await interaction.response.send_message(f"❌ Error:\n```py\n{tb[-1500:]}\n```", ephemeral=True)
+            except Exception:
+                pass
 
 
 class SoloFloorPickerView(AuthorView):

@@ -1,4 +1,5 @@
 from discord.ext import commands, tasks
+from discord.errors import DiscordServerError
 from core.config import TOKEN, INTENTS, validate_config
 from core.logger import log_info, log_error
 from services.daily_manager import DailyManager
@@ -6,7 +7,7 @@ from services.rng_manager import RngManager
 from services.link_manager import LinkManager
 from services.recent_manager import RecentManager
 from services.solo_manager import SoloManager
-from services.api import get_dungeon_xp, init_session, close_session
+from services.api import init_session, close_session
 from services.irc_handler import init_irc_handler
 from services.name_manager import name_manager
 from services.ban_manager import ban_manager
@@ -16,20 +17,18 @@ import asyncio
 import os
 import traceback
 
+DISCORD_RETRY_INTERVAL = 20
+
 class RTCABot(commands.Bot):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._services_started = False
+        self._extensions_loaded = False
+
     async def setup_hook(self):
-        await load_extensions()
-        await init_session()
-        await init_cache()
-        await self.link_manager.initialize()
-        await self.daily_manager.initialize()
-        await self.rng_manager.initialize()
-        await self.recent_manager.initialize()
-        await self.solo_manager.initialize()
-        await name_manager.initialize()
-        await ban_manager.initialize()
-        await self.irc_handler.initialize()
-        await self.daily_manager.sanitize_data()
+        if not self._extensions_loaded:
+            await load_extensions()
+            self._extensions_loaded = True
 
 bot = RTCABot(command_prefix="!", intents=INTENTS)
 
@@ -49,22 +48,21 @@ async def on_message(message):
 async def track_daily_stats():
     try:
         log_info("Running scheduled daily stats update...")
-        
+
         await bot.daily_manager.check_resets()
-        
+
         users = bot.daily_manager.get_tracked_users()
         if not users:
             return
 
         updated, errors, total = await bot.daily_manager.force_update_all()
-        
+
         if updated > 0:
             log_info(f"Daily stats update completed: {updated}/{total} updated, {errors} errors.")
         else:
             log_info("Daily stats update skipped or completed with no changes.")
     except Exception as e:
         log_error(f"Unhandled exception in track_daily_stats loop: {e}")
-        import traceback
         log_error(traceback.format_exc())
 
 @tasks.loop(hours=24)
@@ -78,17 +76,16 @@ async def backup_github():
             log_error(f"GitHub backup failed: {message}")
     except Exception as e:
         log_error(f"Unhandled exception in backup_github loop: {e}")
-        import traceback
         log_error(traceback.format_exc())
 
 @bot.listen()
 async def on_ready():
     if not track_daily_stats.is_running():
         track_daily_stats.start()
-    
+
     if bot.github_manager.is_enabled() and not backup_github.is_running():
         backup_github.start()
-    
+
     log_info(f"✅ Logged in as {bot.user}")
     try:
         synced = await bot.tree.sync()
@@ -114,20 +111,51 @@ async def load_extensions():
         except Exception as e:
             log_error(f"Failed to load extension {ext}: {e}")
 
+async def start_services():
+    await init_session()
+    await init_cache()
+    await bot.link_manager.initialize()
+    await bot.daily_manager.initialize()
+    await bot.rng_manager.initialize()
+    await bot.recent_manager.initialize()
+    await bot.solo_manager.initialize()
+    await name_manager.initialize()
+    await ban_manager.initialize()
+    await bot.irc_handler.initialize()
+    await bot.daily_manager.sanitize_data()
+    bot._services_started = True
+    await load_extensions()
+    bot._extensions_loaded = True
+    log_info("All local services started.")
+
+async def discord_connect_loop():
+    attempt = 0
+    while True:
+        attempt += 1
+        log_info(f"Attempting Discord connection (attempt {attempt})...")
+        try:
+            await bot.start(TOKEN)
+            return
+        except DiscordServerError as e:
+            log_error(f"Discord is unavailable: {e}. Retrying in {DISCORD_RETRY_INTERVAL}s...")
+        except Exception as e:
+            log_error(f"Discord connection failed: {e}. Retrying in {DISCORD_RETRY_INTERVAL}s...")
+
+        await asyncio.sleep(DISCORD_RETRY_INTERVAL)
+
 async def main():
     validate_config()
     log_info("Starting RTCA Discord Bot...")
-    
-    
+
     try:
-        await bot.start(TOKEN)
-    except Exception as e:
-        log_error(f"Failed to start bot: {e}")
-        raise
+        await start_services()
+        await discord_connect_loop()
     finally:
         await shutdown_cache()
         await bot.irc_handler.close()
         await close_session()
+        if not bot.is_closed():
+            await bot.close()
 
 if __name__ == "__main__":
     try:

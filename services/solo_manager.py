@@ -48,6 +48,7 @@ class SoloManager:
         if existing_run and existing_run.get("time_ms", float('inf')) <= time_ms:
             return False, "You already have a faster or equal time recorded."
 
+        verified_method = "mod" if auto_verify and verification is not None else None
         record = {
             "ign": ign,
             "time_ms": time_ms,
@@ -63,6 +64,8 @@ class SoloManager:
             "deaths": deaths,
             "crypts": crypts,
         }
+        if verified_method is not None:
+            record["verified_method"] = verified_method
         if verification is not None:
             record["verification"] = verification
         if evidence is not None:
@@ -83,13 +86,14 @@ class SoloManager:
             return True, "Run successfully removed."
         return False, "Run not found on this floor."
 
-    async def verify_run(self, floor, uuid, approved: bool):
+    async def verify_run(self, floor, uuid, approved: bool, method="proof"):
         floor = floor.upper()
         if floor not in self.data or uuid not in self.data[floor]:
             return False, "Run not found."
 
         if approved:
             self.data[floor][uuid]["verified"] = True
+            self.data[floor][uuid]["verified_method"] = method
             await self._save_data()
             return True, "Run approved."
         else:
@@ -97,7 +101,7 @@ class SoloManager:
             await self._save_data()
             return True, "Run rejected and removed."
 
-    def get_leaderboard(self, floor, category="verified"):
+    def get_leaderboard(self, floor, category="verified_with_proof"):
         floor = floor.upper()
         if floor not in self.data:
             return []
@@ -105,11 +109,21 @@ class SoloManager:
         runs = []
         for uuid, entry in self.data[floor].items():
             is_ver = entry.get("verified", False)
-            if category == "all" or (category == "verified" and is_ver) or (category == "unverified" and not is_ver):
-                runs.append({
-                    "uuid": uuid,
-                    **entry
-                })
+            method = entry.get("verified_method", "proof")
+            if category == "all":
+                match = True
+            elif category == "verified":
+                match = is_ver
+            elif category == "unverified":
+                match = not is_ver
+            elif category == "verified_by_mod":
+                match = is_ver and method == "mod"
+            elif category == "verified_with_proof":
+                match = is_ver and method == "proof"
+            else:
+                match = False
+            if match:
+                runs.append({"uuid": uuid, **entry})
 
         runs.sort(key=lambda x: x["time_ms"])
         return runs

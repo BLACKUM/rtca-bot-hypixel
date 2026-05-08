@@ -565,6 +565,32 @@ def _render_run_map_file(run: dict):
         return None
 
 
+class EditProofModal(Modal):
+    def __init__(self, bot, floor: str, uuid: str, run: dict):
+        super().__init__(title="Edit Proof")
+        self.bot = bot
+        self.floor = floor
+        self.uuid = uuid
+        self.run = run
+        self.proof_input = TextInput(
+            label="Proof",
+            style=discord.TextStyle.paragraph,
+            default=run.get("proof_text", ""),
+            required=False,
+            max_length=1000,
+        )
+        self.add_item(self.proof_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        new_proof = self.proof_input.value.strip()
+        floor_data = self.bot.solo_manager.data.get(self.floor.upper(), {})
+        if self.uuid in floor_data:
+            floor_data[self.uuid]["proof_text"] = new_proof
+            await self.bot.solo_manager._save_data()
+            self.run["proof_text"] = new_proof
+        await interaction.response.send_message("\u2705 Proof updated.", ephemeral=True)
+
+
 class SoloRunDetailView(AuthorView):
     def __init__(self, bot, floor: str, uuid: str, run: dict, all_runs: list, author_id=None):
         super().__init__(timeout=300)
@@ -592,6 +618,10 @@ class SoloRunDetailView(AuthorView):
             ver_btn = discord.ui.Button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", row=0)
             ver_btn.callback = self.verify_btn
             self.add_item(ver_btn)
+
+        edit_proof_btn = discord.ui.Button(label="Edit Proof", style=discord.ButtonStyle.secondary, emoji="✏️", row=0)
+        edit_proof_btn.callback = self.edit_proof_btn
+        self.add_item(edit_proof_btn)
 
         sb_btn = discord.ui.Button(label="Scoreboard", style=discord.ButtonStyle.secondary, emoji="📜", row=1)
         sb_btn.callback = self.show_scoreboard
@@ -631,10 +661,14 @@ class SoloRunDetailView(AuthorView):
         await interaction.edit_original_response(content=None, embed=embed, view=view, attachments=[])
 
     async def verify_btn(self, interaction: discord.Interaction):
-        success, _ = await self.bot.solo_manager.verify_run(self.floor, self.uuid, True)
+        success, _ = await self.bot.solo_manager.verify_run(self.floor, self.uuid, True, method="proof")
         if success:
             self.run["verified"] = True
+            self.run["verified_method"] = "proof"
         await self._refresh(interaction)
+
+    async def edit_proof_btn(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(EditProofModal(self.bot, self.floor, self.uuid, self.run))
 
     async def unverify_btn(self, interaction: discord.Interaction):
         floor_data = self.bot.solo_manager.data.get(self.floor.upper(), {})
@@ -1178,18 +1212,18 @@ class Admin(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.allowed_installs(guilds=True, users=False)
-    @app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.command(name="admin", description="Owner-only administration panel")
     async def admin(self, interaction: discord.Interaction):
         if interaction.user.id not in config.owner_ids:
             await interaction.response.send_message("❌ You do not have permission to access the admin panel.", ephemeral=True)
             return
-            
+
         embed = discord.Embed(title="🛡️ Admin Panel", description="Select a category via buttons below.", color=0x2b2d31)
         view = AdminView(self.bot)
         view.author_id = interaction.user.id
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Admin(bot))

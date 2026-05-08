@@ -8,6 +8,12 @@ import math
 
 PAGE_SIZE = 10
 
+CATEGORY_LABELS = {
+    "unverified": "Unverified",
+    "verified_by_mod": "Verified by Mod",
+    "verified_with_proof": "Verified with Proof",
+}
+
 try:
     from core.secrets import SOLO_CLEAR_CHANNEL_ID
 except ImportError:
@@ -175,7 +181,10 @@ class RunSelect(Select):
         for i, run in enumerate(runs[:25], start_rank):
             ign = run.get('ign', 'Unknown')
             time_str = format_time(run.get('time_ms', 0))
-            emoji = "✅" if run.get("verified") else "⏱️"
+            if run.get("verified"):
+                emoji = "✅" if run.get("verified_method") == "mod" else "✅" # uhhh... yes, idk what emoji i could set for it TODO: figure out it
+            else:
+                emoji = "⏱️"
             options.append(discord.SelectOption(
                 label=f"#{i} - {ign}",
                 description=f"Time: {time_str}",
@@ -191,7 +200,7 @@ class RunSelect(Select):
         await self._lb_view.update_message(interaction)
 
 class LeaderboardView(AuthorView):
-    def __init__(self, bot, floor, category="all", ign=None):
+    def __init__(self, bot, floor, category="verified_with_proof", ign=None):
         super().__init__(timeout=None)
         self.bot = bot
         self.floor = floor
@@ -211,15 +220,15 @@ class LeaderboardView(AuthorView):
             self.add_item(btn)
             return
 
-        cat_ver = discord.ui.Button(label="Verified", style=discord.ButtonStyle.primary if self.category == "verified" else discord.ButtonStyle.secondary, row=0, custom_id="lb_cat_verified")
         cat_unver = discord.ui.Button(label="Unverified", style=discord.ButtonStyle.primary if self.category == "unverified" else discord.ButtonStyle.secondary, row=0, custom_id="lb_cat_unverified")
-        cat_all = discord.ui.Button(label="All", style=discord.ButtonStyle.primary if self.category == "all" else discord.ButtonStyle.secondary, row=0, custom_id="lb_cat_all")
-        cat_ver.callback = self.btn_verified
+        cat_mod = discord.ui.Button(label="Verified by Mod", style=discord.ButtonStyle.primary if self.category == "verified_by_mod" else discord.ButtonStyle.secondary, row=0, custom_id="lb_cat_mod")
+        cat_proof = discord.ui.Button(label="Verified with Proof", style=discord.ButtonStyle.primary if self.category == "verified_with_proof" else discord.ButtonStyle.secondary, row=0, custom_id="lb_cat_proof")
         cat_unver.callback = self.btn_unverified
-        cat_all.callback = self.btn_all
-        self.add_item(cat_ver)
+        cat_mod.callback = self.btn_verified_by_mod
+        cat_proof.callback = self.btn_verified_with_proof
         self.add_item(cat_unver)
-        self.add_item(cat_all)
+        self.add_item(cat_mod)
+        self.add_item(cat_proof)
 
         prev_b = discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, row=1, custom_id="lb_prev", disabled=self.page <= 1)
         search_b = discord.ui.Button(emoji="🔍", style=discord.ButtonStyle.secondary, row=1, custom_id="lb_search")
@@ -261,7 +270,14 @@ class LeaderboardView(AuthorView):
             emb = discord.Embed(title=f"Run Details - {target_run.get('ign')}", color=0x3498db)
             emb.add_field(name="Floor", value=self.floor, inline=True)
             emb.add_field(name="Time", value=time_str, inline=True)
-            emb.add_field(name="Status", value="Verified ✅" if target_run.get('verified') else "Unverified ⏱️", inline=True)
+            v_method = target_run.get("verified_method", "proof")
+            if not target_run.get("verified"):
+                status_str = "Unverified"
+            elif v_method == "mod":
+                status_str = "Verified by Mod" 
+            else:
+                status_str = "Verified with Proof"
+            emb.add_field(name="Status", value=status_str, inline=True)
             emb.add_field(name="Date", value=f"<t:{ts}:D> (<t:{ts}:R>)", inline=False)
             
             score = target_run.get('score', 0)
@@ -285,7 +301,8 @@ class LeaderboardView(AuthorView):
             emb.add_field(name="Proof", value=proof, inline=False)
             return emb
 
-        embed = discord.Embed(title=f"Solo Leaderboard - {self.floor} ({self.category.title()})", color=0x3498db)
+        cat_label = CATEGORY_LABELS.get(self.category, self.category.title())
+        embed = discord.Embed(title=f"Solo Leaderboard - {self.floor} ({cat_label})", color=0x3498db)
         if not runs:
             self.total_pages = 1
             self.page = 1
@@ -337,20 +354,20 @@ class LeaderboardView(AuthorView):
         self.inspect_uuid = None
         await self.update_message(interaction)
 
-    async def btn_verified(self, interaction: discord.Interaction):
-        self.category = "verified"
-        self.inspect_uuid = None
-        self.page = 1
-        await self.update_message(interaction)
-
     async def btn_unverified(self, interaction: discord.Interaction):
         self.category = "unverified"
         self.inspect_uuid = None
         self.page = 1
         await self.update_message(interaction)
 
-    async def btn_all(self, interaction: discord.Interaction):
-        self.category = "all"
+    async def btn_verified_by_mod(self, interaction: discord.Interaction):
+        self.category = "verified_by_mod"
+        self.inspect_uuid = None
+        self.page = 1
+        await self.update_message(interaction)
+
+    async def btn_verified_with_proof(self, interaction: discord.Interaction):
+        self.category = "verified_with_proof"
         self.inspect_uuid = None
         self.page = 1
         await self.update_message(interaction)
@@ -388,12 +405,16 @@ class SoloClears(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.command(name="submit_clear", description="Submit a fast solo dungeon clear.")
     @app_commands.describe(floor="The dungeon floor (default is F7)")
     async def submit_clear_cmd(self, interaction: discord.Interaction, floor: str = "F7"):
         floor = floor.upper()
         await interaction.response.send_modal(SubmitModal(self.bot, floor))
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.command(name="solo_clears", description="View the solo clears leaderboard.")
     @app_commands.describe(floor="The dungeon floor (default is F7)")
     async def solo_leaderboard_cmd(self, interaction: discord.Interaction, floor: str = "F7"):
@@ -403,7 +424,7 @@ class SoloClears(commands.Cog):
             ign = self.bot.link_manager.get_link(interaction.user.id)
         except Exception:
             pass
-        view = LeaderboardView(self.bot, floor, category="all", ign=ign)
+        view = LeaderboardView(self.bot, floor, category="verified_with_proof", ign=ign)
         view.author_id = interaction.user.id
         embed = view.build_embed()
         view.update_components()

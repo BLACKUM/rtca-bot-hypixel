@@ -728,9 +728,12 @@ class SoloDeleteConfirmView(AuthorView):
 
 
 class SoloRunPickerSelect(discord.ui.Select):
-    def __init__(self, parent_view, runs):
+    def __init__(self, bot, floor: str, runs: list, author_id):
         from modules.solo_clears import format_time
-        self._parent = parent_view
+        self.bot = bot
+        self.floor = floor
+        self.runs = runs
+        self.author_id = author_id
         options = []
         for i, run in enumerate(runs[:25], 1):
             ign = run.get("ign", "Unknown")
@@ -745,20 +748,32 @@ class SoloRunPickerSelect(discord.ui.Select):
         super().__init__(placeholder="Select a run to view…", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        uuid = self.values[0]
-        run = next((r for r in self._parent.runs if r["uuid"] == uuid), None)
-        if not run:
-            await interaction.response.send_message("Run no longer exists.", ephemeral=True)
-            return
-        await interaction.response.defer()
-        view = SoloRunDetailView(self._parent.bot, self._parent.floor, uuid, run, self._parent.runs, author_id=self._parent.author_id)
-        embed = _build_run_detail_embed(run, self._parent.floor, uuid)
-        map_file = _render_run_map_file(run)
-        kwargs = {"embed": embed, "view": view, "content": None, "attachments": []}
-        if map_file is not None:
-            kwargs["attachments"] = [map_file]
-            embed.set_image(url="attachment://minimap.png")
-        await interaction.edit_original_response(**kwargs)
+        try:
+            uuid = self.values[0]
+            run = next((r for r in self.runs if r["uuid"] == uuid), None)
+            if not run:
+                await interaction.response.send_message("Run no longer exists.", ephemeral=True)
+                return
+            await interaction.response.defer()
+            view = SoloRunDetailView(self.bot, self.floor, uuid, run, self.runs, author_id=self.author_id)
+            embed = _build_run_detail_embed(run, self.floor, uuid)
+            map_file = _render_run_map_file(run)
+            kwargs = {"embed": embed, "view": view, "content": None, "attachments": []}
+            if map_file is not None:
+                kwargs["attachments"] = [map_file]
+                embed.set_image(url="attachment://minimap.png")
+            await interaction.edit_original_response(**kwargs)
+        except Exception as e:
+            import traceback
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            log_error(f"[SoloAdmin] run picker failed: {tb}")
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(f"❌ Error:\n```py\n{tb[-1500:]}\n```", ephemeral=True)
+                else:
+                    await interaction.response.send_message(f"❌ Error:\n```py\n{tb[-1500:]}\n```", ephemeral=True)
+            except Exception:
+                pass
 
 
 class SoloRunPickerView(AuthorView):
@@ -768,7 +783,7 @@ class SoloRunPickerView(AuthorView):
         self.floor = floor
         self.runs = runs
         self.author_id = author_id
-        self.add_item(SoloRunPickerSelect(self, runs))
+        self.add_item(SoloRunPickerSelect(bot, floor, runs, author_id))
 
         back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="⬅️", row=1)
         back_btn.callback = self._back
@@ -781,9 +796,10 @@ class SoloRunPickerView(AuthorView):
 
 
 class SoloFloorPickerSelect(discord.ui.Select):
-    def __init__(self, parent_view):
-        self._parent = parent_view
-        floor_data = parent_view.bot.solo_manager.data
+    def __init__(self, bot, author_id):
+        self.bot = bot
+        self.author_id = author_id
+        floor_data = bot.solo_manager.data
         options = []
         for fl in SOLO_FLOORS:
             count = len(floor_data.get(fl, {}) or {})
@@ -804,13 +820,13 @@ class SoloFloorPickerSelect(discord.ui.Select):
             if fl == "__none__":
                 await interaction.response.send_message("No clears recorded yet.", ephemeral=True)
                 return
-            runs = self._parent.bot.solo_manager.get_leaderboard(fl, "all")
+            runs = self.bot.solo_manager.get_leaderboard(fl, "all")
             if not runs:
                 await interaction.response.send_message(f"No clears on {fl}.", ephemeral=True)
                 return
             if not interaction.response.is_done():
                 await interaction.response.defer()
-            view = SoloRunPickerView(self._parent.bot, fl, runs, author_id=self._parent.author_id)
+            view = SoloRunPickerView(self.bot, fl, runs, author_id=self.author_id)
             await interaction.edit_original_response(content=f"Select a run on **{fl}**:", embed=None, view=view, attachments=[])
         except Exception as e:
             import traceback
@@ -830,7 +846,7 @@ class SoloFloorPickerView(AuthorView):
         super().__init__(timeout=300)
         self.bot = bot
         self.author_id = author_id
-        self.add_item(SoloFloorPickerSelect(self))
+        self.add_item(SoloFloorPickerSelect(bot, author_id))
 
 class ForceAddSoloClearModal(Modal):
     def __init__(self, bot):

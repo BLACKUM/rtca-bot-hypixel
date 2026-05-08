@@ -606,19 +606,19 @@ class SoloRunDetailView(AuthorView):
         self.add_item(back_btn)
 
     async def _refresh(self, interaction: discord.Interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer()
         embed = _build_run_detail_embed(self.run, self.floor, self.uuid)
         map_file = _render_run_map_file(self.run)
         self._build_buttons()
-        kwargs = {"embed": embed, "view": self, "attachments": []}
+        kwargs = {"content": None, "embed": embed, "view": self, "attachments": []}
         if map_file is not None:
             kwargs["attachments"] = [map_file]
             embed.set_image(url="attachment://minimap.png")
-        if interaction.response.is_done():
-            await interaction.edit_original_response(**kwargs)
-        else:
-            await interaction.response.edit_message(**kwargs)
+        await interaction.edit_original_response(**kwargs)
 
     async def delete_btn(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         view = SoloDeleteConfirmView(self.bot, self.floor, self.uuid, self.run, self.all_runs, author_id=self.author_id)
         embed = discord.Embed(
             title="⚠️ Confirm deletion",
@@ -628,7 +628,7 @@ class SoloRunDetailView(AuthorView):
             ),
             color=0xff0000,
         )
-        await interaction.response.edit_message(embed=embed, view=view, attachments=[])
+        await interaction.edit_original_response(content=None, embed=embed, view=view, attachments=[])
 
     async def verify_btn(self, interaction: discord.Interaction):
         success, _ = await self.bot.solo_manager.verify_run(self.floor, self.uuid, True)
@@ -666,8 +666,9 @@ class SoloRunDetailView(AuthorView):
         await interaction.response.send_message(f"```\n{body}\n```", ephemeral=True)
 
     async def back_btn(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         view = SoloRunPickerView(self.bot, self.floor, self.all_runs, author_id=self.author_id)
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             content=f"Select a run on **{self.floor}**:",
             embed=None,
             view=view,
@@ -687,6 +688,7 @@ class SoloDeleteConfirmView(AuthorView):
 
     @discord.ui.button(label="Confirm Delete", style=discord.ButtonStyle.danger, emoji="✅")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
         success, msg = await self.bot.solo_manager.remove_run(self.floor, self.uuid)
         if success:
             self.all_runs[:] = [r for r in self.all_runs if r["uuid"] != self.uuid]
@@ -697,7 +699,7 @@ class SoloDeleteConfirmView(AuthorView):
         )
         if self.all_runs:
             view = SoloRunPickerView(self.bot, self.floor, self.all_runs, author_id=self.author_id)
-            await interaction.response.edit_message(
+            await interaction.edit_original_response(
                 content=f"Select a run on **{self.floor}**:",
                 embed=embed,
                 view=view,
@@ -705,7 +707,7 @@ class SoloDeleteConfirmView(AuthorView):
             )
         else:
             view = SoloFloorPickerView(self.bot, author_id=self.author_id)
-            await interaction.response.edit_message(
+            await interaction.edit_original_response(
                 content="Pick a floor:",
                 embed=embed,
                 view=view,
@@ -714,14 +716,15 @@ class SoloDeleteConfirmView(AuthorView):
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="↩️")
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
         view = SoloRunDetailView(self.bot, self.floor, self.uuid, self.run, self.all_runs, author_id=self.author_id)
         embed = _build_run_detail_embed(self.run, self.floor, self.uuid)
         map_file = _render_run_map_file(self.run)
-        kwargs = {"embed": embed, "view": view, "attachments": []}
+        kwargs = {"content": None, "embed": embed, "view": view, "attachments": []}
         if map_file is not None:
             kwargs["attachments"] = [map_file]
             embed.set_image(url="attachment://minimap.png")
-        await interaction.response.edit_message(**kwargs)
+        await interaction.edit_original_response(**kwargs)
 
 
 class SoloRunPickerSelect(discord.ui.Select):
@@ -747,6 +750,7 @@ class SoloRunPickerSelect(discord.ui.Select):
         if not run:
             await interaction.response.send_message("Run no longer exists.", ephemeral=True)
             return
+        await interaction.response.defer()
         view = SoloRunDetailView(self._parent.bot, self._parent.floor, uuid, run, self._parent.runs, author_id=self._parent.author_id)
         embed = _build_run_detail_embed(run, self._parent.floor, uuid)
         map_file = _render_run_map_file(run)
@@ -754,7 +758,7 @@ class SoloRunPickerSelect(discord.ui.Select):
         if map_file is not None:
             kwargs["attachments"] = [map_file]
             embed.set_image(url="attachment://minimap.png")
-        await interaction.response.edit_message(**kwargs)
+        await interaction.edit_original_response(**kwargs)
 
 
 class SoloRunPickerView(AuthorView):
@@ -771,8 +775,9 @@ class SoloRunPickerView(AuthorView):
         self.add_item(back_btn)
 
     async def _back(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         view = SoloFloorPickerView(self.bot, author_id=self.author_id)
-        await interaction.response.edit_message(content="Pick a floor:", embed=None, view=view, attachments=[])
+        await interaction.edit_original_response(content="Pick a floor:", embed=None, view=view, attachments=[])
 
 
 class SoloFloorPickerSelect(discord.ui.Select):
@@ -802,8 +807,9 @@ class SoloFloorPickerSelect(discord.ui.Select):
         if not runs:
             await interaction.response.send_message(f"No clears on {fl}.", ephemeral=True)
             return
+        await interaction.response.defer()
         view = SoloRunPickerView(self._parent.bot, fl, runs, author_id=self._parent.author_id)
-        await interaction.response.edit_message(content=f"Select a run on **{fl}**:", embed=None, view=view, attachments=[])
+        await interaction.edit_original_response(content=f"Select a run on **{fl}**:", embed=None, view=view, attachments=[])
 
 
 class SoloFloorPickerView(AuthorView):

@@ -100,6 +100,20 @@ class SoloClearEvidence:
             or self.mojang_server_id
         )
 
+    def is_modern_client(self) -> tuple[bool, list[str]]:
+        missing: list[str] = []
+        if not self.mojang_server_id:
+            missing.append("mojang_server_id")
+        if not self.scoreboard_lines:
+            missing.append("scoreboard_lines")
+        if not self.tablist_lines:
+            missing.append("tablist_lines")
+        if not self.score_components or self.score_components.total <= 0:
+            missing.append("score_components")
+        if not isinstance(self.map_data, dict) or not self.map_data.get("rooms"):
+            missing.append("map_data")
+        return (not missing, missing)
+
 
 @dataclass
 class ValidationResult:

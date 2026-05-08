@@ -464,60 +464,354 @@ class DataAdminView(AuthorView):
             await interaction.followup.send("❌ Error during backup process.")
 
 
-class RemoveClearSelect(discord.ui.Select):
-    def __init__(self, bot, runs, floor):
+SOLO_FLOORS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "M1", "M2", "M3", "M4", "M5", "M6", "M7"]
+
+
+def _build_run_detail_embed(run: dict, floor: str, uuid: str):
+    from modules.solo_clears import format_time
+    ign = run.get("ign", "Unknown")
+    time_str = format_time(run.get("time_ms", 0))
+    is_verified = run.get("verified", False)
+    ts = run.get("date_achieved", 0)
+    discord_id = run.get("discord_id", "")
+    proof = run.get("proof_text", "—")
+    score = run.get("score", 0)
+    deaths = run.get("deaths", 0)
+    crypts = run.get("crypts", 0)
+    secrets = run.get("secrets", 0)
+    puzzles = run.get("puzzles", []) or []
+    prince = run.get("prince", False)
+    mimic = run.get("mimic", False)
+
+    color = 0x00ff00 if is_verified else 0xffa500
+    emb = discord.Embed(
+        title=f"{'✅ Verified' if is_verified else '⏱️ Unverified'} — {ign} on {floor}",
+        color=color,
+    )
+    emb.add_field(name="Time", value=f"`{time_str}`", inline=True)
+    emb.add_field(name="Score", value=str(score) if score > 0 else "—", inline=True)
+    emb.add_field(name="Date", value=f"<t:{ts}:F>\n<t:{ts}:R>" if ts else "—", inline=True)
+
+    submitter = f"<@{discord_id}>" if discord_id and str(discord_id).isdigit() else f"`{discord_id}`"
+    emb.add_field(name="Submitted by", value=submitter, inline=True)
+    emb.add_field(name="UUID", value=f"`{uuid}`", inline=True)
+    emb.add_field(name="​", value="​", inline=True)
+
+    stats_str = (
+        f"Secrets: **{secrets}**\n"
+        f"Deaths: **{deaths}**\n"
+        f"Crypts: **{crypts}**\n"
+        f"Prince: {'✅' if prince else '❌'}\n"
+        f"Mimic: {'✅' if mimic else '❌'}\n"
+        f"Puzzles ({len(puzzles)}): {', '.join(puzzles) if puzzles else '—'}"
+    )
+    emb.add_field(name="Stats", value=stats_str, inline=False)
+
+    verification = run.get("verification") or {}
+    if verification:
+        method = verification.get("method", "—")
+        moj = verification.get("mojang_verified", False)
+        ident = verification.get("is_verified_owner", False)
+        dev = verification.get("is_dev_key", False)
+        modern = verification.get("modern_client", None)
+        missing = verification.get("missing_evidence_fields", []) or []
+        verified_at = verification.get("verified_at", 0)
+        v_str = (
+            f"Method: `{method}`\n"
+            f"Mojang: {'✅' if moj else '❌'}  Identity: {'✅' if ident else '❌'}  Dev key: {'✅' if dev else '❌'}\n"
+            f"Modern client: {'✅' if modern else ('❌' if modern is False else '—')}\n"
+            f"Missing fields: {', '.join(missing) if missing else 'none'}\n"
+            f"Verified at: <t:{verified_at}:R>" if verified_at else ""
+        )
+        emb.add_field(name="Verification", value=v_str or "—", inline=False)
+
+    evidence = run.get("evidence") or {}
+    if evidence:
+        sc = evidence.get("score_components") or {}
+        sc_str = (
+            f"skill={sc.get('skill', 0)}, explore={sc.get('explore', 0)}, "
+            f"time={sc.get('time', 0)}, bonus={sc.get('bonus', 0)} → **{sc.get('total', 0)}**"
+        ) if sc else "—"
+
+        e_str = (
+            f"Score components: {sc_str}\n"
+            f"Enter tick: `{evidence.get('dungeon_enter_tick', '—')}`  Clear tick: `{evidence.get('clear_trigger_tick', '—')}`\n"
+            f"Enter clock: `{evidence.get('client_clock_enter', '—')}`  Clear clock: `{evidence.get('client_clock_clear', '—')}`\n"
+            f"Mojang server_id: `{(evidence.get('mojang_server_id') or '—')[:16]}...`\n"
+            f"Map data: {'present (' + str(len(evidence.get('map_data', {}).get('rooms', []))) + ' rooms)' if evidence.get('map_data') else 'absent'}\n"
+            f"Scoreboard lines: {len(evidence.get('scoreboard_lines', []) or [])}\n"
+            f"Tablist lines: {len(evidence.get('tablist_lines', []) or [])}"
+        )
+        emb.add_field(name="Evidence", value=e_str, inline=False)
+
+    emb.add_field(name="Proof", value=proof[:1000], inline=False)
+    return emb
+
+
+def _render_run_map_file(run: dict):
+    evidence = run.get("evidence") or {}
+    map_data = evidence.get("map_data")
+    if not map_data:
+        return None
+    try:
+        from services.map_renderer import render_map
+        import io as _io
+        png = render_map(map_data)
+        if not png:
+            return None
+        return discord.File(_io.BytesIO(png), filename="minimap.png")
+    except Exception as e:
+        log_error(f"[Admin] map render failed: {e}")
+        return None
+
+
+class SoloRunDetailView(AuthorView):
+    def __init__(self, bot, floor: str, uuid: str, run: dict, all_runs: list, author_id=None):
+        super().__init__(timeout=300)
         self.bot = bot
         self.floor = floor
-        options = []
+        self.uuid = uuid
+        self.run = run
+        self.all_runs = all_runs
+        self.author_id = author_id
+        self._build_buttons()
+
+    def _build_buttons(self):
+        self.clear_items()
+        is_ver = self.run.get("verified", False)
+
+        del_btn = discord.ui.Button(label="Delete", style=discord.ButtonStyle.danger, emoji="🗑️", row=0)
+        del_btn.callback = self.delete_btn
+        self.add_item(del_btn)
+
+        if is_ver:
+            unver_btn = discord.ui.Button(label="Unverify", style=discord.ButtonStyle.secondary, emoji="❌", row=0)
+            unver_btn.callback = self.unverify_btn
+            self.add_item(unver_btn)
+        else:
+            ver_btn = discord.ui.Button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", row=0)
+            ver_btn.callback = self.verify_btn
+            self.add_item(ver_btn)
+
+        sb_btn = discord.ui.Button(label="Scoreboard", style=discord.ButtonStyle.secondary, emoji="📜", row=1)
+        sb_btn.callback = self.show_scoreboard
+        self.add_item(sb_btn)
+
+        tab_btn = discord.ui.Button(label="Tablist", style=discord.ButtonStyle.secondary, emoji="📋", row=1)
+        tab_btn.callback = self.show_tablist
+        self.add_item(tab_btn)
+
+        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="⬅️", row=1)
+        back_btn.callback = self.back_btn
+        self.add_item(back_btn)
+
+    async def _refresh(self, interaction: discord.Interaction):
+        embed = _build_run_detail_embed(self.run, self.floor, self.uuid)
+        map_file = _render_run_map_file(self.run)
+        self._build_buttons()
+        kwargs = {"embed": embed, "view": self, "attachments": []}
+        if map_file is not None:
+            kwargs["attachments"] = [map_file]
+            embed.set_image(url="attachment://minimap.png")
+        if interaction.response.is_done():
+            await interaction.edit_original_response(**kwargs)
+        else:
+            await interaction.response.edit_message(**kwargs)
+
+    async def delete_btn(self, interaction: discord.Interaction):
+        view = SoloDeleteConfirmView(self.bot, self.floor, self.uuid, self.run, self.all_runs, author_id=self.author_id)
+        embed = discord.Embed(
+            title="⚠️ Confirm deletion",
+            description=(
+                f"Delete `{self.run.get('ign')}`'s **{self.floor}** run "
+                f"(`{self.run.get('time_ms', 0)} ms`) permanently?\n\nThis cannot be undone."
+            ),
+            color=0xff0000,
+        )
+        await interaction.response.edit_message(embed=embed, view=view, attachments=[])
+
+    async def verify_btn(self, interaction: discord.Interaction):
+        success, _ = await self.bot.solo_manager.verify_run(self.floor, self.uuid, True)
+        if success:
+            self.run["verified"] = True
+        await self._refresh(interaction)
+
+    async def unverify_btn(self, interaction: discord.Interaction):
+        floor_data = self.bot.solo_manager.data.get(self.floor.upper(), {})
+        rec = floor_data.get(self.uuid)
+        if rec is not None:
+            rec["verified"] = False
+            await self.bot.solo_manager._save_data()
+            self.run["verified"] = False
+        await self._refresh(interaction)
+
+    async def show_scoreboard(self, interaction: discord.Interaction):
+        lines = (self.run.get("evidence") or {}).get("scoreboard_lines") or []
+        if not lines:
+            await interaction.response.send_message("*(No scoreboard data captured.)*", ephemeral=True)
+            return
+        body = "\n".join(lines)
+        if len(body) > 1900:
+            body = body[:1900] + "\n…"
+        await interaction.response.send_message(f"```\n{body}\n```", ephemeral=True)
+
+    async def show_tablist(self, interaction: discord.Interaction):
+        lines = (self.run.get("evidence") or {}).get("tablist_lines") or []
+        if not lines:
+            await interaction.response.send_message("*(No tablist data captured.)*", ephemeral=True)
+            return
+        body = "\n".join(lines)
+        if len(body) > 1900:
+            body = body[:1900] + "\n…"
+        await interaction.response.send_message(f"```\n{body}\n```", ephemeral=True)
+
+    async def back_btn(self, interaction: discord.Interaction):
+        view = SoloRunPickerView(self.bot, self.floor, self.all_runs, author_id=self.author_id)
+        await interaction.response.edit_message(
+            content=f"Select a run on **{self.floor}**:",
+            embed=None,
+            view=view,
+            attachments=[],
+        )
+
+
+class SoloDeleteConfirmView(AuthorView):
+    def __init__(self, bot, floor: str, uuid: str, run: dict, all_runs: list, author_id=None):
+        super().__init__(timeout=120)
+        self.bot = bot
+        self.floor = floor
+        self.uuid = uuid
+        self.run = run
+        self.all_runs = all_runs
+        self.author_id = author_id
+
+    @discord.ui.button(label="Confirm Delete", style=discord.ButtonStyle.danger, emoji="✅")
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        success, msg = await self.bot.solo_manager.remove_run(self.floor, self.uuid)
+        if success:
+            self.all_runs[:] = [r for r in self.all_runs if r["uuid"] != self.uuid]
+        embed = discord.Embed(
+            title="✅ Deleted" if success else "❌ Delete failed",
+            description=msg,
+            color=0x00ff00 if success else 0xff0000,
+        )
+        if self.all_runs:
+            view = SoloRunPickerView(self.bot, self.floor, self.all_runs, author_id=self.author_id)
+            await interaction.response.edit_message(
+                content=f"Select a run on **{self.floor}**:",
+                embed=embed,
+                view=view,
+                attachments=[],
+            )
+        else:
+            view = SoloFloorPickerView(self.bot, author_id=self.author_id)
+            await interaction.response.edit_message(
+                content="Pick a floor:",
+                embed=embed,
+                view=view,
+                attachments=[],
+            )
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="↩️")
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = SoloRunDetailView(self.bot, self.floor, self.uuid, self.run, self.all_runs, author_id=self.author_id)
+        embed = _build_run_detail_embed(self.run, self.floor, self.uuid)
+        map_file = _render_run_map_file(self.run)
+        kwargs = {"embed": embed, "view": view, "attachments": []}
+        if map_file is not None:
+            kwargs["attachments"] = [map_file]
+            embed.set_image(url="attachment://minimap.png")
+        await interaction.response.edit_message(**kwargs)
+
+
+class SoloRunPickerSelect(discord.ui.Select):
+    def __init__(self, parent_view, runs):
         from modules.solo_clears import format_time
-        for run in runs[:25]:
-            ign = run.get('ign', 'Unknown')
-            time_str = format_time(run.get('time_ms', 0))
-            is_verified = run.get('verified', False)
+        self._parent = parent_view
+        options = []
+        for i, run in enumerate(runs[:25], 1):
+            ign = run.get("ign", "Unknown")
+            time_str = format_time(run.get("time_ms", 0))
+            is_ver = run.get("verified", False)
             options.append(discord.SelectOption(
-                label=f"{ign} - {time_str}",
-                value=run['uuid'],
-                description="Verified" if is_verified else "Unverified",
-                emoji="✅" if is_verified else "⏱️"
+                label=f"#{i} {ign} — {time_str}",
+                value=run["uuid"],
+                description="Verified" if is_ver else "Unverified",
+                emoji="✅" if is_ver else "⏱️",
             ))
-        super().__init__(placeholder=f"Select a clear to remove from {floor}...", min_values=1, max_values=1, options=options)
+        super().__init__(placeholder="Select a run to view…", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        try:
-            await interaction.response.defer()
-            uuid = self.values[0]
-            success, msg = await self.bot.solo_manager.remove_run(self.floor, uuid)
-            self.disabled = True
-            await interaction.edit_original_response(content=f"{'✅' if success else '❌'} {msg}", view=self.view)
-        except Exception as e:
-            import traceback
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            await interaction.followup.send(f"❌ ERROR:\n```py\n{tb[-1500:]}\n```")
+        uuid = self.values[0]
+        run = next((r for r in self._parent.runs if r["uuid"] == uuid), None)
+        if not run:
+            await interaction.response.send_message("Run no longer exists.", ephemeral=True)
+            return
+        view = SoloRunDetailView(self._parent.bot, self._parent.floor, uuid, run, self._parent.runs, author_id=self._parent.author_id)
+        embed = _build_run_detail_embed(run, self._parent.floor, uuid)
+        map_file = _render_run_map_file(run)
+        kwargs = {"embed": embed, "view": view, "content": None, "attachments": []}
+        if map_file is not None:
+            kwargs["attachments"] = [map_file]
+            embed.set_image(url="attachment://minimap.png")
+        await interaction.response.edit_message(**kwargs)
 
-class RemoveClearView(AuthorView):
-    def __init__(self, bot, runs, floor):
-        super().__init__(timeout=180)
+
+class SoloRunPickerView(AuthorView):
+    def __init__(self, bot, floor: str, runs: list, author_id=None):
+        super().__init__(timeout=300)
         self.bot = bot
-        self.add_item(RemoveClearSelect(bot, runs, floor))
+        self.floor = floor
+        self.runs = runs
+        self.author_id = author_id
+        self.add_item(SoloRunPickerSelect(self, runs))
 
-class RemoveClearFloorModal(Modal):
+        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="⬅️", row=1)
+        back_btn.callback = self._back
+        self.add_item(back_btn)
+
+    async def _back(self, interaction: discord.Interaction):
+        view = SoloFloorPickerView(self.bot, author_id=self.author_id)
+        await interaction.response.edit_message(content="Pick a floor:", embed=None, view=view, attachments=[])
+
+
+class SoloFloorPickerSelect(discord.ui.Select):
+    def __init__(self, parent_view):
+        self._parent = parent_view
+        floor_data = parent_view.bot.solo_manager.data
+        options = []
+        for fl in SOLO_FLOORS:
+            count = len(floor_data.get(fl, {}) or {})
+            if count == 0:
+                continue
+            options.append(discord.SelectOption(
+                label=fl,
+                value=fl,
+                description=f"{count} run{'s' if count != 1 else ''}",
+            ))
+        if not options:
+            options.append(discord.SelectOption(label="(no clears recorded)", value="__none__"))
+        super().__init__(placeholder="Pick a floor…", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        fl = self.values[0]
+        if fl == "__none__":
+            await interaction.response.send_message("No clears recorded yet.", ephemeral=True)
+            return
+        runs = self._parent.bot.solo_manager.get_leaderboard(fl, "all")
+        if not runs:
+            await interaction.response.send_message(f"No clears on {fl}.", ephemeral=True)
+            return
+        view = SoloRunPickerView(self._parent.bot, fl, runs, author_id=self._parent.author_id)
+        await interaction.response.edit_message(content=f"Select a run on **{fl}**:", embed=None, view=view, attachments=[])
+
+
+class SoloFloorPickerView(AuthorView):
     def __init__(self, bot, author_id=None):
-        super().__init__(title="Select Floor to Remove Clear")
+        super().__init__(timeout=300)
         self.bot = bot
         self.author_id = author_id
-        self.floor = TextInput(label="Floor (e.g. M7)", required=True)
-        self.add_item(self.floor)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        floor = self.floor.value.upper()
-        runs = self.bot.solo_manager.get_leaderboard(floor, "all")
-        if not runs:
-            await interaction.response.send_message(f"❌ No clears found for {floor}.", ephemeral=True)
-            return
-
-        view = RemoveClearView(self.bot, runs, floor)
-        view.author_id = self.author_id
-        await interaction.response.send_message(f"Select a clear to remove from **{floor}**:", view=view, ephemeral=False)
+        self.add_item(SoloFloorPickerSelect(self))
 
 class ForceAddSoloClearModal(Modal):
     def __init__(self, bot):
@@ -555,14 +849,15 @@ class SoloClearsAdminView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=180)
         self.bot = bot
-    
+
     @discord.ui.button(label="Force Add Clear", style=discord.ButtonStyle.success, emoji="➕")
     async def force_add(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(ForceAddSoloClearModal(self.bot))
 
-    @discord.ui.button(label="Remove Clear", style=discord.ButtonStyle.danger, emoji="🗑️")
-    async def remove_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
-         await interaction.response.send_modal(RemoveClearFloorModal(self.bot, author_id=self.author_id))
+    @discord.ui.button(label="Browse Clears", style=discord.ButtonStyle.primary, emoji="🔍")
+    async def browse_clears(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = SoloFloorPickerView(self.bot, author_id=self.author_id)
+        await interaction.response.send_message("Pick a floor:", view=view, ephemeral=True)
 
 class IpBanModal(Modal):
     def __init__(self):

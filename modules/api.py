@@ -632,9 +632,20 @@ class API(commands.Cog):
             is_dev = check_developer_key(dev_key)
             is_verified_owner = verify_identity(encrypted_id, str(uuid))
 
-            auto_verify = is_dev or is_verified_owner or is_mojang_verified
+            full_auth = is_mojang_verified and is_verified_owner
+            modern_client, missing_fields = evidence.is_modern_client()
+
+            auto_verify = is_dev or (full_auth and modern_client)
+
             if not auto_verify:
-                log_info(f"[API] Solo clear from {player} could not be auto-verified — saving as unverified for admin review")
+                reasons = []
+                if not is_mojang_verified:
+                    reasons.append("no Mojang session")
+                if not is_verified_owner:
+                    reasons.append("no encrypted identity")
+                if not modern_client:
+                    reasons.append(f"missing evidence: {missing_fields}")
+                log_info(f"[API] Solo clear from {player}: not auto-verified ({'; '.join(reasons)}) — saving as unverified for admin review")
 
             from modules.solo_clears import parse_time
             time_ms = parse_time(time_str)
@@ -669,6 +680,8 @@ class API(commands.Cog):
                 "mojang_verified": is_mojang_verified,
                 "is_dev_key": is_dev,
                 "is_verified_owner": is_verified_owner,
+                "modern_client": modern_client,
+                "missing_evidence_fields": missing_fields,
                 "verified_at": int(_time.time()),
             }
 

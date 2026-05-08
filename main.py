@@ -141,6 +141,7 @@ async def discord_connect_loop():
         except Exception as e:
             log_error(f"Discord connection failed: {e}. Retrying in {DISCORD_RETRY_INTERVAL}s...")
 
+        await bot.http.close()
         await asyncio.sleep(DISCORD_RETRY_INTERVAL)
 
 async def main():

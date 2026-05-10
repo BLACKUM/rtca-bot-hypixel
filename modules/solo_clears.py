@@ -324,9 +324,7 @@ class LeaderboardView(AuthorView):
             ign = run.get("ign", "Unknown")
 
             user_id = self.bot.daily_manager.get_user_id_by_ign(ign)
-            if ign.upper() == "BLACKUM":
-                display_name = "<@679725029109399574>"
-            elif user_id:
+            if user_id:
                 display_name = f"<@{user_id}>"
             else:
                 display_name = f"**{ign}**"

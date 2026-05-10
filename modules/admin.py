@@ -15,6 +15,7 @@ import json
 import asyncio
 import platform
 import psutil
+from datetime import datetime, timezone
 
 class EmbedPaginatorView(AuthorView):
     def __init__(self, embeds):
@@ -1058,6 +1059,81 @@ def _format_log_line(entry: dict) -> str:
     )
 
 
+def _truncate(value: str, limit: int) -> str:
+    text = str(value or "")
+    if len(text) > limit:
+        return text[:limit - 3] + "..."
+    return text
+
+
+def _code_block(value: str, limit: int = 1000) -> str:
+    text = _truncate(value or "None", limit).replace("```", "`\u200b``")
+    return f"```{text}```"
+
+
+def _build_request_detail_embed(entry: dict) -> discord.Embed:
+    status = entry.get("status", 0)
+    method = entry.get("method", "?")
+    path = entry.get("path", "")
+    query = entry.get("query", "")
+    target = f"{path}?{query}" if query else path
+    details = entry.get("details") or {}
+    ts = entry.get("ts", 0)
+
+    color = 0x2ECC71 if (200 <= status < 300 or status == 101) else 0xE74C3C if status >= 500 else 0xF1C40F
+    embed = discord.Embed(
+        title=f"API Request Details - {status}",
+        description=f"**{method}** `{_truncate(target, 220)}`",
+        color=color,
+    )
+    if ts:
+        embed.timestamp = datetime.fromtimestamp(ts, timezone.utc)
+
+    summary_lines = [
+        f"Status: {status}",
+        f"IP: {entry.get('ip', '?')}",
+        f"Host: {details.get('host') or '?'}",
+        f"Scheme: {details.get('scheme') or '?'}",
+    ]
+    if details.get("blocked_reason"):
+        summary_lines.append(f"Blocked: {details['blocked_reason']}")
+    if details.get("exception"):
+        summary_lines.append(f"Exception: {details['exception']}")
+    embed.add_field(name="Summary", value=_code_block("\n".join(summary_lines)), inline=False)
+
+    client_lines = [
+        f"Remote: {details.get('remote') or '?'}",
+        f"Peer: {details.get('peer') or '?'}",
+        f"X-Forwarded-For: {details.get('forwarded_for') or '?'}",
+        f"X-Real-IP: {details.get('real_ip') or '?'}",
+        f"User-Agent: {details.get('user_agent') or '?'}",
+        f"Referer: {details.get('referer') or '?'}",
+        f"Origin: {details.get('origin') or '?'}",
+    ]
+    embed.add_field(name="Client", value=_code_block("\n".join(client_lines)), inline=False)
+
+    body = entry.get("body") or ""
+    body_lines = [
+        f"Content-Type: {details.get('content_type') or '?'}",
+        f"Content-Length: {details.get('content_length') or 0}",
+        "",
+        body or "No captured body.",
+    ]
+    embed.add_field(name="Body Preview", value=_code_block("\n".join(map(str, body_lines))), inline=False)
+
+    headers = details.get("headers") or {}
+    if headers:
+        header_text = "\n".join(f"{k}: {v}" for k, v in sorted(headers.items()))
+        embed.add_field(name="Headers", value=_code_block(header_text), inline=False)
+
+    response_lines = [
+        f"Content-Type: {details.get('response_content_type') or '?'}",
+        f"Content-Length: {details.get('response_content_length') or '?'}",
+    ]
+    embed.add_field(name="Response", value=_code_block("\n".join(response_lines)), inline=False)
+    return embed
+
+
 def _build_log_embeds(entries: list, title_prefix: str) -> list:
     if not entries:
         return []
@@ -1071,6 +1147,32 @@ def _build_log_embeds(entries: list, title_prefix: str) -> list:
         embed.description = "\n\n".join(_format_log_line(e) for e in chunk)
         embeds.append(embed)
     return embeds
+
+
+class RequestLogDetailsSelect(discord.ui.Select):
+    def __init__(self, entries: list):
+        self.entries = entries[:25]
+        options = []
+        for index, entry in enumerate(self.entries):
+            path = entry.get("path", "")
+            query = entry.get("query", "")
+            target = f"{path}?{query}" if query else path
+            label = f"{entry.get('status', '?')} {entry.get('method', '?')} {_truncate(target, 68)}"
+            description = _truncate(f"{entry.get('ip', '?')} at {entry.get('ts', '?')}", 100)
+            options.append(discord.SelectOption(label=label[:100], value=str(index), description=description))
+        super().__init__(placeholder="Show request details...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        index = int(self.values[0])
+        entry = self.entries[index]
+        await interaction.response.send_message(embed=_build_request_detail_embed(entry), ephemeral=True)
+
+
+class RequestLogEntriesView(EmbedPaginatorView):
+    def __init__(self, embeds: list, entries: list):
+        super().__init__(embeds)
+        if entries:
+            self.add_item(RequestLogDetailsSelect(entries))
 
 
 class RequestLogFilterModal(Modal):
@@ -1092,7 +1194,7 @@ class RequestLogFilterModal(Modal):
             await interaction.response.send_message(f"No requests logged from `{ip}`.", ephemeral=True)
             return
         embeds = _build_log_embeds(entries, f"API Requests from {ip}")
-        view = EmbedPaginatorView(embeds)
+        view = RequestLogEntriesView(embeds, entries)
         view.author_id = self.author_id
         await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
 
@@ -1109,7 +1211,7 @@ class RequestLogView(AuthorView):
             await interaction.response.send_message("No API requests logged yet.", ephemeral=True)
             return
         embeds = _build_log_embeds(entries, "Recent API Requests")
-        view = EmbedPaginatorView(embeds)
+        view = RequestLogEntriesView(embeds, entries)
         view.author_id = self.author_id
         await interaction.response.send_message(embed=embeds[0], view=view, ephemeral=True)
 

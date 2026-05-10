@@ -279,15 +279,38 @@ class API(commands.Cog):
             
             dev_key = request.headers.get('X-Developer-Key', '')
             encrypted_id = request.headers.get('X-Encrypted-Identity', '')
+            mojang_server_id = data.get('mojang_server_id', '')
             
             from services.security import check_developer_key, verify_identity
+            from services.mojang_auth import verify_session
             
             is_dev = check_developer_key(dev_key)
             is_verified_owner = verify_identity(encrypted_id, str(uuid))
+            is_mojang_verified = False
+            if mojang_server_id:
+                is_mojang_verified = await verify_session(player, str(mojang_server_id), expected_uuid=str(uuid))
             
-            if not is_dev and not is_verified_owner:
-                log_error(f"[API] Security check failed for {player} (UUID: {uuid})")
-                return web.json_response({'error': 'Unauthorized: Invalid identity or key'}, status=403)
+            auth_method = "developer_key" if is_dev else "mojang_identity" if is_verified_owner and is_mojang_verified else "none"
+            request["auth_details"] = {
+                "result": "allowed" if is_dev or (is_verified_owner and is_mojang_verified) else "denied",
+                "reason": "ok" if is_dev or (is_verified_owner and is_mojang_verified) else (
+                    "missing_or_invalid_mojang_session" if is_verified_owner else "invalid_encrypted_identity"
+                ),
+                "method": auth_method,
+                "developer_key": is_dev,
+                "encrypted_identity": is_verified_owner,
+                "mojang_session": is_mojang_verified,
+            }
+            
+            if not is_dev and not (is_verified_owner and is_mojang_verified):
+                log_error(
+                    f"[API] Security check failed for {player} (UUID: {uuid}). "
+                    f"identity={is_verified_owner}, mojang={is_mojang_verified}"
+                )
+                return web.json_response(
+                    {'error': 'Unauthorized: valid encrypted identity and Mojang session are required'},
+                    status=403,
+                )
 
             if action == 'increment':
                 new_count = await self.bot.rng_manager.update_drop(str(user_id), category, item, 1)
@@ -636,6 +659,33 @@ class API(commands.Cog):
             modern_client, missing_fields = evidence.is_modern_client()
 
             auto_verify = is_dev or (full_auth and modern_client)
+            if is_dev:
+                auth_reason = "developer_key"
+                auth_method = "developer_key"
+            elif full_auth and modern_client:
+                auth_reason = "full_auth_modern_client"
+                auth_method = "mojang_identity"
+            elif full_auth:
+                auth_reason = "missing_modern_evidence"
+                auth_method = "mojang_identity"
+            elif is_verified_owner:
+                auth_reason = "missing_or_invalid_mojang_session"
+                auth_method = "encrypted_identity"
+            elif is_mojang_verified:
+                auth_reason = "invalid_encrypted_identity"
+                auth_method = "mojang_session"
+            else:
+                auth_reason = "no_valid_auth"
+                auth_method = "none"
+            request["auth_details"] = {
+                "result": "auto_verified" if auto_verify else "manual_review",
+                "reason": auth_reason,
+                "method": auth_method,
+                "developer_key": is_dev,
+                "encrypted_identity": is_verified_owner,
+                "mojang_session": is_mojang_verified,
+                "modern_client": modern_client,
+            }
 
             if not auto_verify:
                 reasons = []

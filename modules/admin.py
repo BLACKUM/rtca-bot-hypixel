@@ -1099,6 +1099,11 @@ def _build_request_detail_embed(entry: dict) -> discord.Embed:
         summary_lines.append(f"Blocked: {details['blocked_reason']}")
     if details.get("exception"):
         summary_lines.append(f"Exception: {details['exception']}")
+    auth = details.get("auth") or {}
+    if auth:
+        summary_lines.append(f"Auth Result: {auth.get('result', '?')}")
+        summary_lines.append(f"Auth Reason: {auth.get('reason', '?')}")
+        summary_lines.append(f"Auth Method: {auth.get('method', '?')}")
     embed.add_field(name="Summary", value=_code_block("\n".join(summary_lines)), inline=False)
 
     client_lines = [

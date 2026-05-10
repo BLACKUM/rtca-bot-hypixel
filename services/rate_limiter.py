@@ -115,15 +115,24 @@ class RateLimiter:
         try:
             response = await handler(request)
             status = getattr(response, "status", 0)
+            auth_details = request.get("auth_details")
+            if auth_details:
+                details["auth"] = auth_details
             details["response_content_type"] = response.headers.get("Content-Type", "")
             details["response_content_length"] = response.headers.get("Content-Length", "")
             request_log.add(ip, method, path, query, status, body_preview=body_preview, details=details)
             return response
         except web.HTTPException as exc:
+            auth_details = request.get("auth_details")
+            if auth_details:
+                details["auth"] = auth_details
             details["exception"] = exc.reason or exc.__class__.__name__
             request_log.add(ip, method, path, query, exc.status, body_preview=body_preview, details=details)
             raise
         except Exception:
+            auth_details = request.get("auth_details")
+            if auth_details:
+                details["auth"] = auth_details
             details["exception"] = "Unhandled server error"
             request_log.add(ip, method, path, query, 500, body_preview=body_preview, details=details)
             raise

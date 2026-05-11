@@ -812,6 +812,129 @@ class API(commands.Cog):
             return web.json_response({'error': str(e)}, status=500)
 
     async def handle_solo_leaderboard(self, request):
+                if not is_mojang_verified:
+                    reasons.append("no Mojang session")
+                if not is_verified_owner:
+                    reasons.append("no encrypted identity")
+                if not modern_client:
+                    reasons.append(f"missing evidence: {missing_fields}")
+                log_info(f"[API] Solo clear from {player}: not auto-verified ({'; '.join(reasons)}) — saving as unverified for admin review")
+
+            from modules.solo_clears import parse_time
+            time_ms = parse_time(time_str)
+            if time_ms <= 0:
+                return web.json_response({'error': 'Invalid time format'}, status=400)
+
+            if evidence.has_extended_evidence():
+                vresult = validate_evidence(evidence, time_ms)
+                if vresult.failures:
+                    log_error(f"[API] Evidence validation failures for {player}: {vresult.failures}")
+                if vresult.warnings:
+                    log_info(f"[API] Evidence validation warnings for {player}: {vresult.warnings}")
+                if vresult.is_outlier:
+                    log_info(f"[API] Submission flagged as outlier for {player} (still auto-verified during warn-only rollout)")
+
+            proof = "Auto-submitted via BlackAddons Mod API"
+            discord_id = self.bot.daily_manager.get_user_id_by_ign(player) or uuid
+
+            score_total = evidence.score_components.total if evidence.score_components else 0
+
+            if is_mojang_verified:
+                verify_method = "mojang"
+            elif is_verified_owner:
+                verify_method = "verified_identity"
+            elif is_dev:
+                verify_method = "dev_key"
+            else:
+                verify_method = "none"
+
+            verification_meta = {
+                "method": verify_method,
+                "mojang_verified": is_mojang_verified,
+                "is_dev_key": is_dev,
+                "is_verified_owner": is_verified_owner,
+                "modern_client": modern_client,
+                "missing_evidence_fields": missing_fields,
+                "verified_at": int(_time.time()),
+            }
+
+            evidence_meta = {
+                "scoreboard_lines": evidence.scoreboard_lines,
+                "tablist_lines": evidence.tablist_lines,
+                "score_components": evidence.score_components.to_dict() if evidence.score_components else None,
+                "dungeon_enter_tick": evidence.dungeon_enter_tick,
+                "clear_trigger_tick": evidence.clear_trigger_tick,
+                "client_clock_enter": evidence.client_clock_enter,
+                "client_clock_clear": evidence.client_clock_clear,
+                "mojang_server_id": evidence.mojang_server_id,
+                "map_data": evidence.map_data,
+                "needs_verification": evidence.needs_verification,
+            }
+
+            success, msg = await self.bot.solo_manager.submit_run(
+                floor, player, uuid, time_ms, proof, discord_id,
+                secrets=secrets, puzzles=puzzles, prince=prince, mimic=mimic,
+                score=score_total, deaths=evidence.deaths, crypts=evidence.crypts,
+                auto_verify=auto_verify,
+                evidence=evidence_meta, verification=verification_meta,
+            )
+
+            if not success:
+                return web.json_response({'error': msg}, status=400)
+            
+            import discord
+            try:
+                from core.secrets import SOLO_CLEAR_CHANNEL_ID
+            except ImportError:
+                SOLO_CLEAR_CHANNEL_ID = None
+
+            if SOLO_CLEAR_CHANNEL_ID:
+                solo_ch = self.bot.get_channel(SOLO_CLEAR_CHANNEL_ID)
+                if solo_ch:
+                    if auto_verify:
+                        title = "New Auto-Verified API Solo Clear"
+                        color = 0x00ff00
+                    else:
+                        title = "Unverified API Solo Clear"
+                        color = 0xffa500
+
+                    embed = discord.Embed(title=title, color=color)
+                    embed.add_field(name="Player", value=f"`{player}`", inline=True)
+                    embed.add_field(name="Floor", value=floor, inline=True)
+                    embed.add_field(name="Time", value=time_str, inline=True)
+                    embed.add_field(name="Stats", value=f"Secrets: {secrets}\nPuzzles: {len(puzzles)}\nPrince: {'✅' if prince else '❌'}\nMimic: {'✅' if mimic else '❌'}", inline=False)
+                    embed.add_field(name="Proof", value=proof, inline=False)
+
+                    map_file = None
+                    if evidence.map_data:
+                        try:
+                            from services.map_renderer import render_map
+                            import io as _io
+                            png = render_map(evidence.map_data)
+                            if png:
+                                map_file = discord.File(_io.BytesIO(png), filename="minimap.png")
+                                embed.set_image(url="attachment://minimap.png")
+                        except Exception as map_err:
+                            log_error(f"[API] map render failed: {map_err}")
+
+                    view = None
+                    if not auto_verify:
+                        from modules.solo_clears import VerifyView
+                        view = VerifyView(self.bot, floor, str(uuid))
+
+                    send_kwargs = {"embed": embed}
+                    if map_file is not None:
+                        send_kwargs["file"] = map_file
+                    if view is not None:
+                        send_kwargs["view"] = view
+                    await solo_ch.send(**send_kwargs)
+
+            return web.json_response({'status': 'success', 'message': msg})
+        except Exception as e:
+            log_error(f"[API] Error processing POST /v1/solo_clear: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_solo_leaderboard(self, request):
         try:
             floor = request.rel_url.query.get('floor', 'F7').upper()
             runs = self.bot.solo_manager.get_leaderboard(floor, 'verified')
@@ -828,6 +951,7 @@ class API(commands.Cog):
                     'prince': run.get('prince', False),
                     'mimic': run.get('mimic', False),
                     'date_achieved': run.get('date_achieved', 0),
+                    'map_data': run.get('evidence', {}).get('map_data') if 'evidence' in run else None,
                 })
             return web.json_response({'floor': floor, 'runs': result})
         except Exception as e:

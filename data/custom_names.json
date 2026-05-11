@@ -167,5 +167,14 @@
         "chroma": false,
         "animated": true,
         "speed": 1.5
+    },
+    "Dronik":
+    {
+        "uuid": "c4c3c3d8-cee4-4505-8a45-d68339888077",
+        "display": "Dronik",
+        "gradient": "linear-gradient(90deg, rgba(65, 0, 150, 1) 0%, rgba(0, 0, 0, 1) 50%, rgba(255, 0, 208, 1) 100%);",
+        "chroma": false,
+        "animated": true,
+        "speed": 1.5
     }
 }

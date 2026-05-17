@@ -91,7 +91,7 @@
     {
         "uuid": "efad5dfc-ab14-4b75-a156-8936e00a80ec",
         "display": "conungede",
-        "gradient": "radial-gradient(circle, rgba(212, 180, 193, 1) 0%, rgba(175, 176, 196, 1) 51%, rgba(222, 220, 220, 1) 100%);",
+        "gradient": "linear-gradient(90deg, rgba(212, 180, 193, 1) 0%, rgba(175, 176, 196, 1) 51%, rgba(222, 220, 220, 1) 100%);",
         "chroma": false,
         "animated": true,
         "speed": 1.0

@@ -23,12 +23,14 @@ def test_default_values(config):
     assert config.xp_per_run_default == 300000.0
     assert config.target_level == 50
     assert config.debug_mode is True
+    assert config.require_identity_check is True
     assert isinstance(config.owner_ids, list)
     assert len(config.owner_ids) > 0
 
 def test_save_and_load(config):
     config.xp_per_run_default = 500.0
     config.debug_mode = False
+    config.require_identity_check = False
     config.owner_ids = [12345]
     
     config.save()
@@ -40,6 +42,7 @@ def test_save_and_load(config):
     
     assert new_config.xp_per_run_default == 500.0
     assert new_config.debug_mode is False
+    assert new_config.require_identity_check is False
     assert new_config.owner_ids == [12345]
 
 def test_partial_load(config):

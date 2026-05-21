@@ -283,6 +283,7 @@ class API(commands.Cog):
             
             from services.security import check_developer_key, verify_identity
             from services.mojang_auth import verify_session
+            from core.config import config
             
             is_dev = check_developer_key(dev_key)
             is_verified_owner = verify_identity(encrypted_id, str(uuid))
@@ -290,11 +291,12 @@ class API(commands.Cog):
             if mojang_server_id:
                 is_mojang_verified = await verify_session(player, str(mojang_server_id), expected_uuid=str(uuid))
             
-            auth_method = "developer_key" if is_dev else "mojang_identity" if is_verified_owner and is_mojang_verified else "none"
+            identity_ok = is_verified_owner or not config.require_identity_check
+            auth_method = "developer_key" if is_dev else "mojang_identity" if identity_ok and is_mojang_verified else "none"
             request["auth_details"] = {
-                "result": "allowed" if is_dev or (is_verified_owner and is_mojang_verified) else "denied",
-                "reason": "ok" if is_dev or (is_verified_owner and is_mojang_verified) else (
-                    "missing_or_invalid_mojang_session" if is_verified_owner else "invalid_encrypted_identity"
+                "result": "allowed" if is_dev or (identity_ok and is_mojang_verified) else "denied",
+                "reason": "ok" if is_dev or (identity_ok and is_mojang_verified) else (
+                    "missing_or_invalid_mojang_session" if identity_ok else "invalid_encrypted_identity"
                 ),
                 "method": auth_method,
                 "developer_key": is_dev,
@@ -302,10 +304,10 @@ class API(commands.Cog):
                 "mojang_session": is_mojang_verified,
             }
             
-            if not is_dev and not (is_verified_owner and is_mojang_verified):
+            if not is_dev and not (identity_ok and is_mojang_verified):
                 log_error(
                     f"[API] Security check failed for {player} (UUID: {uuid}). "
-                    f"identity={is_verified_owner}, mojang={is_mojang_verified}"
+                    f"identity={is_verified_owner} (required={config.require_identity_check}), mojang={is_mojang_verified}"
                 )
                 return web.json_response(
                     {'error': 'Unauthorized: valid encrypted identity and Mojang session are required'},
@@ -652,10 +654,12 @@ class API(commands.Cog):
             encrypted_id = request.headers.get('X-Encrypted-Identity', '')
 
             from services.security import check_developer_key, verify_identity
+            from core.config import config
             is_dev = check_developer_key(dev_key)
             is_verified_owner = verify_identity(encrypted_id, str(uuid))
 
-            full_auth = is_mojang_verified and is_verified_owner
+            identity_ok = is_verified_owner or not config.require_identity_check
+            full_auth = is_mojang_verified and identity_ok
             modern_client, missing_fields = evidence.is_modern_client()
 
             auto_verify = is_dev or (full_auth and modern_client)
@@ -691,7 +695,7 @@ class API(commands.Cog):
                 reasons = []
                 if not is_mojang_verified:
                     reasons.append("no Mojang session")
-                if not is_verified_owner:
+                if not identity_ok:
                     reasons.append("no encrypted identity")
                 if not modern_client:
                     reasons.append(f"missing evidence: {missing_fields}")

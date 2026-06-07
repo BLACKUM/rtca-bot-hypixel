@@ -124,8 +124,6 @@ COOLDOWN_SUBSEQUENT_429 = 60
 COOLDOWN_SERVER_ERROR = 30
 
 SOOPY_BASE_URL = "https://soopy.dev/api/v2/player_skyblock"
-SUBAT0MIC_BASE_URL = "https://subat0mic.click/get"
-ODTHEKING_BASE_URL = "https://api.odtheking.com/hypixel/get"
 PLAIN_DAWN_BASE_URL = "https://plain-dawn-a5d2.ryaneagers2015.workers.dev/hypixel/skyblock/profiles"
 ADJECTILS_BASE_URL = "https://adjectilsbackend.adjectivenoun3215.workers.dev"
 SHIIYU_BASE_URL = "https://sky.shiiyu.moe/api/stats"
@@ -179,48 +177,6 @@ async def fetch_soopy_profile(uuid: str):
         log_error(f"soopy.dev profile request error: {e}")
     return None
 
-async def fetch_subat0mic_profile(uuid: str):
-    url = f"{SUBAT0MIC_BASE_URL}/{uuid}"
-    log_debug(f"Requesting profile data (Subat0mic): {url}")
-    try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
-            if r.status == 200:
-                _api_cooldown.record_success("subat0mic")
-                data = await r.json(loads=json_utils.loads)
-                if data:
-                    data["_source"] = "subat0mic"
-                    return data
-            else:
-                retry_after = int(r.headers.get("Retry-After", 0))
-                _api_cooldown.record_failure("subat0mic", r.status, retry_after)
-    except asyncio.TimeoutError:
-        _api_cooldown.record_failure("subat0mic", 408)
-        log_error("Subat0mic profile request timed out")
-    except Exception as e:
-        _api_cooldown.record_failure("subat0mic", 500)
-        log_error(f"Subat0mic profile request error: {e}")
-    return None
-async def fetch_odtheking_profile(uuid: str):
-    url = f"{ODTHEKING_BASE_URL}/{uuid}"
-    log_debug(f"Requesting profile data (ODTheKing): {url}")
-    try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
-            if r.status == 200:
-                _api_cooldown.record_success("odtheking")
-                data = await r.json(loads=json_utils.loads)
-                if data:
-                    data["_source"] = "odtheking"
-                    return data
-            else:
-                retry_after = int(r.headers.get("Retry-After", 0))
-                _api_cooldown.record_failure("odtheking", r.status, retry_after)
-    except asyncio.TimeoutError:
-        _api_cooldown.record_failure("odtheking", 408)
-        log_error("ODTheKing profile request timed out")
-    except Exception as e:
-        _api_cooldown.record_failure("odtheking", 500)
-        log_error(f"ODTheKing profile request error: {e}")
-    return None
 async def fetch_plain_dawn_profile(uuid: str):
     url = f"{PLAIN_DAWN_BASE_URL}/{uuid}"
     log_debug(f"Requesting profile data (PlainDawn): {url}")
@@ -325,11 +281,7 @@ async def get_profile_data(uuid: str):
             log_debug(f"Skipping API '{api_name}' (on cooldown)")
             continue
 
-        if api_name == "subat0mic":
-            result = await fetch_subat0mic_profile(uuid)
-        elif api_name == "odtheking":
-            result = await fetch_odtheking_profile(uuid)
-        elif api_name == "plain_dawn":
+        if api_name == "plain_dawn":
             result = await fetch_plain_dawn_profile(uuid)
         elif api_name == "adjectils":
             result = await fetch_adjectils_profile(uuid)

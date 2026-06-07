@@ -24,6 +24,14 @@
         "animated": true,
         "speed": 1.2
     },
+    "dreamcastera20":
+    {
+        "uuid": "f69ad8c2-ba8f-44e7-a1e3-5126c565676f",
+        "gradient": "linear-gradient(52deg,rgba(255, 138, 0, 1) 0%, rgba(239, 63, 80, 1) 12%, rgba(120, 46, 148, 1) 82%, rgba(42, 23, 114, 1) 100%)",
+        "chroma": false,
+        "animated": true,
+        "speed": 1.0
+    },
     "radioantenna":
     {
         "uuid": "229b2bc9-0c9f-4007-8722-7cb29c027867",

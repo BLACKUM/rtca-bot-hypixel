@@ -66,16 +66,12 @@ async def test_get_profile_data_priority(mocker):
     mock_soopy = mocker.patch("services.api.fetch_soopy_profile", return_value=None)
     mock_shiiyu = mocker.patch("services.api.fetch_skycrypt_shiiyu_profile", return_value=None)
     mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value=None)
-    mock_subat0mic = mocker.patch("services.api.fetch_subat0mic_profile", return_value=None)
-    mock_odtheking = mocker.patch("services.api.fetch_odtheking_profile", return_value=None)
     mock_plain_dawn = mocker.patch("services.api.fetch_plain_dawn_profile", return_value=None)
     
     from core.config import config
-    config.api_priority = ["subat0mic", "odtheking", "plain_dawn", "adjectils", "soopy", "skycrypt"]
+    config.api_priority = ["plain_dawn", "adjectils", "soopy", "skycrypt"]
     await api.get_profile_data("a"*32)
-    
-    assert mock_subat0mic.called
-    assert mock_odtheking.called
+
     assert mock_plain_dawn.called
     assert mock_adjectils.called
     assert mock_soopy.called
@@ -90,38 +86,26 @@ async def test_get_profile_data_success_stop(mocker):
     mock_soopy = mocker.patch("services.api.fetch_soopy_profile", return_value={"_source": "soopy"})
     mock_shiiyu = mocker.patch("services.api.fetch_skycrypt_shiiyu_profile", return_value={"_source": "skycrypt"})
     mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value={"_source": "adjectils"})
-    mock_subat0mic = mocker.patch("services.api.fetch_subat0mic_profile", return_value={"_source": "subat0mic"})
-    mock_odtheking = mocker.patch("services.api.fetch_odtheking_profile", return_value={"_source": "odtheking"})
     mock_plain_dawn = mocker.patch("services.api.fetch_plain_dawn_profile", return_value={"_source": "plain_dawn"})
     
     from core.config import config
-    config.api_priority = ["plain_dawn", "subat0mic", "odtheking", "adjectils", "soopy", "skycrypt"]
+    config.api_priority = ["plain_dawn", "adjectils", "soopy", "skycrypt"]
     
     result = await api.get_profile_data("a"*32)
     assert result["_source"] == "plain_dawn"
     assert mock_plain_dawn.called
-    assert not mock_subat0mic.called
-    assert not mock_odtheking.called
     assert not mock_adjectils.called
     assert not mock_soopy.called
     assert not mock_shiiyu.called
     
     mock_plain_dawn.reset_mock()
     mock_plain_dawn.return_value = None
-    
-    result = await api.get_profile_data("a"*32)
-    assert result["_source"] == "subat0mic"
+
     assert mock_plain_dawn.called
-    assert mock_subat0mic.called
-    assert not mock_odtheking.called
     assert not mock_adjectils.called
     
     mock_plain_dawn.reset_mock()
     mock_plain_dawn.return_value = None
-    mock_subat0mic.reset_mock()
-    mock_subat0mic.return_value = None
-    mock_odtheking.reset_mock()
-    mock_odtheking.return_value = None
     mock_adjectils.reset_mock()
     mock_adjectils.return_value = None
     
@@ -129,42 +113,6 @@ async def test_get_profile_data_success_stop(mocker):
     assert result["_source"] == "soopy"
     assert mock_soopy.called
     assert not mock_shiiyu.called
-
-@pytest.mark.asyncio
-async def test_fetch_subat0mic_profile(mocker):
-    mock_session = mocker.MagicMock()
-    mock_session.get = mocker.Mock()
-    mocker.patch("services.api._SESSION", mock_session)
-    
-    mock_resp = mocker.AsyncMock()
-    mock_resp.status = 200
-    mock_resp.json.return_value = {"profiles": []}
-    
-    cm = mocker.AsyncMock()
-    cm.__aenter__.return_value = mock_resp
-    cm.__aexit__.return_value = None
-    mock_session.get.return_value = cm
-    
-    data = await api.fetch_subat0mic_profile("a"*32)
-    assert data == {"profiles": [], "_source": "subat0mic"}
-
-@pytest.mark.asyncio
-async def test_fetch_odtheking_profile(mocker):
-    mock_session = mocker.MagicMock()
-    mock_session.get = mocker.Mock()
-    mocker.patch("services.api._SESSION", mock_session)
-    
-    mock_resp = mocker.AsyncMock()
-    mock_resp.status = 200
-    mock_resp.json.return_value = {"profiles": []}
-    
-    cm = mocker.AsyncMock()
-    cm.__aenter__.return_value = mock_resp
-    cm.__aexit__.return_value = None
-    mock_session.get.return_value = cm
-    
-    data = await api.fetch_odtheking_profile("a"*32)
-    assert data == {"profiles": [], "_source": "odtheking"}
 
 @pytest.mark.asyncio
 async def test_fetch_plain_dawn_profile(mocker):

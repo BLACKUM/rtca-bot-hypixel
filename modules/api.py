@@ -22,6 +22,7 @@ class API(commands.Cog):
         self.app.router.add_post('/v1/party/unqueue', self.handle_party_unqueue)
         self.app.router.add_post('/v1/party/update', self.handle_party_update)
         self.app.router.add_get('/v1/names', self.handle_names)
+        self.app.router.add_get('/v1/fonts', self.handle_fonts)
         self.app.router.add_get('/v1/irc', self.handle_irc)
         self.app.router.add_post('/v1/solo_clear', self.handle_solo_clear)
         self.app.router.add_get('/v1/solo_leaderboard', self.handle_solo_leaderboard)
@@ -564,6 +565,24 @@ class API(commands.Cog):
             'status': 'success',
             'names': name_manager.get_names()
         })
+
+    async def handle_fonts(self, request):
+        try:
+            client_hash = request.query.get('hash')
+            
+            from services.fonts import get_fonts_data
+            fonts_data = await get_fonts_data()
+            if not fonts_data:
+                return web.json_response({'error': 'Failed to fetch fonts'}, status=500)
+            
+            server_hash = fonts_data.get('hash')
+            if client_hash and client_hash == server_hash:
+                return web.Response(status=304)
+            
+            return web.json_response(fonts_data)
+        except Exception as e:
+            log_error(f"[API] Error handling fonts request: {e}")
+            return web.json_response({'error': str(e)}, status=500)
 
     async def handle_irc(self, request):
         from services.irc_handler import get_irc_handler

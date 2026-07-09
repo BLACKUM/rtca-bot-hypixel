@@ -24,3 +24,5 @@ IRC_WEBHOOK_URL = ""
 ADMIN_WEBHOOK_URL = ""
 SOLO_CLEAR_WEBHOOK_URL = ""
 
+# Google Fonts API Key
+GOOGLE_FONTS_API_KEY = "your_google_fonts_api_key_here"

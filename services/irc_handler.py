@@ -93,6 +93,8 @@ class IrcHandler:
         user = data.get("user", "Unknown")
         uuid = data.get("uuid", "")
         message = data.get("message", "")
+        if message:
+            message = message.replace("@", "")
         channel = data.get("channel", "general")
         timestamp = data.get("timestamp", int(time.time() * 1000))
 
@@ -175,6 +177,8 @@ class IrcHandler:
 
         irc_channel = channel_map[message.channel.id]
         content = message.clean_content
+        if content:
+            content = content.replace("@", "")
         user = message.author.display_name
         timestamp = int(message.created_at.timestamp() * 1000)
         

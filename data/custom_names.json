@@ -27,6 +27,7 @@
     "dreamcastera20":
     {
         "uuid": "f69ad8c2-ba8f-44e7-a1e3-5126c565676f",
+        "display": "DreamcastERA20",
         "gradient": "linear-gradient(52deg,rgba(255, 138, 0, 1) 0%, rgba(239, 63, 80, 1) 12%, rgba(120, 46, 148, 1) 82%, rgba(42, 23, 114, 1) 100%)",
         "chroma": false,
         "animated": true,

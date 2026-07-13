@@ -6,7 +6,7 @@ import os
 import time
 import threading
 
-from core.secrets import DEVELOPER_KEY, SECRET_KEY
+from core.secrets import DEVELOPER_KEY
 from core.logger import log_error, log_info
 
 KEY_GRACE_SECONDS = 300

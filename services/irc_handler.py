@@ -58,6 +58,8 @@ class IrcHandler:
         uuid = request.query.get("uuid", "").strip()
 
         read_only = False
+        mojang_server_id = ""
+        is_mojang_verified = False
         if not is_admin:
             mojang_server_id = request.query.get("mojang_server_id", "").strip()
             if not mojang_server_id:
@@ -69,6 +71,14 @@ class IrcHandler:
                 if not is_mojang_verified:
                     log_info(f"IRC mojang session verification failed for user={user}, uuid={uuid}. Allowing read-only connection.")
                     read_only = True
+
+        request["auth_details"] = {
+            "result": "allowed" if is_admin or not read_only else "read_only",
+            "reason": "admin_key" if is_admin else "ok" if not read_only else ("missing_mojang_server_id" if not mojang_server_id else "mojang_session_verification_failed"),
+            "method": "developer_key" if is_admin else "mojang_session",
+            "mojang_server_id": mojang_server_id,
+            "mojang_session": is_admin or is_mojang_verified,
+        }
 
         self.connections[ws] = {
             "is_admin": is_admin,

@@ -57,11 +57,31 @@ class API(commands.Cog):
     async def handle_key(self, request):
         from services.security import derive_player_key
         uuid = request.query.get('uuid', '').strip()
-        if not uuid:
+        username = request.query.get('username', '').strip()
+        mojang_server_id = request.query.get('mojang_server_id', '').strip()
+
+        if not uuid or not username or not mojang_server_id:
             return web.json_response({
                 'status': 'error',
-                'message': 'uuid parameter is required for key retrieval'
+                'message': 'uuid, username, and mojang_server_id parameters are required'
             }, status=400)
+
+        from services.mojang_auth import verify_session
+        is_mojang_verified = await verify_session(username, mojang_server_id, expected_uuid=uuid)
+        request["auth_details"] = {
+            "result": "allowed" if is_mojang_verified else "denied",
+            "reason": "ok" if is_mojang_verified else "mojang_session_verification_failed",
+            "method": "mojang_session",
+            "mojang_server_id": mojang_server_id,
+            "mojang_session": is_mojang_verified,
+        }
+
+        if not is_mojang_verified:
+            log_error(f"[API] Key fetch session verification failed for user={username}, uuid={uuid}")
+            return web.json_response({
+                'status': 'error',
+                'message': 'Mojang session verification failed'
+            }, status=403)
 
         return web.json_response({
             'status': 'success',

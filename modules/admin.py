@@ -1104,6 +1104,8 @@ def _build_request_detail_embed(entry: dict) -> discord.Embed:
         summary_lines.append(f"Auth Result: {auth.get('result', '?')}")
         summary_lines.append(f"Auth Reason: {auth.get('reason', '?')}")
         summary_lines.append(f"Auth Method: {auth.get('method', '?')}")
+        if auth.get("mojang_server_id"):
+            summary_lines.append(f"Mojang Server ID: {auth.get('mojang_server_id')}")
     embed.add_field(name="Summary", value=_code_block("\n".join(summary_lines)), inline=False)
 
     client_lines = [

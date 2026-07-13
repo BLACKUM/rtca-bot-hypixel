@@ -59,11 +59,16 @@ class IrcHandler:
 
         read_only = False
         if not is_admin:
-            encrypted_identity = request.query.get("encrypted_identity", "").strip()
-            from services.security import verify_identity
-            if not uuid or not verify_identity(encrypted_identity, uuid):
-                log_info(f"IRC identity verification failed for user={user}, uuid={uuid}. Allowing read-only connection.")
+            mojang_server_id = request.query.get("mojang_server_id", "").strip()
+            if not mojang_server_id:
+                log_info(f"IRC connection verification skipped (no mojang_server_id for user={user}). Allowing read-only connection.")
                 read_only = True
+            else:
+                from services.mojang_auth import verify_session
+                is_mojang_verified = await verify_session(user, mojang_server_id, expected_uuid=uuid)
+                if not is_mojang_verified:
+                    log_info(f"IRC mojang session verification failed for user={user}, uuid={uuid}. Allowing read-only connection.")
+                    read_only = True
 
         self.connections[ws] = {
             "is_admin": is_admin,

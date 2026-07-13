@@ -57,21 +57,22 @@ class IrcHandler:
         user = request.query.get("user", "Unknown").strip()
         uuid = request.query.get("uuid", "").strip()
 
+        read_only = False
         if not is_admin:
             encrypted_identity = request.query.get("encrypted_identity", "").strip()
             from services.security import verify_identity
             if not uuid or not verify_identity(encrypted_identity, uuid):
-                log_error(f"IRC connection identity verification failed for user={user}, uuid={uuid}")
-                await ws.close(code=4003, message="Identity verification failed")
-                return ws
+                log_info(f"IRC identity verification failed for user={user}, uuid={uuid}. Allowing read-only connection.")
+                read_only = True
 
         self.connections[ws] = {
             "is_admin": is_admin,
             "user": user,
             "uuid": uuid,
-            "msg_times": []
+            "msg_times": [],
+            "read_only": read_only
         }
-        log_info(f"New IRC connection established. User: {user} ({uuid}). Admin: {is_admin}. Total: {len(self.connections)}")
+        log_info(f"New IRC connection established. User: {user} ({uuid}). Admin: {is_admin}. Read-only: {read_only}. Total: {len(self.connections)}")
 
         await ws.send_str(json.dumps({
             "type": "auth",
@@ -108,6 +109,13 @@ class IrcHandler:
     async def process_mod_message(self, ws, data):
         conn_info = self.connections.get(ws, {})
         if not conn_info:
+            return
+
+        if conn_info.get("read_only", False):
+            await ws.send_str(json.dumps({
+                "type": "error",
+                "message": "You are in read-only mode. Update your mod to send messages."
+            }))
             return
 
         user = conn_info.get("user", "Unknown")

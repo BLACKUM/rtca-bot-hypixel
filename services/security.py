@@ -6,7 +6,7 @@ import os
 import time
 import threading
 
-from core.secrets import DEVELOPER_KEY
+from core.secrets import DEVELOPER_KEY, SECRET_KEY
 from core.logger import log_error, log_info
 
 KEY_GRACE_SECONDS = 300
@@ -77,11 +77,9 @@ def _try_decrypt_with_key(decoded_data: bytes, key: bytes):
         return None
 
 
-_PLAYER_KEY_SECRET: bytes = os.urandom(32)
-
-
 def derive_player_key(uuid: str) -> str:
-    h = hmac.HMAC(_PLAYER_KEY_SECRET, hashes.SHA256(), backend=default_backend())
+    current_key = get_current_key()
+    h = hmac.HMAC(current_key, hashes.SHA256(), backend=default_backend())
     h.update(uuid.replace('-', '').lower().encode('utf-8'))
     return base64.b64encode(h.finalize()[:16]).decode('utf-8')
 
@@ -116,18 +114,20 @@ def verify_identity(encrypted_identity, claimed_uuid):
 
     norm_claimed = claimed_uuid.replace('-', '').lower()
 
-    try:
-        player_key_b64 = derive_player_key(claimed_uuid)
-        player_key = base64.b64decode(player_key_b64)
-        result = _try_decrypt_with_key(decoded_data, player_key)
-        if result:
-            parts = result.split(':')
-            if parts and parts[0].replace('-', '').lower() == norm_claimed:
-                return True
-    except Exception:
-        pass
+    for shared_key in _all_active_keys():
+        try:
+            h = hmac.HMAC(shared_key, hashes.SHA256(), backend=default_backend())
+            h.update(norm_claimed.encode('utf-8'))
+            player_key = h.finalize()[:16]
+            result = _try_decrypt_with_key(decoded_data, player_key)
+            if result:
+                parts = result.split(':')
+                if parts and parts[0].replace('-', '').lower() == norm_claimed:
+                    return True
+        except Exception:
+            pass
 
-    log_error("Decryption failed: no player-specific key matched (update ur mod)")
+    log_error("Decryption failed: no player-specific key matched (mod must update)")
     return False
 
 

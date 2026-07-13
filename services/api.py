@@ -155,6 +155,29 @@ class _ApiCooldownTracker:
 
 _api_cooldown = _ApiCooldownTracker()
 
+async def fetch_soterm_profile(uuid: str):
+    url = f"https://api.soterm.workers.dev/v2/skyblock/profiles?uuid={uuid}"
+    log_debug(f"Requesting profile data (soterm): {url}")
+    try:
+        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
+            if r.status == 200:
+                _api_cooldown.record_success("soterm")
+                data = await r.json(loads=json_utils.loads)
+                if data:
+                    data["_source"] = "soterm"
+                    return data
+            else:
+                retry_after = int(r.headers.get("Retry-After", 0))
+                _api_cooldown.record_failure("soterm", r.status, retry_after)
+    except asyncio.TimeoutError:
+        _api_cooldown.record_failure("soterm", 408)
+        log_error("Soterm profile request timed out")
+    except Exception as e:
+        _api_cooldown.record_failure("soterm", 500)
+        log_error(f"Soterm profile request error: {e}")
+    return None
+
+
 async def fetch_soopy_profile(uuid: str):
     url = f"{SOOPY_BASE_URL}/{uuid}"
     log_debug(f"Requesting profile data (soopy.dev): {url}")
@@ -283,6 +306,8 @@ async def get_profile_data(uuid: str):
 
         if api_name == "plain_dawn":
             result = await fetch_plain_dawn_profile(uuid)
+        elif api_name == "soterm":
+            result = await fetch_soterm_profile(uuid)
         elif api_name == "adjectils":
             result = await fetch_adjectils_profile(uuid)
         elif api_name == "soopy":

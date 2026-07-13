@@ -101,8 +101,10 @@ async def test_get_profile_data_success_stop(mocker):
     mock_plain_dawn.reset_mock()
     mock_plain_dawn.return_value = None
 
+    result = await api.get_profile_data("a"*32)
     assert mock_plain_dawn.called
-    assert not mock_adjectils.called
+    assert mock_adjectils.called
+    assert result["_source"] == "adjectils"
     
     mock_plain_dawn.reset_mock()
     mock_plain_dawn.return_value = None
@@ -131,6 +133,24 @@ async def test_fetch_plain_dawn_profile(mocker):
     
     data = await api.fetch_plain_dawn_profile("a"*32)
     assert data == {"profiles": [], "_source": "plain_dawn"}
+
+@pytest.mark.asyncio
+async def test_fetch_soterm_profile(mocker):
+    mock_session = mocker.MagicMock()
+    mock_session.get = mocker.Mock()
+    mocker.patch("services.api._SESSION", mock_session)
+    
+    mock_resp = mocker.AsyncMock()
+    mock_resp.status = 200
+    mock_resp.json.return_value = {"profiles": []}
+    
+    cm = mocker.AsyncMock()
+    cm.__aenter__.return_value = mock_resp
+    cm.__aexit__.return_value = None
+    mock_session.get.return_value = cm
+    
+    data = await api.fetch_soterm_profile("a"*32)
+    assert data == {"profiles": [], "_source": "soterm"}
 
 @pytest.mark.asyncio
 async def test_fetch_adjectils_profile_sends_timestamp_header(mocker):

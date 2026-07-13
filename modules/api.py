@@ -55,10 +55,18 @@ class API(commands.Cog):
             log_error(f"Error during API shutdown: {e}")
 
     async def handle_key(self, request):
-        from services.security import get_current_key_string
+        from services.security import derive_player_key
+        uuid = request.query.get('uuid', '').strip()
+        if not uuid:
+            return web.json_response({
+                'status': 'error',
+                'message': 'uuid parameter is required for key retrieval'
+            }, status=400)
+
         return web.json_response({
             'status': 'success',
-            'key': get_current_key_string()
+            'key': derive_player_key(uuid),
+            'type': 'player_specific',
         })
 
     async def index(self, request):
@@ -710,15 +718,19 @@ class API(commands.Cog):
                 "modern_client": modern_client,
             }
 
-            if not auto_verify:
+            if not is_dev and not (full_auth and modern_client):
                 reasons = []
                 if not is_mojang_verified:
                     reasons.append("no Mojang session")
                 if not identity_ok:
                     reasons.append("no encrypted identity")
                 if not modern_client:
-                    reasons.append(f"missing evidence: {missing_fields}")
-                log_info(f"[API] Solo clear from {player}: not auto-verified ({'; '.join(reasons)}) — saving as unverified for admin review")
+                    reasons.append(f"missing evidence fields: {missing_fields}")
+                log_error(f"[API] Solo clear from {player}: rejected — {'; '.join(reasons)}")
+                return web.json_response(
+                    {'error': f'Submission rejected: {"; ".join(reasons)}. Update your mod.'},
+                    status=403,
+                )
 
             from modules.solo_clears import parse_time
             time_ms = parse_time(time_str)

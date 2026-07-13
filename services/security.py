@@ -1,6 +1,6 @@
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives import padding, hashes, hmac
 import base64
 import os
 import time
@@ -74,16 +74,16 @@ def _try_decrypt_with_key(decoded_data: bytes, key: bytes):
         data = unpadder.update(padded_data) + unpadder.finalize()
         return data.decode('utf-8')
     except Exception:
-        pass
-    try:
-        cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
-        decryptor = cipher.decryptor()
-        padded_data = decryptor.update(decoded_data) + decryptor.finalize()
-        unpadder = padding.PKCS7(128).unpadder()
-        data = unpadder.update(padded_data) + unpadder.finalize()
-        return data.decode('utf-8')
-    except Exception:
         return None
+
+
+_PLAYER_KEY_SECRET: bytes = os.urandom(32)
+
+
+def derive_player_key(uuid: str) -> str:
+    h = hmac.HMAC(_PLAYER_KEY_SECRET, hashes.SHA256(), backend=default_backend())
+    h.update(uuid.replace('-', '').lower().encode('utf-8'))
+    return base64.b64encode(h.finalize()[:16]).decode('utf-8')
 
 
 def decrypt(encrypted_text):
@@ -105,24 +105,30 @@ def decrypt(encrypted_text):
 
 
 def verify_identity(encrypted_identity, claimed_uuid):
-    if not encrypted_identity:
-        return False
-
-    decrypted = decrypt(encrypted_identity)
-    if not decrypted:
+    if not encrypted_identity or not claimed_uuid:
         return False
 
     try:
-        parts = decrypted.split(':')
-        if len(parts) < 3:
-            return False
-
-        decrypted_uuid = parts[0].replace('-', '')
-        claimed_uuid = claimed_uuid.replace('-', '')
-
-        return decrypted_uuid == claimed_uuid
-    except Exception:
+        decoded_data = base64.b64decode(encrypted_identity)
+    except Exception as e:
+        log_error(f"Decryption failed: invalid base64 ({e})")
         return False
+
+    norm_claimed = claimed_uuid.replace('-', '').lower()
+
+    try:
+        player_key_b64 = derive_player_key(claimed_uuid)
+        player_key = base64.b64decode(player_key_b64)
+        result = _try_decrypt_with_key(decoded_data, player_key)
+        if result:
+            parts = result.split(':')
+            if parts and parts[0].replace('-', '').lower() == norm_claimed:
+                return True
+    except Exception:
+        pass
+
+    log_error("Decryption failed: no player-specific key matched (update ur mod)")
+    return False
 
 
 def check_developer_key(provided_key):

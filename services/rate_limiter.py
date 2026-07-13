@@ -7,9 +7,10 @@ from services.request_log import request_log, sanitize_headers, sanitize_text
 
 
 def get_client_ip(request):
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+    if request.remote in ('127.0.0.1', '::1'):
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
     return request.remote
 
 

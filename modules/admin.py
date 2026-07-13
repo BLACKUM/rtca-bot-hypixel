@@ -1156,9 +1156,9 @@ def _build_log_embeds(entries: list, title_prefix: str) -> list:
 
 class RequestLogDetailsSelect(discord.ui.Select):
     def __init__(self, entries: list):
-        self.entries = entries[:25]
+        self.entries = entries
         options = []
-        for index, entry in enumerate(self.entries):
+        for index, entry in enumerate(entries):
             path = entry.get("path", "")
             query = entry.get("query", "")
             target = f"{path}?{query}" if query else path
@@ -1175,9 +1175,23 @@ class RequestLogDetailsSelect(discord.ui.Select):
 
 class RequestLogEntriesView(EmbedPaginatorView):
     def __init__(self, embeds: list, entries: list):
+        self.all_entries = entries
+        self._select = None
         super().__init__(embeds)
-        if entries:
-            self.add_item(RequestLogDetailsSelect(entries))
+
+    def _get_page_entries(self):
+        start = self.current_page * 10
+        return self.all_entries[start:start + 10]
+
+    def _update_buttons(self):
+        super()._update_buttons()
+        if self._select is not None:
+            self.remove_item(self._select)
+            self._select = None
+        page_entries = self._get_page_entries()
+        if page_entries:
+            self._select = RequestLogDetailsSelect(page_entries)
+            self.add_item(self._select)
 
 
 class RequestLogFilterModal(Modal):

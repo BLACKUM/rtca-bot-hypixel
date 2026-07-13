@@ -405,14 +405,6 @@ class SoloClears(commands.Cog):
 
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    @app_commands.command(name="submit_clear", description="Submit a fast solo dungeon clear.")
-    @app_commands.describe(floor="The dungeon floor (default is F7)")
-    async def submit_clear_cmd(self, interaction: discord.Interaction, floor: str = "F7"):
-        floor = floor.upper()
-        await interaction.response.send_modal(SubmitModal(self.bot, floor))
-
-    @app_commands.allowed_installs(guilds=True, users=True)
-    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.command(name="solo_clears", description="View the solo clears leaderboard.")
     @app_commands.describe(floor="The dungeon floor (default is F7)")
     async def solo_leaderboard_cmd(self, interaction: discord.Interaction, floor: str = "F7"):

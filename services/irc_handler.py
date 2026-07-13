@@ -54,8 +54,24 @@ class IrcHandler:
         from services.security import check_developer_key
         is_admin = check_developer_key(provided_key)
         
-        self.connections[ws] = {"is_admin": is_admin}
-        log_info(f"New IRC connection established. Admin: {is_admin}. Total: {len(self.connections)}")
+        user = request.query.get("user", "Unknown").strip()
+        uuid = request.query.get("uuid", "").strip()
+
+        if not is_admin:
+            encrypted_identity = request.query.get("encrypted_identity", "").strip()
+            from services.security import verify_identity
+            if not uuid or not verify_identity(encrypted_identity, uuid):
+                log_error(f"IRC connection identity verification failed for user={user}, uuid={uuid}")
+                await ws.close(code=4003, message="Identity verification failed")
+                return ws
+
+        self.connections[ws] = {
+            "is_admin": is_admin,
+            "user": user,
+            "uuid": uuid,
+            "msg_times": []
+        }
+        log_info(f"New IRC connection established. User: {user} ({uuid}). Admin: {is_admin}. Total: {len(self.connections)}")
 
         await ws.send_str(json.dumps({
             "type": "auth",
@@ -90,16 +106,33 @@ class IrcHandler:
         return ws
 
     async def process_mod_message(self, ws, data):
-        user = data.get("user", "Unknown")
-        uuid = data.get("uuid", "")
+        conn_info = self.connections.get(ws, {})
+        if not conn_info:
+            return
+
+        user = conn_info.get("user", "Unknown")
+        uuid = conn_info.get("uuid", "")
         message = data.get("message", "")
         if message:
             message = message.replace("@", "")
         channel = data.get("channel", "general")
         timestamp = data.get("timestamp", int(time.time() * 1000))
 
-        if channel == "admin" and not self.connections.get(ws, {}).get("is_admin", False):
-            log_error(f"Unauthorized admin channel message from {user}")
+        is_admin = conn_info.get("is_admin", False)
+
+        now = time.time()
+        msg_times = conn_info.get("msg_times", [])
+        msg_times = [t for t in msg_times if now - t < 10]
+        if len(msg_times) >= 5:
+            log_error(f"[IRC] Rate limit exceeded for connection (user={user})")
+            await ws.send_str(json.dumps({"type": "error", "message": "Rate limit: slow down."}))
+            conn_info["msg_times"] = msg_times
+            return
+        msg_times.append(now)
+        conn_info["msg_times"] = msg_times
+
+        if channel == "admin" and not is_admin:
+            log_error(f"[IRC] Unauthorized admin channel message from {user}")
             return
 
         from core.config import IRC_WEBHOOK_URL, ADMIN_WEBHOOK_URL

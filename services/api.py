@@ -273,6 +273,39 @@ async def fetch_skycrypt_shiiyu_profile(uuid: str):
     return None
 
 
+async def fetch_hypixel_profile(uuid: str):
+    from core.config import HYPIXEL_API_KEY
+    if not HYPIXEL_API_KEY:
+        log_debug("Hypixel API Key not configured. Skipping.")
+        return None
+
+    url = f"https://api.hypixel.net/v2/skyblock/profiles?uuid={uuid}"
+    log_debug(f"Requesting profile data (Hypixel API): {url}")
+    headers = {
+        "API-Key": HYPIXEL_API_KEY
+    }
+    try:
+        async with _SESSION.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as r:
+            if r.status == 200:
+                _api_cooldown.record_success("hypixel")
+                data = await r.json(loads=json_utils.loads)
+                if data and data.get("success") and "profiles" in data:
+                    data["_source"] = "hypixel"
+                    return data
+                else:
+                    log_error(f"Hypixel API returned success=False or no profiles: {data}")
+            else:
+                retry_after = int(r.headers.get("Retry-After", 0))
+                _api_cooldown.record_failure("hypixel", r.status, retry_after)
+    except asyncio.TimeoutError:
+        _api_cooldown.record_failure("hypixel", 408)
+        log_error("Hypixel API profile request timed out")
+    except Exception as e:
+        _api_cooldown.record_failure("hypixel", 500)
+        log_error(f"Hypixel API profile request error: {e}")
+    return None
+
+
 async def get_ign(uuid: str) -> Optional[str]:
     url = f"https://playerdb.co/api/player/minecraft/{uuid}"
     try:
@@ -314,6 +347,8 @@ async def get_profile_data(uuid: str):
             result = await fetch_soopy_profile(uuid)
         elif api_name == "skycrypt":
             result = await fetch_skycrypt_shiiyu_profile(uuid)
+        elif api_name == "hypixel":
+            result = await fetch_hypixel_profile(uuid)
             
         if result:
             break

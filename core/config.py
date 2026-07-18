@@ -17,6 +17,11 @@ except ImportError:
     GITHUB_BACKUP_REPO = ""
     GITHUB_BACKUP_TOKEN = ""
 
+try:
+    from core.secrets import HYPIXEL_API_KEY
+except ImportError:
+    HYPIXEL_API_KEY = ""
+
 from core.configuration import BotConfig
 
 config = BotConfig()

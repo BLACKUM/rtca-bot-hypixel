@@ -13,7 +13,7 @@ class BotConfig:
         self.profile_cache_ttl: int = 60
         self.prices_cache_ttl: int = 259200
         self.irc_channel_id: int = 0
-        self.api_priority: List[str] = ["soterm", "adjectils", "soopy", "skycrypt", "plain_dawn"]
+        self.api_priority: List[str] = ["soterm", "adjectils", "soopy", "skycrypt", "plain_dawn", "hypixel"]
         self.owner_ids: List[int] = [377351386637271041, 679725029109399574, 827252037380997170]
         self.require_identity_check: bool = True
         self.congrats_gifs: List[str] = [
@@ -122,7 +122,7 @@ class BotConfig:
         if "api_priority" in data:
             self.api_priority = data["api_priority"]
         elif "primary_api" in data:
-            self.api_priority = [data["primary_api"]] + [api for api in ["soterm", "adjectils", "soopy", "skycrypt", "plain_dawn"] if api != data["primary_api"]]
+            self.api_priority = [data["primary_api"]] + [api for api in ["soterm", "adjectils", "soopy", "skycrypt", "plain_dawn", "hypixel"] if api != data["primary_api"]]
         if "owner_ids" in data:
             self.owner_ids = data["owner_ids"]
         if "congrats_gifs" in data:

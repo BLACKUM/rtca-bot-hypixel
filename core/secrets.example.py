@@ -26,3 +26,7 @@ SOLO_CLEAR_WEBHOOK_URL = ""
 
 # Google Fonts API Key
 GOOGLE_FONTS_API_KEY = "your_google_fonts_api_key_here"
+
+# Hypixel API Key
+HYPIXEL_API_KEY = "your_hypixel_api_key_here"
+

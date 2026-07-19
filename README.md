@@ -47,5 +47,6 @@ See [QUICKSTART.md](QUICKSTART.md) for detailed installation and setup instructi
 - **Auction Data**: Price averages provided by [Moulberry's Codes](https://moulberry.codes/).
 - **Special Prices**: Item pricing assistance from [Coflnet](https://sky.coflnet.com/).
 
+- **rtca-bot-hypixel** is not affiliated or endorsed by Hypixel!
 
 ![ZoKPU0I](https://github.com/user-attachments/assets/fbd17103-215e-4c34-87de-f34828de9a1b)

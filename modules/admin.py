@@ -702,9 +702,11 @@ class SoloRunDetailView(AuthorView):
 
     async def back_btn(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        view = SoloRunPickerView(self.bot, self.floor, self.all_runs, author_id=self.author_id)
+        run_index = next((i for i, r in enumerate(self.all_runs) if r.get("uuid") == self.uuid), 0)
+        page = (run_index // 25) + 1
+        view = SoloRunPickerView(self.bot, self.floor, self.all_runs, author_id=self.author_id, page=page)
         await interaction.edit_original_response(
-            content=f"Select a run on **{self.floor}**:",
+            content=view.get_content(),
             embed=None,
             view=view,
             attachments=[],
@@ -735,7 +737,7 @@ class SoloDeleteConfirmView(AuthorView):
         if self.all_runs:
             view = SoloRunPickerView(self.bot, self.floor, self.all_runs, author_id=self.author_id)
             await interaction.edit_original_response(
-                content=f"Select a run on **{self.floor}**:",
+                content=view.get_content(),
                 embed=embed,
                 view=view,
                 attachments=[],
@@ -763,14 +765,17 @@ class SoloDeleteConfirmView(AuthorView):
 
 
 class SoloRunPickerSelect(discord.ui.Select):
-    def __init__(self, bot, floor: str, runs: list, author_id):
+    def __init__(self, bot, floor: str, runs: list, author_id, page: int = 1, page_size: int = 25):
         from modules.solo_clears import format_time
         self.bot = bot
         self.floor = floor
         self.runs = runs
         self.author_id = author_id
         options = []
-        for i, run in enumerate(runs[:25], 1):
+        total_pages = max(1, (len(runs) + page_size - 1) // page_size)
+        start = (page - 1) * page_size
+        page_runs = runs[start:start + page_size]
+        for i, run in enumerate(page_runs, start + 1):
             ign = run.get("ign", "Unknown")
             time_str = format_time(run.get("time_ms", 0))
             is_ver = run.get("verified", False)
@@ -780,7 +785,8 @@ class SoloRunPickerSelect(discord.ui.Select):
                 description="Verified" if is_ver else "Unverified",
                 emoji="✅" if is_ver else "⏱️",
             ))
-        super().__init__(placeholder="Select a run to view…", min_values=1, max_values=1, options=options)
+        placeholder = f"Select a run (Page {page}/{total_pages})…" if total_pages > 1 else "Select a run to view…"
+        super().__init__(placeholder=placeholder, min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         try:
@@ -812,17 +818,49 @@ class SoloRunPickerSelect(discord.ui.Select):
 
 
 class SoloRunPickerView(AuthorView):
-    def __init__(self, bot, floor: str, runs: list, author_id=None):
+    def __init__(self, bot, floor: str, runs: list, author_id=None, page: int = 1):
         super().__init__(timeout=300)
         self.bot = bot
         self.floor = floor
         self.runs = runs
         self.author_id = author_id
-        self.add_item(SoloRunPickerSelect(bot, floor, runs, author_id))
+        self.page_size = 25
+        self.total_pages = max(1, (len(runs) + self.page_size - 1) // self.page_size)
+        self.page = max(1, min(page, self.total_pages))
+        self.update_components()
+
+    def update_components(self):
+        self.clear_items()
+        self.add_item(SoloRunPickerSelect(self.bot, self.floor, self.runs, self.author_id, page=self.page, page_size=self.page_size))
+
+        if self.total_pages > 1:
+            prev_btn = discord.ui.Button(label="Prev", style=discord.ButtonStyle.secondary, emoji="◀️", row=1, disabled=self.page <= 1)
+            next_btn = discord.ui.Button(label="Next", style=discord.ButtonStyle.secondary, emoji="▶️", row=1, disabled=self.page >= self.total_pages)
+            prev_btn.callback = self._prev_page
+            next_btn.callback = self._next_page
+            self.add_item(prev_btn)
+            self.add_item(next_btn)
 
         back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="⬅️", row=1)
         back_btn.callback = self._back
         self.add_item(back_btn)
+
+    def get_content(self) -> str:
+        if self.total_pages > 1:
+            return f"Select a run on **{self.floor}** (Page {self.page}/{self.total_pages}):"
+        return f"Select a run on **{self.floor}**:"
+
+    async def _prev_page(self, interaction: discord.Interaction):
+        if self.page > 1:
+            self.page -= 1
+            self.update_components()
+            await interaction.response.edit_message(content=self.get_content(), view=self)
+
+    async def _next_page(self, interaction: discord.Interaction):
+        if self.page < self.total_pages:
+            self.page += 1
+            self.update_components()
+            await interaction.response.edit_message(content=self.get_content(), view=self)
 
     async def _back(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -862,7 +900,7 @@ class SoloFloorPickerSelect(discord.ui.Select):
             if not interaction.response.is_done():
                 await interaction.response.defer()
             view = SoloRunPickerView(self.bot, fl, runs, author_id=self.author_id)
-            await interaction.edit_original_response(content=f"Select a run on **{fl}**:", embed=None, view=view, attachments=[])
+            await interaction.edit_original_response(content=view.get_content(), embed=None, view=view, attachments=[])
         except Exception as e:
             import traceback
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))

@@ -130,6 +130,40 @@ class ValidationResult:
         self.warnings.append(reason)
 
 
+import re
+
+SOLO_TEXT = "Solo"
+PARTY_ONE_TEXT = "Party (1)"
+
+
+def strip_color(text: str) -> str:
+    if not text:
+        return ""
+    return re.sub(r'§.', '', text).strip()
+
+
+def verify_solo_presence(evidence: SoloClearEvidence) -> Tuple[bool, List[str]]:
+    failures: List[str] = []
+
+    if evidence.scoreboard_lines:
+        sb_solo = any(
+            SOLO_TEXT in strip_color(line) or PARTY_ONE_TEXT in strip_color(line)
+            for line in evidence.scoreboard_lines
+        )
+        if not sb_solo:
+            failures.append("scoreboard lines do not contain Solo or Party (1)")
+
+    if evidence.tablist_lines:
+        tab_solo = any(
+            SOLO_TEXT in strip_color(line) or PARTY_ONE_TEXT in strip_color(line)
+            for line in evidence.tablist_lines
+        )
+        if not tab_solo:
+            failures.append("tablist lines do not contain Solo or Party (1)")
+
+    return (not failures), failures
+
+
 def verify_score_formula(evidence: SoloClearEvidence) -> Tuple[bool, List[str]]:
     components = evidence.score_components
     if not components:
@@ -180,6 +214,11 @@ def verify_plausibility(evidence: SoloClearEvidence, claimed_time_ms: int) -> Tu
 def validate(evidence: SoloClearEvidence, claimed_time_ms: int) -> ValidationResult:
     result = ValidationResult()
 
+    ok, fails = verify_solo_presence(evidence)
+    if not ok:
+        for f in fails:
+            result.fail(f"solo check: {f}")
+
     ok, fails = verify_score_formula(evidence)
     if not ok:
         for f in fails:
@@ -197,3 +236,4 @@ def validate(evidence: SoloClearEvidence, claimed_time_ms: int) -> ValidationRes
             result.warn(f"plausibility: {w}")
 
     return result
+

@@ -761,6 +761,10 @@ class API(commands.Cog):
                 vresult = validate_evidence(evidence, time_ms)
                 if vresult.failures:
                     log_error(f"[API] Evidence validation failures for {player}: {vresult.failures}")
+                    return web.json_response(
+                        {'error': f'Evidence validation failed: {"; ".join(vresult.failures)}'},
+                        status=400,
+                    )
                 if vresult.warnings:
                     log_info(f"[API] Evidence validation warnings for {player}: {vresult.warnings}")
                 if vresult.is_outlier:

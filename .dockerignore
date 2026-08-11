@@ -1,0 +1,36 @@
+# Secrets never go into the image — they are mounted at runtime
+core/secrets.py
+core/github_secrets.py
+
+# Runtime state (bind-mounted / volumes)
+logs/
+.github_backup/
+data/*
+!data/custom_names.json
+!data/warning.md
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+env/
+ENV/
+.venv/
+
+# Repo / tooling
+.git/
+.github/
+release/
+tests/
+run.bat
+run.ps1
+run.sh
+run_tests.py
+*.md
+!QUICKSTART.md
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

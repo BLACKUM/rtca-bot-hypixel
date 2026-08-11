@@ -1,3 +1,4 @@
+import ipaddress
 import time
 from typing import Tuple
 from aiohttp import web
@@ -6,11 +7,35 @@ from services.ban_manager import ban_manager
 from services.request_log import request_log, sanitize_headers, sanitize_text
 
 
+# Loopback (nginx on the host) plus RFC1918/ULA (docker bridge, e.g. traefik).
+# Deliberately narrower than ipaddress.is_private, which also covers CGNAT and
+# the documentation ranges.
+_TRUSTED_PROXY_NETWORKS = tuple(
+    ipaddress.ip_network(cidr)
+    for cidr in ("127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "::1/128", "fc00::/7")
+)
+
+
+def _is_trusted_proxy(ip) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+    except (ValueError, TypeError):
+        return False
+    return any(addr in net for net in _TRUSTED_PROXY_NETWORKS if addr.version == net.version)
+
+
 def get_client_ip(request):
-    if request.remote in ('127.0.0.1', '::1'):
+    # Behind a reverse proxy the peer is the proxy itself; trust its forwarding
+    # headers only then, since a direct client can forge them freely.
+    if _is_trusted_proxy(request.remote):
+        real_ip = request.headers.get("X-Real-Ip")
+        if real_ip:
+            return real_ip.strip()
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+            # Rightmost entry is the one the proxy appended; earlier ones are
+            # whatever the client sent.
+            return forwarded_for.split(",")[-1].strip()
     return request.remote
 
 

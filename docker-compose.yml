@@ -1,0 +1,54 @@
+# RTCA Discord bot + its HTTP API, published through the shared traefik proxy.
+#
+# Deploy:  git pull && docker compose up -d --build
+#
+# Requires core/secrets.py (and optionally core/github_secrets.py) next to this
+# file — both are gitignored and mounted read-only, never baked into the image.
+services:
+  rtca.bot:
+    build: .
+    image: rtca-bot:latest
+    container_name: rtca-bot
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8080
+      TZ: ${TZ:-UTC}
+
+    networks:
+      - proxy
+
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      # Whole host -> the bot API (routes are already at /v1/*, no stripprefix).
+      - "traefik.http.routers.rtca-legacy.rule=Host(`legacy.blackaddons.com`)"
+      - traefik.http.routers.rtca-legacy.entrypoints=websecure
+      - traefik.http.routers.rtca-legacy.tls.certresolver=letsencrypt
+      # aiohttp listens on API_PORT inside the container.
+      - traefik.http.services.rtca-legacy.loadbalancer.server.port=8080
+
+    volumes:
+      # Secrets: copy core/secrets.example.py -> core/secrets.py first
+      - ./core/secrets.py:/app/core/secrets.py:ro
+      - ./core/github_secrets.py:/app/core/github_secrets.py:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - github_backup:/app/.github_backup
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# The same external traefik network the other services use.
+networks:
+  proxy:
+    external: true
+
+volumes:
+  github_backup:

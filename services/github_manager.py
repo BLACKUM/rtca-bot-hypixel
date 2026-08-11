@@ -23,6 +23,11 @@ class GithubManager:
         clean_url = self.repo_url.replace("https://", "")
         return f"https://{self.token}@{clean_url}"
 
+    def _redact(self, text: str) -> str:
+        if not self.token or not text:
+            return text
+        return text.replace(self.token, "********")
+
     async def run_git_command(self, args: list[str], cwd: str = None) -> tuple[bool, str]:
         try:
             work_dir = cwd or self.backup_dir
@@ -33,16 +38,17 @@ class GithubManager:
                 stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await process.communicate()
-            
+
+            # args carry the authenticated remote URL on clone/remote commands
+            command = self._redact(f"git {' '.join(args)}")
+
             if process.returncode == 0:
                 output = stdout.decode().strip()
-                log_info(f"Git command success: git {' '.join(args)}")
+                log_info(f"Git command success: {command}")
                 return True, output
             else:
-                error = stderr.decode().strip()
-                if self.token:
-                    error = error.replace(self.token, "********")
-                log_error(f"Git command failed: git {' '.join(args)}\nError: {error}")
+                error = self._redact(stderr.decode().strip())
+                log_error(f"Git command failed: {command}\nError: {error}")
                 return False, error
         except Exception as e:
             log_error(f"Exception running git command: {e}")
@@ -55,10 +61,12 @@ class GithubManager:
 
         authed_url = self._get_authed_url()
 
-        if not os.path.exists(self.backup_dir):
-            log_info(f"Initializing backup directory: {self.backup_dir}")
-            os.makedirs(self.backup_dir)
-            
+        # Gate on the working copy, not the directory: a bind mount or docker
+        # volume makes the directory exist before anything was cloned into it.
+        if not os.path.isdir(os.path.join(self.backup_dir, ".git")):
+            log_info(f"Initializing backup repository: {self.backup_dir}")
+            os.makedirs(self.backup_dir, exist_ok=True)
+
             success, err = await self.run_git_command(["clone", authed_url, "."], cwd=self.backup_dir)
             if not success:
                 success, err = await self.run_git_command(["init"], cwd=self.backup_dir)

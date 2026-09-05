@@ -59,7 +59,7 @@ class RecentManager:
 
     async def update_runs(self, user_uuid, runs):
         if not runs: return
-        user_uuid = str(user_uuid)
+        user_uuid = str(user_uuid).replace("-", "")
         
         if user_uuid not in self.data:
             self.data[user_uuid] = { "_meta": { "last_scan_ts": 0 } }
@@ -72,10 +72,11 @@ class RecentManager:
         new_scan_ts = last_scan
         updated = False
         
-        sorted_runs = sorted(runs, key=lambda x: x.get("completion_ts", 0))
+        sorted_runs = sorted(runs, key=lambda x: x.get("completion_ts") or x.get("timestamp") or 0)
         
         for run in sorted_runs:
-            ts = run.get("completion_ts", 0) / 1000
+            raw_ts = run.get("completion_ts") or run.get("timestamp") or 0
+            ts = raw_ts / 1000
             if ts <= last_scan:
                 continue
                 
@@ -97,7 +98,7 @@ class RecentManager:
                 if tier == 0 and not is_master: floor_name = "Entrance"
 
             for p in run.get("participants", []):
-                p_uuid = p.get("player_uuid")
+                p_uuid = str(p.get("player_uuid", "")).replace("-", "")
                 if not p_uuid or p_uuid == user_uuid: continue
                 
                 if p_uuid not in user_data:
@@ -143,11 +144,13 @@ class RecentManager:
 
     def get_teammates(self, user_uuid):
         user_uuid = str(user_uuid)
-        if user_uuid not in self.data:
+        uuid_clean = user_uuid.replace("-", "")
+        user_dict = self.data.get(uuid_clean) or self.data.get(user_uuid)
+        if not user_dict:
             return []
             
         teammates = []
-        for pid, data in self.data[user_uuid].items():
+        for pid, data in user_dict.items():
             if pid == "_meta": continue
 
             teammates.append((data.get("ign", "Unknown"), data))

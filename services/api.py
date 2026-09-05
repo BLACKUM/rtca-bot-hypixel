@@ -229,7 +229,7 @@ async def fetch_adjectils_profile(uuid: str):
         async with _SESSION.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
                 _api_cooldown.record_success("adjectils")
-                data = await r.json(loads=json_utils.loads)
+                data = await r.json(content_type=None, loads=json_utils.loads)
                 if data:
                     data["_source"] = "adjectils"
                     return data
@@ -288,7 +288,7 @@ async def fetch_hypixel_profile(uuid: str):
         async with _SESSION.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as r:
             if r.status == 200:
                 _api_cooldown.record_success("hypixel")
-                data = await r.json(loads=json_utils.loads)
+                data = await r.json(content_type=None, loads=json_utils.loads)
                 if data and data.get("success") and "profiles" in data:
                     data["_source"] = "hypixel"
                     return data

@@ -42,10 +42,9 @@ See [QUICKSTART.md](QUICKSTART.md) for detailed installation and setup instructi
 
 ## Powered By
 
-- **Player Data**: UUID lookup provided by [PlayerDB](https://playerdb.co/).
-- **Hypixel Data**: Official [Hypixel API](https://api.hypixel.net/) for Bazaar prices.
-- **Auction Data**: Price averages provided by [Moulberry's Codes](https://moulberry.codes/).
-- **Special Prices**: Item pricing assistance from [Coflnet](https://sky.coflnet.com/).
+- **Hypixel Data**: Official [Hypixel API](https://api.hypixel.net/) for SkyBlock profiles, linked Discord accounts and Bazaar prices.
+- **Player Data**: Username to UUID lookup provided by the [Mojang API](https://api.mojang.com/).
+- **Auction Data**: Lowest BIN averages provided by [Moulberry's Codes](https://moulberry.codes/).
 
 - **rtca-bot-hypixel** is not affiliated or endorsed by Hypixel!
 

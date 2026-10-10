@@ -6,11 +6,7 @@ from services.daily_manager import DailyManager
 from services.rng_manager import RngManager
 from services.link_manager import LinkManager
 from services.recent_manager import RecentManager
-from services.solo_manager import SoloManager
 from services.api import init_session, close_session
-from services.irc_handler import init_irc_handler
-from services.name_manager import name_manager
-from services.ban_manager import ban_manager
 from services.github_manager import GithubManager
 from core.cache import initialize as init_cache, shutdown as shutdown_cache
 import asyncio
@@ -36,13 +32,7 @@ bot.daily_manager = DailyManager()
 bot.rng_manager = RngManager()
 bot.link_manager = LinkManager()
 bot.recent_manager = RecentManager()
-bot.solo_manager = SoloManager()
 bot.github_manager = GithubManager()
-bot.irc_handler = init_irc_handler(bot)
-
-@bot.listen()
-async def on_message(message):
-    await bot.irc_handler.on_discord_message(message)
 
 @tasks.loop(hours=2)
 async def track_daily_stats():
@@ -100,9 +90,7 @@ async def load_extensions():
         "modules.leaderboard",
         "modules.settings",
         "modules.error_handler",
-        "modules.admin",
-        "modules.api",
-        "modules.solo_clears"
+        "modules.admin"
     ]
     for ext in extensions:
         try:
@@ -118,10 +106,6 @@ async def start_services():
     await bot.daily_manager.initialize()
     await bot.rng_manager.initialize()
     await bot.recent_manager.initialize()
-    await bot.solo_manager.initialize()
-    await name_manager.initialize()
-    await ban_manager.initialize()
-    await bot.irc_handler.initialize()
     await bot.daily_manager.sanitize_data()
     bot._services_started = True
     await load_extensions()
@@ -153,7 +137,6 @@ async def main():
         await discord_connect_loop()
     finally:
         await shutdown_cache()
-        await bot.irc_handler.close()
         await close_session()
         if not bot.is_closed():
             await bot.close()

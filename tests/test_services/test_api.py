@@ -27,7 +27,7 @@ async def test_get_uuid_fetch(mocker):
     
     mock_resp = mocker.AsyncMock()
     mock_resp.status = 200
-    mock_resp.json.return_value = {"data": {"player": {"raw_id": "real_uuid"}}}
+    mock_resp.json.return_value = {"id": "real_uuid", "name": "Player"}
     
     cm = mocker.AsyncMock()
     cm.__aenter__.return_value = mock_resp
@@ -47,7 +47,7 @@ async def test_get_profile_data(mocker):
     
     mock_resp = mocker.AsyncMock()
     mock_resp.status = 200
-    mock_resp.json.return_value = {"profiles": []}
+    mock_resp.json.return_value = {"success": True, "profiles": []}
     
     cm = mocker.AsyncMock()
     cm.__aenter__.return_value = mock_resp
@@ -55,70 +55,16 @@ async def test_get_profile_data(mocker):
     mock_session.get.return_value = cm
     
     data = await api.get_profile_data("a"*32) # 32 chars
-    assert data == {"profiles": [], "_source": "plain_dawn"}
+    assert data == {"success": True, "profiles": [], "_source": "hypixel"}
 
 @pytest.mark.asyncio
-async def test_get_profile_data_priority(mocker):
+async def test_get_profile_data_skips_hypixel_on_cooldown(mocker):
     mocker.patch("services.api.cache_get", return_value=None)
-    mocker.patch("services.api.cache_set")
     mocker.patch("services.api.init_session")
-    
-    mock_soopy = mocker.patch("services.api.fetch_soopy_profile", return_value=None)
-    mock_shiiyu = mocker.patch("services.api.fetch_skycrypt_shiiyu_profile", return_value=None)
-    mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value=None)
-    mock_plain_dawn = mocker.patch("services.api.fetch_plain_dawn_profile", return_value=None)
-    mock_hypixel = mocker.patch("services.api.fetch_hypixel_profile", return_value=None)
-    
-    from core.config import config
-    config.api_priority = ["plain_dawn", "adjectils", "soopy", "skycrypt", "hypixel"]
-    await api.get_profile_data("a"*32)
+    mocker.patch.object(api._api_cooldown, "is_cooling_down", return_value=True)
+    mock_hypixel = mocker.patch("services.api.fetch_hypixel_profile")
 
-    assert mock_plain_dawn.called
-    assert mock_adjectils.called
-    assert mock_soopy.called
-    assert mock_shiiyu.called
-    assert mock_hypixel.called
-
-@pytest.mark.asyncio
-async def test_get_profile_data_success_stop(mocker):
-    mocker.patch("services.api.cache_get", return_value=None)
-    mocker.patch("services.api.cache_set")
-    mocker.patch("services.api.init_session")
-    
-    mock_soopy = mocker.patch("services.api.fetch_soopy_profile", return_value={"_source": "soopy"})
-    mock_shiiyu = mocker.patch("services.api.fetch_skycrypt_shiiyu_profile", return_value={"_source": "skycrypt"})
-    mock_adjectils = mocker.patch("services.api.fetch_adjectils_profile", return_value={"_source": "adjectils"})
-    mock_plain_dawn = mocker.patch("services.api.fetch_plain_dawn_profile", return_value={"_source": "plain_dawn"})
-    mock_hypixel = mocker.patch("services.api.fetch_hypixel_profile", return_value={"_source": "hypixel"})
-    
-    from core.config import config
-    config.api_priority = ["plain_dawn", "adjectils", "soopy", "skycrypt", "hypixel"]
-    
-    result = await api.get_profile_data("a"*32)
-    assert result["_source"] == "plain_dawn"
-    assert mock_plain_dawn.called
-    assert not mock_adjectils.called
-    assert not mock_soopy.called
-    assert not mock_shiiyu.called
-    assert not mock_hypixel.called
-    
-    mock_plain_dawn.reset_mock()
-    mock_plain_dawn.return_value = None
-
-    result = await api.get_profile_data("a"*32)
-    assert mock_plain_dawn.called
-    assert mock_adjectils.called
-    assert result["_source"] == "adjectils"
-    
-    mock_plain_dawn.reset_mock()
-    mock_plain_dawn.return_value = None
-    mock_adjectils.reset_mock()
-    mock_adjectils.return_value = None
-    
-    result = await api.get_profile_data("a"*32)
-    assert result["_source"] == "soopy"
-    assert mock_soopy.called
-    assert not mock_shiiyu.called
+    assert await api.get_profile_data("a"*32) is None
     assert not mock_hypixel.called
 
 @pytest.mark.asyncio
@@ -126,7 +72,7 @@ async def test_fetch_hypixel_profile(mocker):
     mock_session = mocker.MagicMock()
     mock_session.get = mocker.Mock()
     mocker.patch("services.api._SESSION", mock_session)
-    mocker.patch("core.config.HYPIXEL_API_KEY", "test_key")
+    mocker.patch("services.api.HYPIXEL_API_KEY", "test_key")
     
     mock_resp = mocker.AsyncMock()
     mock_resp.status = 200
@@ -145,69 +91,26 @@ async def test_fetch_hypixel_profile(mocker):
     assert call_kwargs["headers"] == {"API-Key": "test_key"}
 
 @pytest.mark.asyncio
-async def test_fetch_hypixel_profile_missing_key(mocker):
-    mocker.patch("core.config.HYPIXEL_API_KEY", "")
-    data = await api.fetch_hypixel_profile("a"*32)
-    assert data is None
-
-
-@pytest.mark.asyncio
-async def test_fetch_plain_dawn_profile(mocker):
-    mock_session = mocker.MagicMock()
-    mock_session.get = mocker.Mock()
-    mocker.patch("services.api._SESSION", mock_session)
-    
-    mock_resp = mocker.AsyncMock()
-    mock_resp.status = 200
-    mock_resp.json.return_value = {"profiles": []}
-    
-    cm = mocker.AsyncMock()
-    cm.__aenter__.return_value = mock_resp
-    cm.__aexit__.return_value = None
-    mock_session.get.return_value = cm
-    
-    data = await api.fetch_plain_dawn_profile("a"*32)
-    assert data == {"profiles": [], "_source": "plain_dawn"}
-
-@pytest.mark.asyncio
-async def test_fetch_soterm_profile(mocker):
-    mock_session = mocker.MagicMock()
-    mock_session.get = mocker.Mock()
-    mocker.patch("services.api._SESSION", mock_session)
-    
-    mock_resp = mocker.AsyncMock()
-    mock_resp.status = 200
-    mock_resp.json.return_value = {"profiles": []}
-    
-    cm = mocker.AsyncMock()
-    cm.__aenter__.return_value = mock_resp
-    cm.__aexit__.return_value = None
-    mock_session.get.return_value = cm
-    
-    data = await api.fetch_soterm_profile("a"*32)
-    assert data == {"profiles": [], "_source": "soterm"}
-
-@pytest.mark.asyncio
-async def test_fetch_adjectils_profile_sends_timestamp_header(mocker):
+async def test_get_player_discord(mocker):
     mock_session = mocker.MagicMock()
     mocker.patch("services.api._SESSION", mock_session)
+    mocker.patch("services.api.HYPIXEL_API_KEY", "test_key")
 
     mock_resp = mocker.AsyncMock()
     mock_resp.status = 200
-    mock_resp.json.return_value = {"profiles": []}
+    mock_resp.json.return_value = {"success": True, "player": {"socialMedia": {"links": {"DISCORD": "someone"}}}}
 
     cm = mocker.AsyncMock()
     cm.__aenter__.return_value = mock_resp
     cm.__aexit__.return_value = None
     mock_session.get.return_value = cm
 
-    data = await api.fetch_adjectils_profile("a" * 32)
+    assert await api.get_player_discord("a"*32) == "someone"
+    assert mock_session.get.call_args.kwargs["headers"] == {"API-Key": "test_key"}
 
-    assert data == {"profiles": [], "_source": "adjectils"}
-    call_kwargs = mock_session.get.call_args.kwargs
-    assert "headers" in call_kwargs
-    assert "X-Timestamp" in call_kwargs["headers"]
-    assert call_kwargs["headers"]["X-Timestamp"].isdigit()
+    mock_resp.json.return_value = {"success": True, "player": None}
+    assert await api.get_player_discord("a"*32) is None
+
 @pytest.mark.asyncio
 async def test_get_bazaar_prices(mocker):
     mocker.patch("services.api.cache_get", return_value=None)
@@ -253,78 +156,6 @@ async def test_get_ah_prices(mocker):
     
     prices = await api._fetch_ah_prices()
     assert prices == {"ITEM_ID": 200.0}
-
-def test_parse_soopy_dungeon_stats():
-    member_data = {
-        "dungeons": {
-            "catacombs_xp": 1000.5,
-            "class_levels": {
-                "archer": {"xp": 100.0},
-                "berserk": {"xp": 200.0}
-            },
-            "floorStats": {
-                "f1": {"completions": 10, "fastest_time_s": {"raw": 100}}
-            }
-        },
-        "accessory_reforge": {"highest_magical_power": 450},
-        "kills": {"watcher_summon_undead": 50}
-    }
-    player_data = {
-        "stats": {
-            "achievements": {
-                "skyblock": {
-                    "dungeon_secrets": 74445
-                }
-            }
-        }
-    }
-    
-    result = api._parse_soopy_dungeon_stats(member_data, player_data)
-    
-    assert result["catacombs"] == 1000.5
-    assert result["secrets"] == 74445
-    assert result["blood_mob_kills"] == 50
-    assert result["magical_power"] == 450
-    assert result["accessory_bag_storage"]["highest_magical_power"] == 450
-    assert result["classes"]["Archer"] == 100.0
-    assert result["classes"]["Berserk"] == 200.0
-    assert result["floors"]["F1"]["runs"] == 10
-    assert result["floors"]["F1"]["fastest_s"] == 100
-
-
-@pytest.mark.asyncio
-async def test_get_dungeon_stats_soopy_with_extra_api(mocker):
-    mock_profile = {
-        "profiles": [
-            {
-                "selected": True,
-                "members": {
-                    "uuid": {
-                        "dungeons": {"catacombs_xp": 10},
-                        "accessory_reforge": {"highest_magical_power": 123},
-                        "kills": {"watcher_summon_undead": 5}
-                    }
-                }
-            }
-        ]
-    }
-    mock_player = {
-        "stats": {
-            "achievements": {
-                "skyblock": {
-                    "dungeon_secrets": 74445
-                }
-            }
-        }
-    }
-    mocker.patch("services.api.get_profile_data", return_value=mock_profile)
-    mocker.patch("services.api.get_soopy_player_data", return_value=mock_player)
-    
-    stats = await api.get_dungeon_stats("uuid")
-    
-    assert stats["magical_power"] == 123
-    assert stats["accessory_bag_storage"]["highest_magical_power"] == 123
-    assert stats["secrets"] == 74445
 
 @pytest.mark.asyncio
 async def test_get_dungeon_stats_ignores_total(mocker):

@@ -73,19 +73,12 @@ class ProfileSelect(Select):
             return
 
         dungeons = member.get("dungeons", {})
-        if "class_levels" in dungeons:
-            class_levels = dungeons.get("class_levels", {})
-            new_classes = {
-                cls: float((class_levels.get(cls) or {}).get("xp", 0) or 0)
-                for cls in ["archer", "berserk", "healer", "mage", "tank"]
-            }
-        else:
-            player_classes = dungeons.get("player_classes", {})
-            new_classes = {
-                cls: data["experience"]
-                for cls, data in player_classes.items()
-                if cls in ["archer", "berserk", "healer", "mage", "tank"]
-            }
+        player_classes = dungeons.get("player_classes", {})
+        new_classes = {
+            cls: data["experience"]
+            for cls, data in player_classes.items()
+            if cls in ["archer", "berserk", "healer", "mage", "tank"]
+        }
 
         if not new_classes:
             await interaction.followup.send("\u274c This profile has no dungeon data.", ephemeral=True)
@@ -100,10 +93,7 @@ class ProfileSelect(Select):
             "mage": perks.get("cold_efficiency", 0) * 0.02,
             "tank": perks.get("diamond_in_the_rough", 0) * 0.02,
         }
-        if "catacombs_xp" in dungeons:
-            new_cata_xp = float(dungeons.get("catacombs_xp", 0) or 0)
-        else:
-            new_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
+        new_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
 
         for p in self.parent_view.profiles_list:
             p["selected"] = (p["cute_name"] == profile_name)
@@ -628,19 +618,12 @@ class Dungeons(commands.Cog):
 
         dungeons = member.get("dungeons", {})
 
-        if "class_levels" in dungeons:
-            class_levels = dungeons.get("class_levels", {})
-            dungeon_classes = {
-                cls: float((class_levels.get(cls) or {}).get("xp", 0) or 0)
-                for cls in ["archer", "berserk", "healer", "mage", "tank"]
-            }
-        else:
-            player_classes = dungeons.get("player_classes", {})
-            dungeon_classes = {
-                cls: data["experience"]
-                for cls, data in player_classes.items()
-                if cls in ["archer", "berserk", "healer", "mage", "tank"]
-            }
+        player_classes = dungeons.get("player_classes", {})
+        dungeon_classes = {
+            cls: data["experience"]
+            for cls, data in player_classes.items()
+            if cls in ["archer", "berserk", "healer", "mage", "tank"]
+        }
 
         if not dungeon_classes:
             embed = discord.Embed(
@@ -725,10 +708,7 @@ class Dungeons(commands.Cog):
         
         log_debug(f"Dungeon XP per run: {dungeon_xp:,.0f}")
         
-        if "catacombs_xp" in dungeons:
-            current_cata_xp = float(dungeons.get("catacombs_xp", 0) or 0)
-        else:
-            current_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
+        current_cata_xp = float(dungeons.get("dungeon_types", {}).get("catacombs", {}).get("experience", 0))
         
         runs_total, results = await simulate_async(dungeon_classes, base_floor, bonuses)
         view = BonusSelectView(

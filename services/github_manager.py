@@ -90,12 +90,8 @@ class GithubManager:
             "data/daily_data.json",
             "data/rng_data.json",
             "data/user_links.json",
-            "data/custom_names.json",
             "data/config.json",
-            "data/solo_clears.json",
             "data/recent_teammates.json",
-            "data/ip_bans.json",
-            "data/irc_history.json",
         ]
         
         files_copied = 0

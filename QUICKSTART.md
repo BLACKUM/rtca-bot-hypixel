@@ -12,7 +12,7 @@ cd rtca-bot-hypixel
 
 ## Configuration
 
-Before running, you need to set up your Discord bot token:
+Before running, you need to set up your Discord bot token and Hypixel API key:
 
 1. **Create the secrets file:**
    
@@ -26,12 +26,14 @@ Before running, you need to set up your Discord bot token:
    copy core\secrets.example.py core\secrets.py
    ```
 
-2. **Edit `core/secrets.py` and add your Discord Bot Token:**
+2. **Edit `core/secrets.py` and add your Discord Bot Token and Hypixel API Key:**
    ```python
    TOKEN = "your_discord_bot_token_here"
+   HYPIXEL_API_KEY = "your_hypixel_api_key_here"
    ```
    
    Get your token from: https://discord.com/developers/applications
+   Get your Hypixel API key from: https://developer.hypixel.net/dashboard
 
 **Note:** The `core/secrets.py` file is not tracked by git for security reasons.
 

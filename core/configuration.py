@@ -12,10 +12,7 @@ class BotConfig:
         self.debug_mode: bool = True
         self.profile_cache_ttl: int = 60
         self.prices_cache_ttl: int = 259200
-        self.irc_channel_id: int = 0
-        self.api_priority: List[str] = ["adjectils", "soopy", "hypixel"]
         self.owner_ids: List[int] = [377351386637271041, 679725029109399574, 827252037380997170]
-        self.require_identity_check: bool = True
         self.congrats_gifs: List[str] = [
             "https://c.tenor.com/n5-r2F_JeGMAAAAd/tenor.gif",
             "https://c.tenor.com/xAW8c7Z8-3cAAAAd/tenor.gif",
@@ -96,11 +93,8 @@ class BotConfig:
             "debug_mode": self.debug_mode,
             "profile_cache_ttl": self.profile_cache_ttl,
             "prices_cache_ttl": self.prices_cache_ttl,
-            "irc_channel_id": self.irc_channel_id,
-            "api_priority": self.api_priority,
             "owner_ids": self.owner_ids,
-            "congrats_gifs": self.congrats_gifs,
-            "require_identity_check": self.require_identity_check
+            "congrats_gifs": self.congrats_gifs
         }
         try:
             os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
@@ -117,12 +111,6 @@ class BotConfig:
         self.debug_mode = data.get("debug_mode", self.debug_mode)
         self.profile_cache_ttl = data.get("profile_cache_ttl", self.profile_cache_ttl)
         self.prices_cache_ttl = data.get("prices_cache_ttl", self.prices_cache_ttl)
-        self.irc_channel_id = data.get("irc_channel_id", self.irc_channel_id)
-        self.require_identity_check = data.get("require_identity_check", self.require_identity_check)
-        if "api_priority" in data:
-            self.api_priority = data["api_priority"]
-        elif "primary_api" in data:
-            self.api_priority = [data["primary_api"]] + [api for api in ["adjectils", "soopy", "hypixel"] if api != data["primary_api"]]
         if "owner_ids" in data:
             self.owner_ids = data["owner_ids"]
         if "congrats_gifs" in data:

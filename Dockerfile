@@ -13,12 +13,11 @@ RUN python -m venv /opt/venv \
 
 FROM python:3.12-slim AS runtime
 
-# git — for the GitHub data backup service; dejavu — fonts for PIL map rendering
+# git — for the GitHub data backup service
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates \
       git \
-      fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/opt/venv/bin:$PATH" \
@@ -42,10 +41,5 @@ RUN groupadd --gid 1000 bot \
  && chown -R bot:bot /app
 
 USER bot
-
-EXPOSE 8080
-
-HEALTHCHECK --interval=60s --timeout=5s --start-period=45s --retries=3 \
-  CMD python -c "import os,sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:' + os.getenv('API_PORT', '8080') + '/', timeout=4).status == 200 else 1)"
 
 CMD ["python", "main.py"]

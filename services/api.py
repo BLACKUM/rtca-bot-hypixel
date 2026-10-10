@@ -5,7 +5,7 @@ import time
 import aiofiles
 from services import json_utils
 from urllib.parse import quote
-from core.config import config
+from core.config import config, HYPIXEL_API_KEY
 from core.game_data import SKELETON_MASTER_CHESTPLATE_50
 
 from core.logger import log_debug, log_error, log_info
@@ -41,6 +41,9 @@ async def close_session():
     log_info("Global API Session closed.")
 
 
+MOJANG_PROFILE_URL = "https://api.mojang.com/users/profiles/minecraft"
+HYPIXEL_BASE_URL = "https://api.hypixel.net/v2"
+
 # cloudflare bypass, i hate i even have to do this
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
@@ -72,12 +75,12 @@ async def get_uuid(name: str):
         
     msg = quote(name)
     try:
-        async with _SESSION.get(f"https://playerdb.co/api/player/minecraft/{msg}") as r:
+        async with _SESSION.get(f"{MOJANG_PROFILE_URL}/{msg}", timeout=aiohttp.ClientTimeout(total=10)) as r:
             if r.status != 200:
                 log_error(f"UUID request failed ({r.status})")
                 return None
-            data = await r.json(loads=json_utils.loads)
-            uuid = data["data"]["player"]["raw_id"]
+            data = await r.json(content_type=None, loads=json_utils.loads)
+            uuid = data["id"]
             log_debug(f"UUID fetched: {uuid}")
             await cache_set(name.lower(), uuid, ttl=config.profile_cache_ttl)
             return uuid
@@ -86,47 +89,9 @@ async def get_uuid(name: str):
          return None
 
 
-async def get_soopy_player_data(uuid: str):
-    cached = await cache_get(f"soopy_player:{uuid}")
-    if cached:
-        return cached
-
-    if not _SESSION:
-        await init_session()
-
-    url = f"https://soopy.dev/api/v2/player/{uuid}"
-    log_debug(f"Requesting player data (soopy.dev): {url}")
-    try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
-            if r.status == 200:
-                data = await r.json(loads=json_utils.loads)
-                if data.get("success") and data.get("data"):
-                    result = data["data"]
-                    await cache_set(f"soopy_player:{uuid}", result, ttl=config.profile_cache_ttl)
-                    return result
-    except Exception as e:
-        log_error(f"soopy.dev player request error: {e}")
-    return None
-
-
-async def get_profile_data(uuid: str):
-
-    cached = await cache_get(uuid)
-    if cached:
-        log_debug(f"Using cached data for {uuid}")
-        return cached
-    if not uuid or len(uuid) != 32 or not all(c in '0123456789abcdefABCDEF' for c in uuid):
-        log_error(f"Invalid UUID format: {uuid}")
-        return None
-
 COOLDOWN_FIRST_429 = 5
 COOLDOWN_SUBSEQUENT_429 = 60
 COOLDOWN_SERVER_ERROR = 30
-
-SOOPY_BASE_URL = "https://soopy.dev/api/v2/player_skyblock"
-PLAIN_DAWN_BASE_URL = "https://plain-dawn-a5d2.ryaneagers2015.workers.dev/hypixel/skyblock/profiles"
-ADJECTILS_BASE_URL = "https://adjectilsbackend.adjectivenoun3215.workers.dev"
-SHIIYU_BASE_URL = "https://sky.shiiyu.moe/api/stats"
 
 class _ApiCooldownTracker:
     def __init__(self):
@@ -155,131 +120,8 @@ class _ApiCooldownTracker:
 
 _api_cooldown = _ApiCooldownTracker()
 
-async def fetch_soterm_profile(uuid: str):
-    url = f"https://api.soterm.workers.dev/v2/skyblock/profiles?uuid={uuid}"
-    log_debug(f"Requesting profile data (soterm): {url}")
-    try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
-            if r.status == 200:
-                _api_cooldown.record_success("soterm")
-                data = await r.json(loads=json_utils.loads)
-                if data:
-                    data["_source"] = "soterm"
-                    return data
-            else:
-                retry_after = int(r.headers.get("Retry-After", 0))
-                _api_cooldown.record_failure("soterm", r.status, retry_after)
-    except asyncio.TimeoutError:
-        _api_cooldown.record_failure("soterm", 408)
-        log_error("Soterm profile request timed out")
-    except Exception as e:
-        _api_cooldown.record_failure("soterm", 500)
-        log_error(f"Soterm profile request error: {e}")
-    return None
-
-
-async def fetch_soopy_profile(uuid: str):
-    url = f"{SOOPY_BASE_URL}/{uuid}"
-    log_debug(f"Requesting profile data (soopy.dev): {url}")
-    try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
-            if r.status == 200:
-                _api_cooldown.record_success("soopy")
-                data = await r.json(loads=json_utils.loads)
-                if data.get("success") and data.get("data"):
-                    return _normalize_soopy(data["data"], uuid)
-                log_error(f"soopy.dev returned success=false for {uuid}")
-            else:
-                retry_after = int(r.headers.get("Retry-After", 0))
-                _api_cooldown.record_failure("soopy", r.status, retry_after)
-    except asyncio.TimeoutError:
-        _api_cooldown.record_failure("soopy", 408)
-        log_error("soopy.dev profile request timed out")
-    except Exception as e:
-        _api_cooldown.record_failure("soopy", 500)
-        log_error(f"soopy.dev profile request error: {e}")
-    return None
-
-async def fetch_plain_dawn_profile(uuid: str):
-    url = f"{PLAIN_DAWN_BASE_URL}/{uuid}"
-    log_debug(f"Requesting profile data (PlainDawn): {url}")
-    try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
-            if r.status == 200:
-                _api_cooldown.record_success("plain_dawn")
-                data = await r.json(loads=json_utils.loads)
-                if data:
-                    data["_source"] = "plain_dawn"
-                    return data
-            else:
-                retry_after = int(r.headers.get("Retry-After", 0))
-                _api_cooldown.record_failure("plain_dawn", r.status, retry_after)
-    except asyncio.TimeoutError:
-        _api_cooldown.record_failure("plain_dawn", 408)
-        log_error("PlainDawn profile request timed out")
-    except Exception as e:
-        _api_cooldown.record_failure("plain_dawn", 500)
-        log_error(f"PlainDawn profile request error: {e}")
-    return None
-async def fetch_adjectils_profile(uuid: str):
-    url = f"{ADJECTILS_BASE_URL}/v2/skyblock/profiles?uuid={uuid}"
-    log_debug(f"Requesting profile data (adjectilsbackend): {url}")
-    headers = {"X-Timestamp": str(int(time.time() * 1000))}
-    try:
-        async with _SESSION.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as r:
-            if r.status == 200:
-                _api_cooldown.record_success("adjectils")
-                data = await r.json(content_type=None, loads=json_utils.loads)
-                if data:
-                    data["_source"] = "adjectils"
-                    return data
-            else:
-                retry_after = int(r.headers.get("Retry-After", 0))
-                _api_cooldown.record_failure("adjectils", r.status, retry_after)
-    except asyncio.TimeoutError:
-        _api_cooldown.record_failure("adjectils", 408)
-        log_error("Adjectils profile request timed out (15s)")
-    except Exception as e:
-        _api_cooldown.record_failure("adjectils", 500)
-        log_error(f"Adjectils profile request error: {e}")
-    return None
-
-
-async def fetch_skycrypt_shiiyu_profile(uuid: str):
-    from services.skycrypt_service import get_skycrypt_profile
-    ign = await get_ign(uuid)
-    if not ign:
-        return None
-    
-    url = f"{SHIIYU_BASE_URL}/{ign}"
-    log_debug(f"Requesting profile data (sky.shiiyu.moe): {url}")
-    try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=20)) as r:
-            if r.status == 200:
-                _api_cooldown.record_success("skycrypt")
-                data = await r.json(content_type=None)
-                if data and "profiles" in data:
-                    data["_source"] = "skycrypt"
-                    return data
-            else:
-                retry_after = int(r.headers.get("Retry-After", 0))
-                _api_cooldown.record_failure("skycrypt", r.status, retry_after)
-    except asyncio.TimeoutError:
-        _api_cooldown.record_failure("skycrypt", 408)
-        log_error("sky.shiiyu.moe profile request timed out")
-    except Exception as e:
-        _api_cooldown.record_failure("skycrypt", 500)
-        log_error(f"sky.shiiyu.moe profile request error: {e}")
-    return None
-
-
 async def fetch_hypixel_profile(uuid: str):
-    from core.config import HYPIXEL_API_KEY
-    if not HYPIXEL_API_KEY:
-        log_debug("Hypixel API Key not configured. Skipping.")
-        return None
-
-    url = f"https://api.hypixel.net/v2/skyblock/profiles?uuid={uuid}"
+    url = f"{HYPIXEL_BASE_URL}/skyblock/profiles?uuid={uuid}"
     log_debug(f"Requesting profile data (Hypixel API): {url}")
     headers = {
         "API-Key": HYPIXEL_API_KEY
@@ -306,18 +148,6 @@ async def fetch_hypixel_profile(uuid: str):
     return None
 
 
-async def get_ign(uuid: str) -> Optional[str]:
-    url = f"https://playerdb.co/api/player/minecraft/{uuid}"
-    try:
-        async with _SESSION.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
-            if r.status == 200:
-                data = await r.json()
-                return data.get("data", {}).get("player", {}).get("username")
-    except Exception:
-        pass
-    return None
-
-
 async def get_profile_data(uuid: str):
     cached = await cache_get(uuid)
     if cached:
@@ -331,114 +161,16 @@ async def get_profile_data(uuid: str):
     if not _SESSION:
         await init_session()
 
-    result = None
-    for api_name in config.api_priority:
-        if _api_cooldown.is_cooling_down(api_name):
-            log_debug(f"Skipping API '{api_name}' (on cooldown)")
-            continue
+    if _api_cooldown.is_cooling_down("hypixel"):
+        log_debug("Skipping Hypixel API (on cooldown)")
+        return None
 
-        if api_name == "plain_dawn":
-            result = await fetch_plain_dawn_profile(uuid)
-        elif api_name == "soterm":
-            result = await fetch_soterm_profile(uuid)
-        elif api_name == "adjectils":
-            result = await fetch_adjectils_profile(uuid)
-        elif api_name == "soopy":
-            result = await fetch_soopy_profile(uuid)
-        elif api_name == "skycrypt":
-            result = await fetch_skycrypt_shiiyu_profile(uuid)
-        elif api_name == "hypixel":
-            result = await fetch_hypixel_profile(uuid)
-            
-        if result:
-            break
-
+    result = await fetch_hypixel_profile(uuid)
     if result:
         await cache_set(uuid, result, ttl=config.profile_cache_ttl)
         return result
     
     return None
-
-
-def _normalize_soopy(data: dict, uuid: str) -> dict:
-    profiles_raw = data.get("profiles", {})
-    current_profile_id = data.get("stats", {}).get("currentProfileId", "")
-    profiles = []
-    for profile_id, profile_info in profiles_raw.items():
-        stats = profile_info.get("stats", {})
-        members_raw = profile_info.get("members", {})
-        members = {}
-        for member_uuid, member_data in members_raw.items():
-            formatted_uuid = (
-                f"{member_uuid[:8]}-{member_uuid[8:12]}-{member_uuid[12:16]}-{member_uuid[16:20]}-{member_uuid[20:]}"
-                if len(member_uuid) == 32 and "-" not in member_uuid else member_uuid
-            )
-            members[formatted_uuid] = member_data
-            members[member_uuid] = member_data
-        profiles.append({
-            "profile_id": profile_id,
-            "cute_name": stats.get("cute_name", ""),
-            "selected": profile_id == current_profile_id,
-            "members": members,
-            "_soopy": True,
-        })
-    return {"profiles": profiles, "_source": "soopy"}
-
-
-def _parse_soopy_dungeon_stats(member: dict, player_data: dict = None) -> dict:
-    dungeons = member.get("dungeons", {})
-    cata_xp = float(dungeons.get("catacombs_xp", 0) or 0)
-
-    class_levels = dungeons.get("class_levels", {})
-    class_xp = {}
-    for cls in ["archer", "berserk", "healer", "mage", "tank"]:
-        cls_data = class_levels.get(cls, {})
-        class_xp[cls.capitalize()] = float((cls_data or {}).get("xp", 0) or 0)
-
-    floor_stats_raw = dungeons.get("floorStats", {})
-    floors = {}
-    floor_key_map = {
-        "e": "Entrance",
-        "f1": "F1", "f2": "F2", "f3": "F3", "f4": "F4",
-        "f5": "F5", "f6": "F6", "f7": "F7",
-        "m1": "M1", "m2": "M2", "m3": "M3", "m4": "M4",
-        "m5": "M5", "m6": "M6", "m7": "M7",
-    }
-    for raw_key, display_key in floor_key_map.items():
-        floor_data = floor_stats_raw.get(raw_key) or {}
-        completions = int(floor_data.get("completions") or 0)
-        s_raw = (floor_data.get("fastest_time_s") or {}).get("raw")
-        s_plus_raw = (floor_data.get("fastest_time_s_plus") or {}).get("raw")
-        floors[display_key] = {
-            "runs": completions,
-            "best_score": int(floor_data.get("best_score") or 0),
-            "fastest_s": int(s_raw) if isinstance(s_raw, (int, float)) and not isinstance(s_raw, bool) else 0,
-            "fastest_s_plus": int(s_plus_raw) if isinstance(s_plus_raw, (int, float)) and not isinstance(s_plus_raw, bool) else 0,
-        }
-
-    kills = member.get("kills", {})
-    blood_mob_kills = int((kills or {}).get("watcher_summon_undead", 0) or 0)
-    
-    secrets = -1
-    if player_data:
-        achievements = player_data.get("stats", {}).get("achievements", {}).get("skyblock", {})
-        secrets = achievements.get("dungeon_secrets", -1)
-
-    accessory_reforge = member.get("accessory_reforge", {})
-    magical_power = int((accessory_reforge or {}).get("highest_magical_power", 0) or 0)
-
-    return {
-        "catacombs": cata_xp,
-        "secrets": secrets,
-        "blood_mob_kills": blood_mob_kills,
-        "classes": class_xp,
-        "floors": floors,
-        "magical_power": magical_power,
-        "accessory_bag_storage": {
-            "highest_magical_power": magical_power
-        }
-    }
-
 
 
 async def _load_prices_from_disk() -> Optional[dict]:
@@ -475,7 +207,7 @@ async def _save_prices_to_disk(prices: dict):
 
 
 async def _fetch_bazaar_prices() -> dict:
-    url = "https://api.hypixel.net/skyblock/bazaar"
+    url = f"{HYPIXEL_BASE_URL}/skyblock/bazaar"
     log_info("Fetching Bazaar prices from API...")
     if not _SESSION:
         await init_session()
@@ -517,8 +249,8 @@ async def get_player_discord(uuid: str) -> Optional[str]:
     if not _SESSION:
         await init_session()
 
-    url = f"{ADJECTILS_BASE_URL}/v2/player?uuid={uuid}"
-    headers = {"X-Timestamp": str(int(time.time() * 1000))}
+    url = f"{HYPIXEL_BASE_URL}/player?uuid={uuid}"
+    headers = {"API-Key": HYPIXEL_API_KEY}
     try:
         async with _SESSION.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as r:
             if r.status != 200:
@@ -536,31 +268,6 @@ async def get_player_discord(uuid: str) -> Optional[str]:
         return None
 
 
-async def fetch_special_price(session, key, url):
-    try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
-            if r.status == 200:
-                data = await r.json(loads=json_utils.loads)
-                price = data.get("median", data.get("min", 0))
-                return key, price
-    except Exception as e:
-        log_error(f"Failed to fetch special price for {key}: {e}")
-    return key, None
-
-
-async def get_special_prices() -> dict:
-    if not _SESSION:
-        await init_session()
-    tasks = [
-        fetch_special_price(_SESSION, "SHINY_NECRON_HANDLE",
-            "https://sky.coflnet.com/api/item/price/NECRON_HANDLE?IsShiny=true"),
-        fetch_special_price(_SESSION, SKELETON_MASTER_CHESTPLATE_50,
-            "https://sky.coflnet.com/api/item/price/SKELETON_MASTER_CHESTPLATE?ItemTier=10-10&NoOtherValuableEnchants=true&BaseStatBoost=50"),
-    ]
-    results = await asyncio.gather(*tasks)
-    return {k: v for k, v in results if v is not None}
-
-
 async def get_all_prices() -> dict:
     global _prices_memory, _prices_fetched_at
 
@@ -575,14 +282,12 @@ async def get_all_prices() -> dict:
         _prices_fetched_at = time.time()
         return _prices_memory
 
-    bz, ah, special = await asyncio.gather(
+    bz, ah = await asyncio.gather(
         _fetch_bazaar_prices(),
         _fetch_ah_prices(),
-        get_special_prices(),
     )
     prices = bz.copy()
     prices.update(ah)
-    prices.update(special)
     if SKELETON_MASTER_CHESTPLATE_50 not in prices:
         prices[SKELETON_MASTER_CHESTPLATE_50] = 40_000_000
 
@@ -626,22 +331,6 @@ async def get_dungeon_runs(uuid: str, profile_name: str = None):
 
     dungeons = member.get("dungeons", {})
 
-    if "floorStats" in dungeons:
-        floor_stats = dungeons.get("floorStats", {})
-        tier_to_floor_soopy = {
-            "f1": "Floor 1 (Bonzo)", "f2": "Floor 2 (Scarf)",
-            "f3": "Floor 3 (Professor)", "f4": "Floor 4 (Thorn)",
-            "f5": "Floor 5 (Livid)", "f6": "Floor 6 (Sadan)",
-            "f7": "Floor 7 (Necron)",
-        }
-        run_counts = {}
-        for floor_key, floor_name in tier_to_floor_soopy.items():
-            normal_runs = int((floor_stats.get(floor_key) or {}).get("completions", 0) or 0)
-            master_key = floor_key.replace("f", "m")
-            master_runs = int((floor_stats.get(master_key) or {}).get("completions", 0) or 0)
-            run_counts[floor_name] = {"normal": normal_runs, "master": master_runs}
-        return run_counts
-
     catacombs_data = dungeons.get("dungeon_types", {}).get("catacombs", {})
     master_catacombs_data = dungeons.get("dungeon_types", {}).get("master_catacombs", {})
     master_completions = master_catacombs_data.get("tier_completions", {})
@@ -674,27 +363,6 @@ async def get_dungeon_xp(uuid: str, profile_name: str = None):
 
     dungeons = member.get("dungeons", {})
 
-    if "catacombs_xp" in dungeons:
-        class_levels = dungeons.get("class_levels", {})
-        class_xp = {
-            cls: float((class_levels.get(cls) or {}).get("xp", 0) or 0)
-            for cls in ["archer", "berserk", "healer", "mage", "tank"]
-        }
-        floor_stats = dungeons.get("floorStats", {})
-        normal_runs = {
-            str(i): int((floor_stats.get(f"f{i}") or {}).get("completions", 0) or 0)
-            for i in range(1, 8)
-        }
-        master_runs = {
-            str(i): int((floor_stats.get(f"m{i}") or {}).get("completions", 0) or 0)
-            for i in range(1, 8)
-        }
-        return {
-            "catacombs": float(dungeons.get("catacombs_xp", 0) or 0),
-            "classes": class_xp,
-            "runs": {"normal": normal_runs, "master": master_runs},
-        }
-
     catacombs = dungeons.get("dungeon_types", {}).get("catacombs", {})
     master_catacombs = dungeons.get("dungeon_types", {}).get("master_catacombs", {})
     cata_xp = float(catacombs.get("experience", 0))
@@ -722,17 +390,6 @@ async def get_dungeon_stats(uuid: str, profile_name: str = None):
         return None
 
     dungeons = member.get("dungeons", {})
-
-    if profile_data.get("_source") == "skycrypt":
-        from services.skycrypt_service import get_dungeon_stats_skycrypt
-        ign = await get_ign(uuid)
-        if ign:
-            return await get_dungeon_stats_skycrypt(ign, profile_name)
-
-    if profile_data.get("_source") == "soopy" or "catacombs_xp" in dungeons:
-        player_data = await get_soopy_player_data(uuid)
-        return _parse_soopy_dungeon_stats(member, player_data)
-
 
     catacombs = dungeons.get("dungeon_types", {}).get("catacombs", {})
     master_catacombs = dungeons.get("dungeon_types", {}).get("master_catacombs", {})
@@ -809,9 +466,5 @@ async def get_recent_runs(uuid: str, profile_name: str = None):
         return []
 
     dungeons = member.get("dungeons", {})
-
-    if isinstance(dungeons.get("treasures"), list):
-        return dungeons.get("treasures", [])
-
     treasures = dungeons.get("treasures", {})
     return treasures.get("runs", [])

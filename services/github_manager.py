@@ -91,7 +91,6 @@ class GithubManager:
             "data/rng_data.json",
             "data/user_links.json",
             "data/config.json",
-            "data/recent_teammates.json",
         ]
         
         files_copied = 0

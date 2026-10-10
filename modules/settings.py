@@ -26,7 +26,7 @@ class ProfileSelect(discord.ui.Select):
             
             desc = []
             if is_tracked:
-                desc.append("Currently Tracking")
+                desc.append("Default Profile")
             
             options.append(discord.SelectOption(
                 label=label,
@@ -55,7 +55,7 @@ class ProfileSelect(discord.ui.Select):
 
 class TrackProfileButton(discord.ui.Button):
     def __init__(self, profile_name: str):
-        super().__init__(label=f"Track '{profile_name}'", style=discord.ButtonStyle.success, custom_id="track_profile")
+        super().__init__(label=f"Use '{profile_name}'", style=discord.ButtonStyle.success, custom_id="track_profile")
         self.profile_name = profile_name
 
     async def callback(self, interaction: discord.Interaction):
@@ -63,18 +63,18 @@ class TrackProfileButton(discord.ui.Button):
         
         viewer_ign = view.bot.link_manager.get_link(interaction.user.id)
         if not viewer_ign:
-             await interaction.response.send_message("❌ You must link your account to track profiles.", ephemeral=True)
+             await interaction.response.send_message("❌ You must link your account to set a default profile.", ephemeral=True)
              return
              
         viewer_uuid = await get_uuid(viewer_ign)
         
         if viewer_uuid != view.uuid:
-             await interaction.response.send_message("❌ You can only track your own profiles.", ephemeral=True)
+             await interaction.response.send_message("❌ You can only set your own default profile.", ephemeral=True)
              return
 
         await view.bot.daily_manager.set_user_profile(interaction.user.id, self.profile_name)
         
-        await interaction.response.send_message(f"✅ Now tracking profile **{self.profile_name}** for leaderboards and daily stats!", ephemeral=True)
+        await interaction.response.send_message(f"✅ **{self.profile_name}** is now your default profile for bot commands!", ephemeral=True)
         
         view.forced_profile = self.profile_name
         view.update_view()
@@ -145,13 +145,13 @@ class ProfileSelectView(AuthorView):
         
         items_footer = []
         if self.forced_profile:
-            items_footer.append(f"Currently tracking: {self.forced_profile}")
+            items_footer.append(f"Default profile: {self.forced_profile}")
         
         if self.forced_profile != cute_name:
              items_footer.append(f"Viewing: {cute_name}")
              
         if not self.forced_profile:
-            items_footer.append("⚠️ No profile selected for tracking.")
+            items_footer.append("⚠️ No default profile selected.")
             
         embed.set_footer(text=" • ".join(items_footer))
             
@@ -227,7 +227,7 @@ class Settings(commands.Cog):
 
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    @app_commands.command(name="profile", description="View profile stats and select which profile to track")
+    @app_commands.command(name="profile", description="View profile stats and select your default profile")
     @app_commands.describe(ign="Minecraft IGN (optional if linked)")
     async def profile(self, interaction: discord.Interaction, ign: str = None):
         if ign is None:

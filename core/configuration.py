@@ -10,7 +10,7 @@ class BotConfig:
         self.xp_per_run_default: float = 300000.0
         self.target_level: int = 50
         self.debug_mode: bool = True
-        self.profile_cache_ttl: int = 60
+        self.profile_cache_ttl: int = 300
         self.prices_cache_ttl: int = 259200
         self.owner_ids: List[int] = [377351386637271041, 679725029109399574, 827252037380997170]
         self.congrats_gifs: List[str] = [

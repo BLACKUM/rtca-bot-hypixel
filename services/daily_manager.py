@@ -2,16 +2,9 @@ from services import json_utils as json
 import os
 import time
 import aiofiles
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
-from core.logger import log_info, log_error, log_debug
-from core.config import config
-from services.xp_calculations import get_dungeon_level
-from services.api import get_uuid, get_dungeon_xp
-from datetime import timedelta
-import asyncio
-import random
-from services.xp_calculations import get_dungeon_level, get_class_average
+from typing import List, Optional, Tuple
+from core.logger import log_info, log_error
+from services.api import get_uuid
 
 DAILY_DATA_FILE = "data/daily_data.json"
 
@@ -20,87 +13,10 @@ DAILY_DATA_FILE = "data/daily_data.json"
 class DailyManager:
     def __init__(self):
         self.data = {
-            "users": {},
-            "daily_snapshots": {},
-            "monthly_snapshots": {},
-            "current_xp": {},
-            "last_daily_reset": 0,
-            "last_monthly_reset": 0,
-            "last_updated": 0
+            "users": {}
         }
     async def initialize(self):
         await self.load_data()
-
-    def get_reset_timestamps(self) -> Tuple[int, int]:
-        now = datetime.now(timezone.utc)
-        target_daily = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        next_daily_ts = int(target_daily.timestamp())
-        
-        if now.month == 12:
-            target_monthly = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:
-            target_monthly = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        next_monthly_ts = int(target_monthly.timestamp())
-        
-        return next_daily_ts, next_monthly_ts
-
-    async def force_update_all(self, status_message=None, force=False):
-        tracked_users = self.get_tracked_users()
-        total_users = len(tracked_users)
-        
-        now = int(time.time())
-        last_updated = self.data.get("last_updated", 0)
-        
-        if not force and now - last_updated < 86400:
-            log_debug(f"Skipping daily update (last updated {now - last_updated}s ago)")
-            if status_message:
-                 try:
-                     await status_message.edit(content=f"✅ Daily stats already up to date (Updated <t:{last_updated}:R>)")
-                 except: pass
-            return 0, 0, total_users
-        
-        log_info(f"Starting stats update for {total_users} users (Forced: {force})")
-        
-        if total_users == 0:
-            return 0, 0, 0 # updated, errors, total
-            
-        updated_count = 0
-        errors = 0
-        processed_count = 0
-        
-        for user_id, uuid in tracked_users:
-            try:
-                if not uuid:
-                    log_error(f"Skipping update for {user_id}: No UUID")
-                    errors += 1
-                else:
-                    forced_profile = self.data["users"].get(user_id, {}).get("forced_profile")
-                    xp_data = await get_dungeon_xp(uuid, profile_name=forced_profile)
-                    if xp_data:
-                        await self.update_user_data(user_id, xp_data, save=False)
-                        updated_count += 1
-                    else:
-                        errors += 1
-            except Exception as e:
-                log_error(f"Error updating user {user_id}: {e}")
-                errors += 1
-            finally:
-                processed_count += 1
-                if status_message and (processed_count <= 5 or processed_count % 5 == 0 or processed_count == total_users):
-                    try:
-                        await status_message.edit(
-                            content=f"🔄 **Force Update In Progress**\nProcessing: {processed_count}/{total_users}\nUpdated: {updated_count}\nErrors: {errors}"
-                        )
-                    except Exception:
-                        pass
-            
-            await asyncio.sleep(0.25)
-
-        if updated_count > 0:
-            await self._save_data()
-            log_info(f"Saved daily data for {updated_count} updated users.")
-                
-        return updated_count, errors, total_users
 
     async def load_data(self):
         if not os.path.exists(DAILY_DATA_FILE):
@@ -141,7 +57,7 @@ class DailyManager:
                 "forced_profile": None
             }
             await self._save_data()
-            log_info(f"Registered user {ign} ({user_id}) for daily tracking.")
+            log_info(f"Registered user {ign} ({user_id}).")
         elif self.data["users"][user_id]["ign"] != ign:
              self.data["users"][user_id]["ign"] = ign
              await self._save_data()
@@ -149,163 +65,15 @@ class DailyManager:
     def get_tracked_users(self) -> List[Tuple[str, str]]:
         return [(uid, info["uuid"]) for uid, info in self.data["users"].items()]
 
-    def get_user_id_by_ign(self, ign: str) -> Optional[str]:
-        for user_id, info in self.data["users"].items():
-            if info["ign"].lower() == ign.lower():
-                return user_id
-        return None
-
     async def set_user_profile(self, user_id: str, profile_name: Optional[str]):
         user_id = str(user_id)
         if user_id not in self.data["users"]:
             return False
         
         self.data["users"][user_id]["forced_profile"] = profile_name
-        
-        # Reset snapshots to prevent phantom XP gains
-        if user_id in self.data["current_xp"]:
-            self.data["daily_snapshots"][user_id] = self.data["current_xp"][user_id]
-            self.data["monthly_snapshots"][user_id] = self.data["current_xp"][user_id]
-            
         await self._save_data()
         log_info(f"Set forced profile for {user_id} to {profile_name}")
         return True
-
-    async def update_user_data(self, user_id: str, xp_data: dict, save: bool = True):
-        user_id = str(user_id)
-        now = int(time.time())
-        
-        self.data["current_xp"][user_id] = {
-            "timestamp": now,
-            "cata_xp": xp_data["catacombs"],
-            "classes": xp_data["classes"],
-            "runs": xp_data.get("runs", {"normal": {}, "master": {}})
-        }
-        
-        if user_id not in self.data["daily_snapshots"]:
-             self.data["daily_snapshots"][user_id] = self.data["current_xp"][user_id]
-        elif "runs" not in self.data["daily_snapshots"][user_id]:
-             self.data["daily_snapshots"][user_id]["runs"] = self.data["current_xp"][user_id]["runs"]
-        
-        if user_id not in self.data["monthly_snapshots"]:
-             self.data["monthly_snapshots"][user_id] = self.data["current_xp"][user_id]
-        elif "runs" not in self.data["monthly_snapshots"][user_id]:
-             self.data["monthly_snapshots"][user_id]["runs"] = self.data["current_xp"][user_id]["runs"]
-             
-        self.data["last_updated"] = now
-        if save:
-            await self._save_data()
-
-    async def check_resets(self):
-        now = datetime.now(timezone.utc)
-        
-        last_reset_ts = self.data.get("last_daily_reset", 0)
-        last_reset_date = datetime.fromtimestamp(last_reset_ts, timezone.utc)
-        
-        if now.date() > last_reset_date.date():
-            log_info("Performing Daily Reset...")
-            self.data["daily_snapshots"] = self.data["current_xp"].copy()
-            self.data["last_daily_reset"] = int(now.timestamp())
-        await self._save_data()
-             
-        last_month_ts = self.data.get("last_monthly_reset", 0)
-        last_month_date = datetime.fromtimestamp(last_month_ts, timezone.utc)
-        
-        if now.month != last_month_date.month or now.year != last_month_date.year:
-            log_info("Performing Monthly Reset...")
-            self.data["monthly_snapshots"] = self.data["current_xp"].copy()
-            self.data["last_monthly_reset"] = int(now.timestamp())
-            await self._save_data()
-
-    def get_last_updated(self) -> int:
-        return self.data.get("last_updated", 0)
-
-    def get_daily_stats(self, user_id: str):
-        return self._calculate_stats(user_id, "daily_snapshots")
-
-    def get_monthly_stats(self, user_id: str):
-        return self._calculate_stats(user_id, "monthly_snapshots")
-
-    def _calculate_stats(self, user_id: str, snapshot_key: str):
-        user_id = str(user_id)
-        current = self.data["current_xp"].get(user_id)
-        start = self.data[snapshot_key].get(user_id)
-        
-        if not current or not start:
-            return None
-            
-        stats = {
-            "cata_gained": current["cata_xp"] - start["cata_xp"],
-            "cata_start_xp": start["cata_xp"],
-            "cata_current_xp": current["cata_xp"],
-            "cata_start_lvl": get_dungeon_level(start["cata_xp"]),
-            "cata_current_lvl": get_dungeon_level(current["cata_xp"]),
-            "cata_current_lvl": get_dungeon_level(current["cata_xp"]),
-            "classes": {},
-            "runs": {"normal": {}, "master": {}}
-        }
-        
-        current_runs = current.get("runs", {"normal": {}, "master": {}})
-        start_runs = start.get("runs", {"normal": {}, "master": {}})
-        
-        for type_key in ["normal", "master"]:
-            c_runs = current_runs.get(type_key, {})
-            s_runs = start_runs.get(type_key, {})
-            all_floors = set(c_runs.keys()) | set(s_runs.keys())
-            
-            for floor in all_floors:
-                c_val = int(c_runs.get(floor, 0))
-                s_val = int(s_runs.get(floor, 0))
-                diff = c_val - s_val
-                if diff > 0:
-                    stats["runs"][type_key][floor] = diff
-        
-        for cls, xp in current["classes"].items():
-            start_xp = start["classes"].get(cls, 0)
-            stats["classes"][cls] = {
-                "gained": xp - start_xp,
-                "start_xp": start_xp,
-                "current_xp": xp,
-                "start_lvl": get_dungeon_level(start_xp),
-                "current_lvl": get_dungeon_level(xp)
-            }
-            
-        return stats
-
-    def get_leaderboard(self, type="daily", metric="xp"):
-        snapshot_key = "daily_snapshots" if type == "daily" else "monthly_snapshots"
-        leaderboard_map = {}
-        
-        for user_id, info in self.data["users"].items():
-            stats = self._calculate_stats(user_id, snapshot_key)
-            if stats:
-                ign = info["ign"]
-                val = 0
-                
-                if metric == "runs":
-                    if "runs" in stats:
-                        for cat in ["normal", "master"]:
-                            for count in stats["runs"].get(cat, {}).values():
-                                val += count
-                elif metric.startswith("runs_"):
-                    try:
-                        _, m_type, m_floor = metric.split("_", 2)
-                        val = stats.get("runs", {}).get(m_type, {}).get(m_floor, 0)
-                    except:
-                        val = 0
-                else:
-                    val = stats["cata_gained"]
-
-                if ign not in leaderboard_map or val > leaderboard_map[ign]["gained"]:
-                    leaderboard_map[ign] = {
-                        "ign": ign,
-                        "gained": val,
-                        "user_id": user_id
-                    }
-        
-        leaderboard = list(leaderboard_map.values())
-        leaderboard.sort(key=lambda x: x["gained"], reverse=True)
-        return leaderboard
 
     async def sanitize_data(self):
         sanitize_stamp = "data/.last_sanitize"

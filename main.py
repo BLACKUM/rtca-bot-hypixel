@@ -1,3 +1,4 @@
+import discord
 from discord.ext import commands, tasks
 from discord.errors import DiscordServerError
 from core.config import TOKEN, INTENTS, validate_config
@@ -5,7 +6,6 @@ from core.logger import log_info, log_error
 from services.daily_manager import DailyManager
 from services.rng_manager import RngManager
 from services.link_manager import LinkManager
-from services.recent_manager import RecentManager
 from services.api import init_session, close_session
 from services.github_manager import GithubManager
 from core.cache import initialize as init_cache, shutdown as shutdown_cache
@@ -26,34 +26,13 @@ class RTCABot(commands.Bot):
             await load_extensions()
             self._extensions_loaded = True
 
-bot = RTCABot(command_prefix="!", intents=INTENTS)
+# Hypixel API policy: the product must state it is not affiliated with or endorsed by Hypixel.
+bot = RTCABot(command_prefix="!", intents=INTENTS, activity=discord.CustomActivity(name="Not affiliated with or endorsed by Hypixel"))
 
 bot.daily_manager = DailyManager()
 bot.rng_manager = RngManager()
 bot.link_manager = LinkManager()
-bot.recent_manager = RecentManager()
 bot.github_manager = GithubManager()
-
-@tasks.loop(hours=2)
-async def track_daily_stats():
-    try:
-        log_info("Running scheduled daily stats update...")
-
-        await bot.daily_manager.check_resets()
-
-        users = bot.daily_manager.get_tracked_users()
-        if not users:
-            return
-
-        updated, errors, total = await bot.daily_manager.force_update_all()
-
-        if updated > 0:
-            log_info(f"Daily stats update completed: {updated}/{total} updated, {errors} errors.")
-        else:
-            log_info("Daily stats update skipped or completed with no changes.")
-    except Exception as e:
-        log_error(f"Unhandled exception in track_daily_stats loop: {e}")
-        log_error(traceback.format_exc())
 
 @tasks.loop(hours=24)
 async def backup_github():
@@ -70,9 +49,6 @@ async def backup_github():
 
 @bot.listen()
 async def on_ready():
-    if not track_daily_stats.is_running():
-        track_daily_stats.start()
-
     if bot.github_manager.is_enabled() and not backup_github.is_running():
         backup_github.start()
 
@@ -105,7 +81,6 @@ async def start_services():
     await bot.link_manager.initialize()
     await bot.daily_manager.initialize()
     await bot.rng_manager.initialize()
-    await bot.recent_manager.initialize()
     await bot.daily_manager.sanitize_data()
     bot._services_started = True
     await load_extensions()

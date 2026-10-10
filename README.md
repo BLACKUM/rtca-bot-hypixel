@@ -1,11 +1,11 @@
 # rtca-bot-hypixel
-Discord bot for calculating class average 50 in Hypixel SkyBlock, tracking RNG drops, and monitoring daily XP gains.
+Discord bot for calculating class average 50 in Hypixel SkyBlock and tracking RNG drops.
 
 ## Features
 
 - **Class Average 50 Simulation**: calculation of how many runs are needed to reach class average 50.
 - **RNG Drop Tracker**: Track your rare dungeon drops, calculate total profit, and view profit-per-run.
-- **XP Leaderboards**: Daily and Monthly leaderboards for Catacombs XP gains among tracked users.
+- **Recent Teammates**: See who you played with in the runs Hypixel currently reports for your profile.
 - **Profile Linking**: Link your Discord account to your Hypixel IGN for seamless command usage.
 - **Admin Panel**: Comprehensive dashboard for bot management, system operations, and configuration editing.
 
@@ -17,18 +17,16 @@ Discord bot for calculating class average 50 in Hypixel SkyBlock, tracking RNG d
     - `floor`: Dungeon floor to simulate (e.g., M7, F7). Default is M7.
 - `/rng`: Open the RNG Drop Tracker interface.
     - View drops, set counts, and see profit estimates (needs linked account for profit calculation).
-- `/daily`: View functionality for daily stats.
-    - **Leaderboard**: Top users by XP gained today.
-    - **Monthly**: Top users by XP gained this month.
-    - **Personal**: Your own detailed daily/monthly stats (includes class increments).
+- `/dungeons [ign]`: View dungeon stats and class levels.
+- `/recent [ign]`: View teammates from your recent runs.
+- `/profile [ign]`: View profile stats and pick your default profile.
 - `/link <ign>`: Link your Discord account to a Hypixel username.
 - `/unlink`: Unlink your current account.
 
 ### Owner Only
 - `/admin`: Opens the Administration Panel.
     - **Dungeons**: Manage default simulation settings.
-    - **Leaderboard**: Add users and force updates.
-    - **Data**: View linked and tracked users.
+    - **Data**: View linked and registered users.
     - **Config**: Edit bot configuration on the fly.
     - **System**: Update, Restart, Shutdown, Get Logs, and view Host Info.
 

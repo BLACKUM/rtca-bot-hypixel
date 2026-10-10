@@ -36,7 +36,7 @@ async def test_get_uuid_fetch(mocker):
     
     uuid = await api.get_uuid("Player")
     assert uuid == "real_uuid"
-    mock_set.assert_called_with("player", "real_uuid", ttl=pytest.approx(60))
+    mock_set.assert_called_with("player", "real_uuid", ttl=pytest.approx(300))
 
 @pytest.mark.asyncio
 async def test_get_profile_data(mocker):

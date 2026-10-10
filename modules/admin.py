@@ -39,47 +39,6 @@ class EmbedPaginatorView(AuthorView):
             self._update_buttons()
             await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
-class AddUserModal(Modal):
-    def __init__(self, bot):
-        super().__init__(title="Add User to Daily Leaderboard")
-        self.bot = bot
-        
-        self.ign_input = TextInput(
-            label="Minecraft IGN",
-            placeholder="Enter IGN...",
-            required=True,
-            max_length=16
-        )
-        self.user_id_input = TextInput(
-            label="Discord User ID",
-            placeholder="Enter Discord User ID...",
-            required=True,
-             max_length=20
-        )
-        self.add_item(self.ign_input)
-        self.add_item(self.user_id_input)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        ign = self.ign_input.value
-        user_id = self.user_id_input.value
-        
-        try:
-             int(user_id)
-        except ValueError:
-             await interaction.response.send_message("❌ Invalid Discord User ID.", ephemeral=True)
-             return
-
-        await interaction.response.defer(ephemeral=True)
-        
-        uuid = await get_uuid(ign)
-        if not uuid:
-             await interaction.followup.send(f"❌ Could not find UUID for IGN: `{ign}`")
-             return
-             
-        await self.bot.daily_manager.register_user(user_id, ign, uuid)
-        await interaction.followup.send(f"✅ Manually registered User <@{user_id}> as `{ign}` for daily tracking.")
-
-
 class ForceLinkModal(Modal):
     def __init__(self, bot):
         super().__init__(title="Force Link User")
@@ -375,26 +334,6 @@ class SystemSelect(Select):
              await interaction.followup.send(embed=embed)
 
 
-class LeaderboardAdminView(AuthorView):
-    def __init__(self, bot):
-        super().__init__(timeout=180)
-        self.bot = bot
-    
-    @discord.ui.button(label="Add User", style=discord.ButtonStyle.success, emoji="➕")
-    async def add_user(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(AddUserModal(self.bot))
-
-    @discord.ui.button(label="Force Update", style=discord.ButtonStyle.danger, emoji="⚡")
-    async def force_update(self, interaction: discord.Interaction, button: discord.ui.Button):
-         await interaction.response.defer(ephemeral=False)
-         try:
-            base_msg = await interaction.followup.send("🔄 Starting Force Update...")
-            updated, errors, total = await self.bot.daily_manager.force_update_all(base_msg, force=True)
-            await base_msg.edit(content=f"✅ **Force Update Complete**\nTotal: {total}\nUpdated: {updated}\nErrors: {errors}")
-         except Exception as e:
-             log_error(f"Admin force update failed: {e}")
-             await interaction.followup.send("❌ Error during update.")
-
 class DataAdminView(AuthorView):
     def __init__(self, bot):
         super().__init__(timeout=180)
@@ -418,13 +357,13 @@ class DataAdminView(AuthorView):
              
          await interaction.response.send_message(embed=embeds[0], ephemeral=True)
 
-    @discord.ui.button(label="Tracked Users", style=discord.ButtonStyle.primary, emoji="📊")
+    @discord.ui.button(label="Registered Users", style=discord.ButtonStyle.primary, emoji="📊")
     async def tracked_users(self, interaction: discord.Interaction, button: discord.ui.Button):
          users = self.bot.daily_manager.get_tracked_users()
          daily_data = self.bot.daily_manager.data["users"]
          
          if not users:
-              await interaction.response.send_message("No tracked users.", ephemeral=True)
+              await interaction.response.send_message("No registered users.", ephemeral=True)
               return
 
          lines = []
@@ -436,7 +375,7 @@ class DataAdminView(AuthorView):
 
          embeds = []
          for i, chunk in enumerate(chunks):
-             embed = discord.Embed(title=f"Tracked Users ({len(users)}) - Page {i+1}/{len(chunks)}", color=0xFFA500)
+             embed = discord.Embed(title=f"Registered Users ({len(users)}) - Page {i+1}/{len(chunks)}", color=0xFFA500)
              embed.description = "\n".join(chunk)
              embeds.append(embed)
 
@@ -457,7 +396,6 @@ class DataAdminView(AuthorView):
             else:
                 await msg.edit(content=f"❌ **Backup Failed:** {message}")
         except Exception as e:
-            from core.logger import log_error
             log_error(f"Manual GitHub backup failed: {e}")
             await interaction.followup.send("❌ Error during backup process.")
 
@@ -474,12 +412,6 @@ class AdminView(AuthorView):
         embed = view._create_embed()
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         view.message = await interaction.original_response()
-
-    @discord.ui.button(label="Leaderboard", style=discord.ButtonStyle.primary, emoji="🏆", row=0)
-    async def leaderboard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = LeaderboardAdminView(self.bot)
-        view.author_id = self.author_id
-        await interaction.response.send_message("🏆 **Leaderboard Admin**", view=view, ephemeral=True)
 
     @discord.ui.button(label="Data", style=discord.ButtonStyle.secondary, emoji="📁", row=0)
     async def data(self, interaction: discord.Interaction, button: discord.ui.Button):
